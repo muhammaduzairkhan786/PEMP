@@ -1,0 +1,15 @@
+# macOS
+.DS_Store
+
+# Office temp/lock files
+~$*.docx
+~$*.doc
+
+# Editor / IDE
+.vscode/
+.idea/
+
+# Logs & local env
+*.log
+.env
+.env.local
