@@ -13,3 +13,9 @@
 *.log
 .env
 .env.local
+
+# .NET build output
+[Bb]in/
+[Oo]bj/
+*.user
+TestResults/

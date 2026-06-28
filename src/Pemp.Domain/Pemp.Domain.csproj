@@ -1,0 +1,3 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Domain core: pure C#, no framework/cloud dependencies. -->
+</Project>
