@@ -18,6 +18,12 @@ body{font-family:var(--font-sans);background:var(--canvas);color:var(--ink);font
   grid-template-areas:"brand topbar" "nav main";height:100vh;overflow:hidden;
   transition:background var(--dur-base),color var(--dur-base)}
 .mono{font-family:var(--font-mono)}.muted{color:var(--ink-muted)}
+/* a11y: visible focus + screen-reader-only text */
+:focus-visible{outline:2px solid var(--brand-glow);outline-offset:2px;border-radius:4px}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+@media (prefers-reduced-motion: reduce){
+  .node.current .bead,.node.justunlocked .bead,.reauth .key{animation:none!important}
+}
 
 .brandcell{grid-area:brand;background:var(--surface);border-right:1px solid var(--border);border-bottom:1px solid var(--border);
   display:flex;align-items:center;gap:10px;padding:0 var(--space-4)}
@@ -35,7 +41,7 @@ body{font-family:var(--font-sans);background:var(--canvas);color:var(--ink);font
 .spacer{margin-left:auto}
 .rolesel{background:var(--surface-raised);color:var(--ink);border:1px solid var(--border-strong);border-radius:var(--radius-pill);
   padding:5px 12px;font-family:inherit;font-size:var(--text-xs);cursor:pointer}
-.kbd{font-size:var(--text-xs);color:var(--ink-muted);border:1px solid var(--border);border-radius:var(--radius-sm);padding:3px 8px;cursor:pointer}
+.kbd{font-size:var(--text-xs);color:var(--ink-muted);background:var(--surface);font-family:inherit;border:1px solid var(--border);border-radius:var(--radius-sm);padding:3px 8px;cursor:pointer}
 .kbd:hover{color:var(--ink);border-color:var(--border-strong)}
 
 /* spine (master + sub share this) */
@@ -189,21 +195,22 @@ table.t tr:hover td{background:var(--surface-raised)}
     <span id="ctxLabel" class="eyebrow">Engagement</span>
     <span id="ctxBody" style="display:contents"></span>
     <span class="spacer"></span>
+    <label class="sr-only" for="roleSel">Switch role</label>
     <select class="rolesel" id="roleSel"></select>
-    <span class="kbd" id="kbtn">⌘K</span>
-    <span class="kbd" id="themeBtn">◐ Theme</span>
+    <button type="button" class="kbd" id="kbtn" aria-label="Open command palette">⌘K</button>
+    <button type="button" class="kbd" id="themeBtn" aria-label="Toggle light or dark theme">◐ Theme</button>
   </div>
   <div class="spine master" id="masterSpine"></div>
 </header>
 
-<nav id="nav"></nav>
+<nav id="nav" role="tablist" aria-label="Sections"></nav>
 <main id="main"></main>
 
-<div class="scrim" id="gate"><div class="modal" id="gateModal"></div></div>
-<div class="toast" id="toast"><span class="tick">🔗✓</span> <span id="toastMsg"></span></div>
-<div class="palette" id="palette"><div class="pbox">
-  <input id="pinput" placeholder="Search engagements, findings, or type an action…" autocomplete="off">
-  <div class="presults" id="presults"></div>
+<div class="scrim" id="gate"><div class="modal" id="gateModal" role="dialog" aria-modal="true" aria-labelledby="gateTitle"></div></div>
+<div class="toast" id="toast" role="status" aria-live="polite"><span class="tick">🔗✓</span> <span id="toastMsg"></span></div>
+<div class="palette" id="palette" role="dialog" aria-modal="true" aria-label="Command palette"><div class="pbox">
+  <input id="pinput" role="combobox" aria-expanded="true" aria-controls="presults" aria-label="Search engagements, findings, or type an action" placeholder="Search engagements, findings, or type an action…" autocomplete="off">
+  <div class="presults" id="presults" role="listbox" aria-label="Results"></div>
   <div class="pfoot"><span>↑↓ move</span><span>↵ run</span><span>esc close</span><span style="margin-left:auto">RBAC-scoped to your role · §13</span></div>
 </div></div>
 
@@ -263,10 +270,11 @@ function glyph(s){return s==='done'?'✓':s==='locked'?'🔒':'';}
 function renderSpine(el,nodes,nav){
   el.innerHTML=nodes.map(n=>{
     const navable = nav && n.tab && ROLES[role].tabs.includes(n.tab);
-    return `<div class="node ${n.s} ${navable?'nav':''}" ${navable?`data-tab="${n.tab}"`:''}>
-      <div class="connector"></div><div class="bead">${glyph(n.s)}</div><div class="lbl">${n.l}</div></div>`;
+    const a11y = navable?`data-tab="${n.tab}" role="button" tabindex="0" aria-label="Go to ${n.l}"`:`aria-label="${n.l}: ${n.s}"`;
+    return `<div class="node ${n.s} ${navable?'nav':''}" ${a11y}>
+      <div class="connector"></div><div class="bead" aria-hidden="true">${glyph(n.s)}</div><div class="lbl">${n.l}</div></div>`;
   }).join('');
-  if(nav) el.querySelectorAll('.node.nav').forEach(x=>x.onclick=()=>go(x.dataset.tab));
+  if(nav) el.querySelectorAll('.node.nav').forEach(x=>{const f=()=>go(x.dataset.tab);x.onclick=f;x.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();f();}};});
 }
 function pct(flow){const d=flow.filter(f=>f.s==='done').length;return Math.round(100*d/flow.length);}
 
@@ -289,11 +297,11 @@ function renderNav(){
   nav.innerHTML=ROLES[role].tabs.map(t=>{
     const flow=FLOW[`${role}:${t}`], locked=LOCKED[`${role}:${t}`], active=t===tab;
     const count = locked?'<span class="count">🔒</span>' : flow?`<span class="count">${pct(flow)}%</span>`:'';
-    return `<div class="navtab ${active?'active':''} ${locked?'lockedtab':''}" data-tab="${t}">
-      <div class="top"><span class="ico">${ICON[t]||'•'}</span> ${LABEL[t]} ${count}</div>
+    return `<div class="navtab ${active?'active':''} ${locked?'lockedtab':''}" data-tab="${t}" role="tab" tabindex="0" aria-selected="${active}" ${locked?'aria-disabled="true"':''}>
+      <div class="top"><span class="ico" aria-hidden="true">${ICON[t]||'•'}</span> ${LABEL[t]} ${count}</div>
       ${flow?`<div class="subbar"><i style="width:${locked?6:pct(flow)}%"></i></div>`:''}</div>`;
   }).join('')+`<div class="navfoot">${ROLES[role].name} · ${ROLES[role].person}</div>`;
-  nav.querySelectorAll('.navtab').forEach(n=>n.onclick=()=>go(n.dataset.tab));
+  nav.querySelectorAll('.navtab').forEach(n=>{const f=()=>go(n.dataset.tab);n.onclick=f;n.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();f();}};});
 }
 function renderMain(){
   const flow=FLOW[fk()];
@@ -309,8 +317,9 @@ const head=(t,s)=>`<div class="eyebrow">${ROLES[role].name}</div><h1 class="titl
 const nextCard=(t,o,srs,locked,btn,fn)=>`<div class="card nextaction"><div style="font-size:26px">${locked?'🔒':'▸'}</div>
   <div class="meta"><b>${t}</b><span class="muted">${o} · <span class="srs">${srs}</span></span>${locked?'<div class="lockline">Unlocks earlier in the flow</div>':''}</div>
   ${btn?`<button class="btn primary" onclick="${fn}">${btn}</button>`:''}</div>`;
-const arow=(d,v,t,r,sc,sl,b,fn)=>`<div class="row actionable"><span class="dot ${d}"></span><div class="grow"><span class="verb">${v}</span> · ${t}<br><span class="ref">${r}</span></div><span class="sla ${sc}">${sl}</span><button class="btn primary" onclick="${fn}">${b}</button></div>`;
-const wrow=(d,v,t,m)=>`<div class="row waiting"><span class="dot ${d}"></span><div class="grow"><span class="verb">${v}</span> · ${t}<br><span class="ref">${m}</span></div><span class="nudge">Nudge</span></div>`;
+const PRI={crit:'Critical',high:'High',med:'Medium',low:'Low'};
+const arow=(d,v,t,r,sc,sl,b,fn)=>`<div class="row actionable"><span class="dot ${d}" role="img" aria-label="${PRI[d]} priority"></span><div class="grow"><span class="verb">${v}</span> · ${t}<br><span class="ref">${r}</span></div><span class="sla ${sc}">${sl}</span><button class="btn primary" onclick="${fn}">${b}</button></div>`;
+const wrow=(d,v,t,m)=>`<div class="row waiting"><span class="dot ${d}" role="img" aria-label="${PRI[d]} priority"></span><div class="grow"><span class="verb">${v}</span> · ${t}<br><span class="ref">${m}</span></div><span class="nudge">Nudge</span></div>`;
 const tile=(k,v,t,cls)=>`<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="t ${cls||''}">${t}</div></div>`;
 const stub=()=>`<div class="empty">This surface follows the same pattern — sub-spine + one primary action + role-filtered content.<br><span style="font-size:var(--text-xs)">Representative screen.</span></div>`;
 
@@ -334,7 +343,7 @@ const BODY={
   <div class="q" style="border:none"><b>API</b> — Rate-limit thresholds <span class="pill done">Captured ✓</span></div>
   <p class="muted" style="margin-top:10px;font-size:var(--text-sm)">Prefilled from ENG-2025-0331 · <span class="srs">FR-SCO-04</span></p></div>`,
 'tester:sow':()=>head('Statement of Work','Auto-drafted from the assessment — sign to unlock testing.')+
-  nextCard('Sign the Statement of Work','Owner: You (issuing to Acme)','FR-SOW-06',false,'Review & Sign SoW ▶','openGate("sign")')+
+  nextCard('Sign the Statement of Work','Owner: You (issuing to Acme)','FR-SOW-06',false,'Review & Sign SoW ▶',"openGate('sign')")+
   `<div class="card"><div class="sectionlabel" style="margin-top:0">Draft v3 <span class="srs">FR-SOW-01</span></div>
   <p><b>1. Scope:</b> Claims Portal web + API · <b>2. Methodology:</b> OWASP ASVS<br><b>3. Dates:</b> 14–25 Jul 2026 · <b>4. Prerequisites:</b> 3 test accounts, VPN</p>
   <div class="lockline">🔒 Testing stays locked until signed <span class="srs">FR-SOW-06</span></div></div>`,
@@ -352,7 +361,7 @@ const BODY={
   (LOCKED['tester:findings']?`<div class="lockbanner">🔒 Unlocks after access is verified and testing starts.</div>`:'')+registerTable(LOCKED['tester:findings']),
 'tester:reports':()=>head('Reporting',LOCKED['tester:reports']?'Locked — opens when findings are drafted.':'Assemble, peer-review, release.')+
   (LOCKED['tester:reports']?`<div class="lockbanner">🔒 Unlocks once findings exist to draft.</div>`:'')+
-  nextCard('Release final report','Owner: You → peer → Acme','FR-REP-02',LOCKED['tester:reports'],LOCKED['tester:reports']?'':'Release ▶','openGate("release")')+
+  nextCard('Release final report','Owner: You → peer → Acme','FR-REP-02',LOCKED['tester:reports'],LOCKED['tester:reports']?'':'Release ▶',"openGate('release')")+
   `<div class="card" style="${LOCKED['tester:reports']?'opacity:.55':''}"><div class="sectionlabel" style="margin-top:0">Assembled from engagement + findings <span class="srs">FR-REP-01</span></div>
   <p>Exec summary · 7 findings · register snapshot · appendix</p><div class="lockline">🔒 QA GATE: peer review before release <span class="srs">FR-REP-02</span></div></div>`,
 
@@ -370,7 +379,7 @@ const BODY={
   <div class="q" style="border:none">Tested 4 months ago (ENG-2025-0331). <button class="btn ghost">Reuse & prefill</button> <span class="srs">FR-REQ-05</span></div></div>`,
 'acme:engagements':()=>head('Engagements','Every engagement, one consistent story.')+engCards(),
 'acme:approvals':()=>head('Approvals','Sign-offs queued — each opens the gate ceremony.')+
-  nextCard('Review & sign SoW','Claims Portal · ENG-2026-0412','FR-SOW-05',false,'Review & Sign SoW ▶','openGate("sign")')+
+  nextCard('Review & sign SoW','Claims Portal · ENG-2026-0412','FR-SOW-05',false,'Review & Sign SoW ▶',"openGate('sign')")+
   `<div class="card"><div class="q">Claims Portal · v3 <span class="pill retest">awaiting you</span></div><div class="q" style="border:none">Payments API · v1 <span class="pill done">signed ✓</span></div></div>`,
 'acme:reports':()=>head('Reports','Released reports, access-controlled.')+
   `<div class="card"><table class="t"><thead><tr><th>Engagement</th><th>Version</th><th>Status</th></tr></thead><tbody>
@@ -387,7 +396,7 @@ const BODY={
   `<div class="card"><div class="q">Claims Portal · Project · WEB, API <span class="pill retest">unassigned</span></div><div class="q" style="border:none">Mobile App · BAU · MOBILE <span class="pill retest">unassigned</span></div></div>`,
 'dm:assignments':()=>head('Assignments','Who is on what.')+engCards(),
 'dm:capacity':()=>head('Capacity Board','Assign like moving a sticky note.')+
-  nextCard('Assign A. Khan (best fit)','Claims Portal · needs WEB, API · 6 days','FR-ASG-02',false,'Assign A. Khan ▶','toast("Assigned A. Khan · scoping unlocked.")')+
+  nextCard('Assign A. Khan (best fit)','Claims Portal · needs WEB, API · 6 days','FR-ASG-02',false,'Assign A. Khan ▶',"toast('Assigned A. Khan · scoping unlocked.')")+
   `<div class="card" style="padding:0;overflow:hidden"><table class="cap"><thead><tr><th>Tester</th><th>Skills</th><th>Load</th><th>Fit</th></tr></thead><tbody>
   <tr><td>A. Khan ✦</td><td><span class="skill">WEB</span><span class="skill">API</span><span class="skill">CLOUD</span></td><td><span class="load"><i style="width:60%"></i></span> 60%</td><td><span class="fit best">● Best</span></td></tr>
   <tr><td>R. Patel</td><td><span class="skill">WEB</span><span class="skill">MOBILE</span></td><td><span class="load"><i style="width:85%"></i></span> 85%</td><td><span class="fit">○</span></td></tr>
@@ -395,7 +404,7 @@ const BODY={
   <p class="muted" style="margin-top:8px;font-size:var(--text-sm)">⚠ Assigning R. Patel would over-allocate Tue–Wed — warns, never blocks · <span class="srs">FR-ASG-04</span></p>`,
 'dm:engagements':()=>head('Engagements','Everything in flight.')+engCards(),
 'dm:approvals':()=>head('Project SoW Review','Review, then pass to Acme for sign-off.')+
-  nextCard('Approve & forward to Acme','Retail Web · v2','FR-SOW-03',false,'Approve → Acme ▶','toast("SoW approved · sent to Acme.")')+
+  nextCard('Approve & forward to Acme','Retail Web · v2','FR-SOW-03',false,'Approve → Acme ▶',"toast('SoW approved · sent to Acme.')")+
   `<div class="card"><div class="q" style="border:none">Scope, methodology, dates and prerequisites look complete. <span class="pill done">checks pass ✓</span></div></div>`,
 
 /* ---- STAKEHOLDER (simplest surface) ---- */
@@ -410,7 +419,7 @@ const BODY={
   <div class="q" style="border:none"><span class="sevchip med">Medium</span> &nbsp;Error pages reveal too much detail <span class="pill remediated">fixed</span></div>
   <p class="muted" style="margin-top:10px;font-size:var(--text-sm)">You see your own app only · <span class="srs">SEC-AZN-04</span></p></div>`,
 'stakeholder:retests':()=>head('Retests','Ask us to re-check the fixes you shipped.')+
-  nextCard('Request a retest','Pick the fixed findings to re-verify','FR-RET-01',false,'Request retest ▶','toast("Retest requested — a tester will verify.")')+
+  nextCard('Request a retest','Pick the fixed findings to re-verify','FR-RET-01',false,'Request retest ▶',"toast('Retest requested — a tester will verify.')")+
   `<div class="card"><div class="q"><label><input type="checkbox" checked> Login script issue (you marked fixed)</label></div>
   <div class="q" style="border:none"><label><input type="checkbox"> Error detail issue</label></div></div>
   <div class="sectionlabel">Last retest — before / after <span class="srs">FR-RET-04</span></div>
@@ -458,21 +467,23 @@ function engCards(){return `<div class="card"><div class="q">Claims Portal · EN
 
 /* ============================ GATE CEREMONY ============================ */
 const gate=document.getElementById('gate'),modal=document.getElementById('gateModal');
-let gateKind='sign';
-function openGate(kind){gateKind=kind||'sign';gate.classList.add('show');frameAttest();}
-function closeGate(){gate.classList.remove('show');}
+const RM=()=>window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let gateKind='sign', lastFocus=null;
+function openGate(kind){gateKind=kind||'sign';lastFocus=document.activeElement;gate.classList.add('show');frameAttest();focusModal();}
+function closeGate(){if(!gate.classList.contains('show'))return;gate.classList.remove('show');if(lastFocus&&lastFocus.focus)lastFocus.focus();}
+function focusModal(){const b=modal.querySelector('.btn.primary');if(b)setTimeout(()=>b.focus(),30);}
 gate.onclick=e=>{if(e.target===gate)closeGate();};
 function frameAttest(){const sign=gateKind==='sign';
-  modal.innerHTML=`<h3>${sign?'Sign Statement of Work':'Release final report'}</h3>
+  modal.innerHTML=`<h3 id="gateTitle">${sign?'Sign Statement of Work':'Release final report'}</h3>
   <p class="muted" style="margin-bottom:12px">${sign?'You are agreeing to:':'You are releasing:'}</p>
   <ul class="attest">${sign?'<li>Scope: Claims Portal web + API</li><li>Dates: 14–25 Jul 2026</li><li>Prerequisites: 3 test accounts, VPN</li>':'<li>Final report v-final</li><li>7 findings · register snapshot</li><li>Peer QA: passed (R. Patel)</li>'}</ul>
   <div class="chainline"><span class="tick">🔗</span> Creates an immutable, hash-chained record &nbsp;<span class="srs">SEC-AUD-01</span></div>
   <div class="actions"><button class="btn ghost" onclick="closeGate()">Cancel</button><button class="btn primary" onclick="frameReauth()">${sign?'Confirm sign':'Confirm release'}</button></div>`;}
-function frameReauth(){modal.innerHTML=`<h3>Confirm it's you</h3><div class="reauth"><div class="key">🔐</div>
+function frameReauth(){modal.innerHTML=`<h3 id="gateTitle">Confirm it's you</h3><div class="reauth"><div class="key" aria-hidden="true">🔐</div>
   <p class="muted">Re-authenticate via Entra MFA for this privileged action.<br><span class="srs">SEC-IAM-04</span></p></div>
-  <div class="actions"><button class="btn ghost" onclick="closeGate()">Cancel</button><button class="btn primary" onclick="frameCommit()">Verify with Entra ▶</button></div>`;}
-function frameCommit(){modal.innerHTML=`<h3>${gateKind==='sign'?'Signing…':'Releasing…'}</h3><div class="reauth"><div class="key" style="animation:pulse 1s infinite">${gateKind==='sign'?'✍️':'📤'}</div>
-  <p class="muted">1) record · 2) hash-chain append · 3) state transition</p></div>`;setTimeout(()=>gateKind==='sign'?payoffSign():payoffRelease(),900);}
+  <div class="actions"><button class="btn ghost" onclick="closeGate()">Cancel</button><button class="btn primary" onclick="frameCommit()">Verify with Entra ▶</button></div>`;focusModal();}
+function frameCommit(){modal.innerHTML=`<h3 id="gateTitle">${gateKind==='sign'?'Signing…':'Releasing…'}</h3><div class="reauth"><div class="key" aria-hidden="true" style="${RM()?'':'animation:pulse 1s infinite'}">${gateKind==='sign'?'✍️':'📤'}</div>
+  <p class="muted">1) record · 2) hash-chain append · 3) state transition</p></div>`;setTimeout(()=>gateKind==='sign'?payoffSign():payoffRelease(),RM()?0:900);}
 
 function payoffSign(){closeGate();
   master.find(n=>n.k==='sow').s='done'; master.find(n=>n.k==='access').s='current';
@@ -495,7 +506,7 @@ function toast(m){const t=document.getElementById('toast');document.getElementBy
 
 /* ============================ ⌘K PALETTE (RBAC-scoped) ============================ */
 const pal=document.getElementById('palette'),pin=document.getElementById('pinput'),pres=document.getElementById('presults');
-let pidx=0,pcmds=[];
+let pidx=0,pcmds=[],lastFocusP=null;
 function buildCmds(){
   const nav=ROLES[role].tabs.map(t=>({kind:'Go',label:`Go to ${LABEL[t]}`,run:()=>go(t)}));
   const acts=[];
@@ -507,11 +518,13 @@ function buildCmds(){
   const search=[{kind:'Find',label:'ENG-2026-0412 · Claims Portal',run:()=>{if(ROLES[role].scoped)go(ROLES[role].landing);else go('engagements'in LABEL&&ROLES[role].tabs.includes('engagements')?'engagements':ROLES[role].landing);}}];
   return [...acts,...nav,...search];
 }
-function openPalette(){pcmds=buildCmds();pidx=0;pin.value='';pal.classList.add('show');renderPal();setTimeout(()=>pin.focus(),30);}
-function closePalette(){pal.classList.remove('show');}
+function openPalette(){lastFocusP=document.activeElement;pcmds=buildCmds();pidx=0;pin.value='';pal.classList.add('show');renderPal();setTimeout(()=>pin.focus(),30);}
+function closePalette(){if(!pal.classList.contains('show'))return;pal.classList.remove('show');if(lastFocusP&&lastFocusP.focus)lastFocusP.focus();}
 function renderPal(){const q=pin.value.toLowerCase();const f=pcmds.filter(c=>c.label.toLowerCase().includes(q));
   if(pidx>=f.length)pidx=Math.max(0,f.length-1);
-  pres.innerHTML=f.map((c,i)=>`<div class="pitem ${i===pidx?'sel':''}" data-i="${i}"><span>${c.label}</span><span class="kind">${c.kind}</span></div>`).join('')||`<div class="pitem muted">No matches</div>`;
+  pres.innerHTML=f.length?f.map((c,i)=>`<div class="pitem ${i===pidx?'sel':''}" id="pitem-${i}" role="option" aria-selected="${i===pidx}" data-i="${i}"><span>${c.label}</span><span class="kind">${c.kind}</span></div>`).join('')
+    :`<div class="muted" style="padding:10px 14px">No matches</div>`;
+  pin.setAttribute('aria-activedescendant', f.length?`pitem-${pidx}`:'');
   pres.querySelectorAll('.pitem[data-i]').forEach(el=>el.onclick=()=>{f[+el.dataset.i].run();closePalette();});
   pres._f=f;}
 pin.addEventListener('input',()=>{pidx=0;renderPal();});

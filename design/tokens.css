@@ -13,7 +13,7 @@
   --surface-raised:#1a2235;
   --surface-modal: #1c2740;
   --ink:           #e7ecf5;   /* near-white primary text */
-  --ink-muted:     #8b95ab;   /* grey secondary text */
+  --ink-muted:     #9aa6bd;   /* grey secondary text — ≥4.5:1 on surface (AA) */
   --border:        #232c42;
   --border-strong: #34405c;
 

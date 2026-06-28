@@ -4,7 +4,7 @@
 >
 > **v0.2 added:** per-phase ASCII wireframes (§5), the state-machine guard table, the My-Turn home spec, the gate-ceremony frame-by-frame, the component kit, design tokens, and the ⌘K command palette.
 >
-> **v0.3 adds:** the **Admin Console** (§6, `FR-ADM`/`FR-AUD-03`) and **Analytics, Exceptions & Security Monitoring** (§7, `FR-ANL-03/04/05`, `SEC-INS`) — two whole surfaces that had role tabs but no design; an elevated **"signature look"** visual system + dark-first tokens (§2/§12); the **field-level visibility matrix** (§4, `SEC-AZN-03/04`); evidence-upload, retest-request and prerequisite-definition detail in the phase layouts (§5); and the former open questions now **resolved** (§16). All v0.2 content is retained, renumbered where new sections were inserted.
+> **v0.3 adds:** the **Admin Console** (§6, `FR-ADM`/`FR-AUD-03`) and **Analytics, Exceptions & Security Monitoring** (§7, `FR-ANL-03/04/05`, `SEC-INS`) — two whole surfaces that had role tabs but no design; a tightened visual identity + light/dark tokens (§2/§12); the **field-level visibility matrix** (§4, `SEC-AZN-03/04`); evidence-upload, retest-request and prerequisite-definition detail in the phase layouts (§5); and the former open questions now **resolved** (§16). All v0.2 content is retained, renumbered where new sections were inserted.
 
 ---
 
@@ -12,9 +12,7 @@
 
 > **"The engagement runs itself; the human just confirms the next move."**
 
-PEMP manages a process that is genuinely complex — 15 lifecycle steps, 5 roles, hard security gates, credential vaulting, a live vulnerability register. The design goal is to make that complexity *invisible to the person in front of it*. Each user, at any moment, should feel like they are doing **one small, obvious thing** — while the system quietly enforces the rigour underneath.
-
-The model is **professional-addictive** (Linear, Superhuman, Stripe, Vercel), not consumer-gamified (no badges, streaks, or confetti for its own sake). For security professionals and insurer staff, "addictive" means: *it never makes me think, it never makes me wait, and it never makes me wonder if I did it right.* That is the loop that brings people back daily.
+PEMP manages a genuinely complex process — 15 lifecycle steps, 5 roles, hard security gates, credential vaulting, a live vulnerability register. The design goal is to make that complexity *invisible to the person in front of it*: each user, at any moment, is doing **one small, obvious thing** while the system enforces the rigour underneath. The model is professional, not gamified — no badges or streaks; the daily pull is simply *it never makes me think, wait, or wonder if I did it right.*
 
 Three promises every screen must keep:
 1. **I always know whose turn it is and what the next action is.** (Never a blank "now what?")
@@ -38,7 +36,10 @@ Intake  Assign  Scope   SoW    Access  Test   Findings  Report  Retest
 - **Done** = solid + ✓. **Current** = pulses softly, names the owner. **Future** = ghosted. **Gated** = 🔒 with the unmet precondition on hover ("Locked — needs signed SoW", `FR-SOW-06`).
 - One consistent story for all roles; only the controls below change per role.
 
-**The spine is fractal.** The master rail tells the *engagement* story; **each tab carries its own sub-spine** for that stage's internal steps — same component, "compact" variant, same five states. SoW → `Draft · DM review · Acme sign · Signed`; Access → `Define prereqs · Provision · Credentials · Verify`; Findings → `Capture · CVSS · Register · Peer-ready`; Reports → `Assemble · Draft · Peer QA · Release`. The two levels **lock together**: clicking a master stage opens its tab, and completing a gate advances the master rail *and* unlocks the next tab's sub-flow in one beat (the SoW ceremony marks SoW ✓ on the master rail, fills the SoW sub-spine to Signed, and lights the Access tab's sub-spine — §8/§10). Each sidebar tab shows a thin progress bar = its sub-spine completion, so a role always sees, at two zoom levels, *whose turn it is and what's next*. Implemented in `design/prototype/`.
+**The spine can go fractal — [Should, validate in Phase-2 wireframes].** A promising extension, prototyped in `design/prototype/`, not yet settled v1:
+- **Master rail** = the engagement story (above). **Each tab** can carry its own compact **sub-spine** for that stage's steps — e.g. SoW → `Draft · DM review · Acme sign · Signed`; Access → `Define prereqs · Provision · Credentials · Verify`.
+- **The two levels lock together:** clicking a master stage opens its tab; completing a gate advances the master rail *and* fills/unlocks the next sub-spine in one beat (§8/§10). A thin per-tab progress bar shows sub-spine completion.
+- **Risk to watch:** two progress systems on one screen can compete for attention. Wireframe-test that the sub-spine *clarifies* rather than clutters before committing; if in doubt, ship the master rail alone in v1.
 - Clicking a past stage = read-only replay drawn from the audit log (`FR-AUD-02`).
 
 ### 1.2 "My Turn" — the home inbox
@@ -59,16 +60,14 @@ The product's soul is enforcement, so gate moments (sign-off, access-verified, t
 
 Calm, confident, modern — a tool that handles dangerous data without ever looking dangerous.
 
-### 2.1 Signature look — "a piece of art you reach for daily"
-The product should be *instantly recognisable* and quietly beautiful, the way Linear or Stripe is — not by decoration, but by a tight, ownable identity:
-- **Signature accent.** Evolve the SRS header navy (`1F3864` family) into a brighter, modern **brand hue** for primary actions, paired with one **luminous highlight** reserved for *payoff moments* (a spine unlocking, a sign-off committing). The accent is rare on screen — which is exactly what makes pressing it feel significant.
-- **Dark-first, light-equal.** **[new — not in SRS]** Security pros and on-call staff live in dark surfaces, often at night; the system is designed dark-first with light as a fully-tuned equal, not an afterthought. *Justification:* directly serves the daily-use / "addictive" intent (`NFR-USA` family) for this audience; both themes ship to AA contrast (`NFR-USA-03`).
-- **Signature motifs.** Two recurring visual marks carry the brand: the **glowing spine-rail** (the engagement's heartbeat, §1.1) and the **hash-chain "tick"** — a small chain-link/check mark that appears wherever something becomes tamper-evident (`SEC-AUD-01`), turning "this is logged" into a felt moment of trust rather than fine print.
+### 2.1 Visual identity
+A tight, ownable look — recognisable, not decorated:
+- **Signature accent.** Evolve the SRS header navy (`1F3864` family) into a brighter brand hue for primary actions, plus one **luminous highlight** reserved for *payoff moments* (a spine unlocking, a sign-off committing). The accent stays rare on screen — which is what makes pressing it feel significant.
+- **Two motifs carry the brand:** the **glowing spine-rail** (§1.1) and the **hash-chain "tick"** — a small chain-link/check that appears wherever something becomes tamper-evident (`SEC-AUD-01`), making "this is logged" a felt moment of trust.
+- **Simple front, powerful back.** Surfaces stay calm — one primary action, generous space; the depth (live register, capacity board, audit chain) is one click away, never in your face. The stakeholder sees a single button; behind it a state machine, object-level auth and a hash chain do the work.
+- **Light and dark, both AA** (`NFR-USA-03`). **[new — not in SRS]** Build **light first**, dark as a fast-follow theme (security staff often work after hours); design covers both. *Justification: serves the daily-use intent without doubling v1 build/QA up front.* Tokens in §12.
 
-### 2.2 Simple front, powerful back
-Every surface stays **calm and minimal** — one primary action, generous space, nothing to decode — while the *visible richness* (the live register's density, the capacity heatmap, the audit chain ticking) signals the powerful engine underneath. The depth is always one click away, never in your face: the stakeholder sees a single button; the platform behind it is enforcing a state machine, object-level auth, and a hash chain. Looking effortless **is** the design.
-
-### 2.3 Foundations
+### 2.2 Foundations
 - **Palette:** near-neutral canvas, the one signature brand accent for primary actions (+ its luminous payoff highlight), and a disciplined **status spectrum** used *only* for status, never decoration. Severity is a fixed 5-step scale (mirrors `FR-FND-01` CVSS bands); process state is waiting / on-you / done / blocked / locked. Every status colour ships an icon + label partner (`NFR-USA-03`). (Tokens in §12.)
 - **Typography:** one strong sans for UI; mono *only* for credentials, hashes, CVSS vectors, references, evidence — signalling "machine-truth." Large, clear, tabular numbers.
 - **Space & density:** generous whitespace on home/flow surfaces (calm); higher density only in working surfaces (register, capacity, dashboards) where pros want a lot on screen.
@@ -89,7 +88,7 @@ Every surface stays **calm and minimal** — one primary action, generous space,
 | **Application Stakeholder** | My Assessment · Findings · Retests | My-Turn (forms to complete, findings to read) — the simplest surface |
 | **System Administrator** | Users · Configuration · Audit · Integrations | Operational console (health, exceptions, audit search) |
 
-The stakeholder is the least technical, most "kid-easy" surface: usually exactly one thing to do (fill a form / read a finding / ask for a retest).
+Tabs are **cross-engagement collections** ("all my SoWs," "all my findings"), not a single engagement's stages — the per-engagement steps live inside the engagement view (§4), so the tabs stay nouns-I-own, never a feature menu. The stakeholder is the least technical surface: usually exactly one thing to do (fill a form / read a finding / ask for a retest).
 
 ---
 
@@ -280,7 +279,7 @@ CAPTURE (drawer)                         THE LIVE REGISTER
 │                                    [ Release final report ▶ ] │
 └───────────────────────────────────────────────────────────────┘
 ```
-Tester curates, system assembles; release held by peer-review ceremony. **Delight:** "your report is 90% written."
+Tester curates, system assembles; release held by peer-review ceremony. **Reject path:** the peer can **return to draft** with comments — the report drops back to `draft`, the spine stays at Report (not Final), and the row returns to the author's My-Turn ("address review comments"). If no peer is available, the gate escalates to the DM to assign one; the author can never review their own report. **Delight:** "your report is 90% written."
 
 ### Phase 9 — Retest · `FR-RET` · Owners: Stakeholder/Acme request → Tester verifies
 **Primary action — stakeholder: "Request retest" · tester: "Mark pass/fail."**
@@ -410,7 +409,7 @@ Out-of-scope access, **bulk exports**, **off-hours / credential-access spikes**,
 │            [ Export management report (PDF) ]   FR-ANL-05     │
 └───────────────────────────────────────────────────────────────┘
 ```
-Recurring vulnerability classes (links to finding-dedup `FR-FND-06`), **mean-time-to-remediate**, severity trends, per-app risk (`FR-ANL-04`); exportable role-based management reports (`FR-ANL-05`). **Delight:** a non-technical exec sees risk dropping across the portfolio at a glance.
+Recurring vulnerability classes (links to finding-dedup `FR-FND-06`), **mean-time-to-remediate**, severity trends, per-app risk (`FR-ANL-04`); exportable role-based management reports (`FR-ANL-05`). **[Defer past v1]** — this BI surface needs historical data to be meaningful; ship §7.1 (exceptions) and §7.2 (security events), which are operationally needed from day one, and add portfolio analytics once there's a trend to show.
 
 ---
 
@@ -429,7 +428,7 @@ Each transition unlocks **only** when its guard is satisfied. This table is the 
 | 7 | Execution start | IR advance notice sent (`FR-EXE-01`) | Tester | — | "Send IR notice to begin" |
 | 8 | Execution → Findings/summary | End-of-test notice (`FR-EXE-03`) + summary sent same day (`FR-EXE-04`) | Tester | test-window | counts up days in window |
 | 9 | Findings → Report | Draft generated from findings (`FR-REP-01`) | Tester | time-to-draft | 🔒 "Add findings to draft report" |
-| 10 | Report → Final | **Peer review passed** (`FR-REP-02`) | Peer tester | time-in-review | 🔒 "Awaiting QA peer review" |
+| 10 | Report → Final | **Peer review passed** (`FR-REP-02`) | Peer tester | time-in-review | 🔒 "Awaiting QA peer review" — peer may **return to draft** (back to Report, author's My-Turn); author can't self-review |
 | 11 | Final → Closed | Final report + register stored (`FR-REP-04`, `FR-DOC-02` immutable) | Tester | — | "Releasing…" (async, `NFR-PER-03`) |
 | 12 | Closed → Retest (child) | Retest requested vs remediated findings (`FR-RET-01`) → child engagement (`FR-RET-02`) | Stakeholder/Acme | time-to-retest | "Request retest" available on closed |
 
@@ -541,10 +540,10 @@ Cross-cutting: every interactive component ships keyboard focus, visible focus r
 
 ## 12. Design Tokens (names + intent; final values in Phase 2)
 
-**Dark-first:** the Dark column is the *primary* tuning; Light is a fully-resolved equal (§2.1). Both ship to WCAG AA (`NFR-USA-03`).
+**Light and dark are co-equal** (§2.1): both fully tuned to WCAG AA (`NFR-USA-03`); build light first, dark as fast-follow.
 
 ### Colour
-| Token | Intent | Light | Dark (primary) |
+| Token | Intent | Light | Dark |
 |-------|--------|-------|------|
 | `canvas` | app background | warm off-white | deep slate |
 | `surface` | cards/drawers | white | raised slate |
@@ -594,11 +593,11 @@ The power-user spine; every action also has a keyboard path (`NFR-USA-03`). **[n
 
 **Vocabulary:** Navigate (`go to engagement / register / my-turn / tab`), Act (`sign SoW`, `verify access`, `add finding`, `send IR notice`, `request retest` — each gated by the same guard table §8 and object-level auth, so the palette never offers an illegal move), Search (engagements, findings, refs).
 
-**Keyboard model:** `⌘K` palette · `g` then letter = go-to (g+e engagements, g+m my-turn) · `j/k` move rows · `↵` primary action · `e` open drawer · `⌘↵` confirm in ceremony · `Esc` cancel/close. Results are RBAC-scoped (testers see only their engagements, `SEC-INS-01`).
+**Keyboard model (v1):** `⌘K` palette · `↵` primary action · `Esc` cancel/close · `⌘↵` confirm in ceremony — plus standard tab/arrow focus. Results are RBAC-scoped (testers see only their engagements, `SEC-INS-01`). The fuller vim-style chord map (`g+e`, `g+m`, `j/k`, `e`) is a **[Phase-2 power-user option]**, not a v1 commitment — most of this audience won't need it.
 
 ---
 
-## 14. What Makes It Addictive (legitimately, for this audience)
+## 14. Why It Sticks — the daily-return loop
 
 1. **Zero-inbox loop** — My-Turn → clear → reward (§9).
 2. **No-think clarity** — one obvious action per screen.
@@ -622,7 +621,7 @@ Deliberately **not** used: points, badges, streaks, confetti — they'd undermin
 ## 16. Resolved Decisions & Phase-2 Wireframe Checklist
 
 **Resolved decisions (carry into Phase 2):**
-- **Front end → SPA.** The optimistic-UI + ⌘K + drawer-heavy model resolves the one open stack item (`ASM-01`) in favour of a **SPA** (React or Blazor-WASM). Phase-2 design ratifies React-vs-Blazor-WASM only; the SPA posture itself is settled.
+- **Front end → recommend SPA.** The optimistic-UI + ⌘K + drawer-heavy model points to a **SPA** (React or Blazor-WASM) for the one open stack item (`ASM-01`). This is the design's **recommendation to Phase 2**, which formally ratifies the front-end stack — not a decision this document owns.
 - **Snooze (§9) and ⌘K (§13) → in v1**, shipped behind **admin feature flags** (§6.2 Configuration) so scope stays reversible without code change (`FR-ADM-04`). Both remain tagged **[new — not in SRS]** with their justifications.
 - **ITSM integration → webhook-preferred, polling-fallback** for live ticket status on the Access screen (`CON-05`, §6.3); exact system + auth named in Phase 2.
 - **B2B guest first-run → kid-easy onboarding.** **[new — not in SRS]** Entra guest invite → one-tap consent → lands the stakeholder directly on their single assessment/finding (`FR-AUTH-07`), never on an empty console. *Justification:* protects the "simplest surface" promise (§3) for the least-technical, external user.
