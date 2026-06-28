@@ -3,55 +3,48 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PEMP — Experience Prototype (v0.3) · fractal spine</title>
+<title>PEMP — Experience Prototype (v0.3) · all roles · fractal spine</title>
 <link rel="stylesheet" href="../tokens.css">
 <style>
 /* ============================================================================
-   PEMP prototype — the FRACTAL SPINE.
-   Master spine = the engagement story (persistent, top).
-   Each tab carries its own sub-spine for that stage's sub-tasks.
-   The two levels lock together: signing the SoW advances the master spine AND
-   unlocks the next tab's sub-flow.  DESIGN_PLAN v0.3 §1.1, §4, §8, §10.
+   PEMP prototype — all 5 roles, the fractal spine, ⌘K palette, admin & analytics.
+   Data-driven: roles → tabs → sub-spines render from one model.
+   DESIGN_PLAN v0.3.
    ============================================================================ */
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
-body{
-  font-family:var(--font-sans); background:var(--canvas); color:var(--ink);
-  font-size:var(--text-base); line-height:1.5; -webkit-font-smoothing:antialiased;
-  display:grid; grid-template-columns:240px 1fr; grid-template-rows:auto 1fr;
-  grid-template-areas:"brand topbar" "nav main"; height:100vh; overflow:hidden;
-  transition:background var(--dur-base) var(--ease-standard), color var(--dur-base) var(--ease-standard);
-}
-.mono{font-family:var(--font-mono)} .muted{color:var(--ink-muted)}
+body{font-family:var(--font-sans);background:var(--canvas);color:var(--ink);font-size:var(--text-base);line-height:1.5;
+  -webkit-font-smoothing:antialiased;display:grid;grid-template-columns:244px 1fr;grid-template-rows:auto 1fr;
+  grid-template-areas:"brand topbar" "nav main";height:100vh;overflow:hidden;
+  transition:background var(--dur-base),color var(--dur-base)}
+.mono{font-family:var(--font-mono)}.muted{color:var(--ink-muted)}
 
-/* ---------- Brand cell ---------- */
-.brandcell{grid-area:brand; background:var(--surface); border-right:1px solid var(--border); border-bottom:1px solid var(--border);
-  display:flex; align-items:center; gap:10px; padding:0 var(--space-4)}
+.brandcell{grid-area:brand;background:var(--surface);border-right:1px solid var(--border);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:10px;padding:0 var(--space-4)}
 .logo{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--brand),var(--brand-glow));
-  box-shadow:var(--brand-glow-sh); display:grid;place-items:center; font-weight:800;color:var(--brand-ink)}
+  box-shadow:var(--brand-glow-sh);display:grid;place-items:center;font-weight:800;color:var(--brand-ink)}
 .brandcell b{font-size:var(--text-lg);letter-spacing:.3px}
 
-/* ---------- Topbar: engagement context + master spine ---------- */
-.topbar{grid-area:topbar; background:var(--surface); border-bottom:1px solid var(--border);
-  padding:10px var(--space-8); display:flex; flex-direction:column; gap:8px; justify-content:center}
+.topbar{grid-area:topbar;background:var(--surface);border-bottom:1px solid var(--border);
+  padding:9px var(--space-8);display:flex;flex-direction:column;gap:7px;justify-content:center}
 .engrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:var(--text-sm)}
 .engrow .name{font-weight:700;font-size:var(--text-base)}
 .chip{font-size:var(--text-xs);font-weight:650;padding:2px 9px;border-radius:var(--radius-pill);border:1px solid var(--border)}
 .chip.project{color:var(--brand-glow);border-color:color-mix(in srgb,var(--brand) 50%,transparent);background:var(--brand-soft)}
 .chip.crit{color:var(--sev-high);border-color:color-mix(in srgb,var(--sev-high) 40%,transparent)}
-.kbd{margin-left:auto;font-size:var(--text-xs);color:var(--ink-muted);border:1px solid var(--border);border-radius:var(--radius-sm);padding:2px 8px}
-.themebtn{font-size:var(--text-xs);color:var(--ink-muted);border:1px solid var(--border);border-radius:var(--radius-pill);padding:4px 10px;cursor:pointer}
-.themebtn:hover{color:var(--ink);border-color:var(--border-strong)}
+.spacer{margin-left:auto}
+.rolesel{background:var(--surface-raised);color:var(--ink);border:1px solid var(--border-strong);border-radius:var(--radius-pill);
+  padding:5px 12px;font-family:inherit;font-size:var(--text-xs);cursor:pointer}
+.kbd{font-size:var(--text-xs);color:var(--ink-muted);border:1px solid var(--border);border-radius:var(--radius-sm);padding:3px 8px;cursor:pointer}
+.kbd:hover{color:var(--ink);border-color:var(--border-strong)}
 
-/* ---------- Spine (shared by master + sub) ---------- */
+/* spine (master + sub share this) */
 .spine{display:flex;align-items:flex-start;overflow-x:auto;gap:0}
-.spine.master{padding:2px 0}
 .spine.sub{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-6) var(--space-4);margin-bottom:var(--space-6)}
 .node{display:flex;flex-direction:column;align-items:center;gap:7px;min-width:74px;position:relative}
 .spine.master .node{min-width:84px}
-.node .bead{width:16px;height:16px;border-radius:50%;z-index:2;border:2px solid var(--border-strong);
-  background:var(--canvas);display:grid;place-items:center;font-size:9px;color:var(--ink-muted);
-  transition:all var(--dur-ceremony) var(--ease-emphasis); cursor:default}
+.node .bead{width:16px;height:16px;border-radius:50%;z-index:2;border:2px solid var(--border-strong);background:var(--canvas);
+  display:grid;place-items:center;font-size:9px;color:var(--ink-muted);transition:all var(--dur-ceremony) var(--ease-emphasis)}
 .spine.master .node .bead{width:18px;height:18px}
 .node.nav .bead{cursor:pointer}
 .node.done .bead{background:var(--state-done);border-color:var(--state-done);color:var(--canvas)}
@@ -69,25 +62,22 @@ body{
 @keyframes pulse{0%,100%{box-shadow:var(--brand-glow-sh)}50%{box-shadow:0 0 0 1px var(--brand),0 0 8px rgba(91,141,239,.25)}}
 @keyframes unlock{0%{transform:scale(.55)}60%{transform:scale(1.28)}100%{transform:scale(1)}}
 
-/* ---------- Sidebar nav: each tab shows its own sub-flow progress ---------- */
+/* nav */
 nav{grid-area:nav;background:var(--surface);border-right:1px solid var(--border);padding:var(--space-3);display:flex;flex-direction:column;gap:3px;overflow-y:auto}
-.navtab{padding:9px 11px;border-radius:var(--radius-md);cursor:pointer;user-select:none;border:1px solid transparent;transition:all var(--dur-fast) var(--ease-standard)}
+.navtab{padding:9px 11px;border-radius:var(--radius-md);cursor:pointer;user-select:none;border:1px solid transparent;transition:all var(--dur-fast)}
 .navtab:hover{background:var(--surface-raised)}
 .navtab.active{background:var(--brand-soft);border-color:var(--border-strong)}
 .navtab .top{display:flex;align-items:center;gap:9px;font-size:var(--text-sm);color:var(--ink-muted)}
 .navtab.active .top,.navtab:hover .top{color:var(--ink)}
-.navtab .ico{width:18px;text-align:center}
-.navtab .count{margin-left:auto;font-size:11px;color:var(--ink-muted)}
+.navtab .ico{width:18px;text-align:center}.navtab .count{margin-left:auto;font-size:11px;color:var(--ink-muted)}
 .navtab.lockedtab .ico{opacity:.6}
 .subbar{height:3px;border-radius:2px;background:var(--border);margin:7px 2px 0;overflow:hidden}
 .subbar i{display:block;height:100%;background:linear-gradient(90deg,var(--state-done),var(--brand));width:0;transition:width var(--dur-ceremony) var(--ease-emphasis)}
 .navtab.lockedtab .subbar i{background:var(--state-locked)}
 .navfoot{margin-top:auto;padding:10px 11px;font-size:11px;color:var(--ink-muted)}
 
-/* ---------- Main ---------- */
 main{grid-area:main;overflow-y:auto;padding:var(--space-8) var(--space-12)}
-.screen{display:none;max-width:1080px;animation:fadein var(--dur-base) var(--ease-standard)}
-.screen.active{display:block}
+.screen{max-width:1080px;animation:fadein var(--dur-base)}
 @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 .eyebrow{font-size:var(--text-xs);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-muted)}
 h1.title{font-size:var(--text-2xl);font-weight:750;margin:4px 0 2px;letter-spacing:-.01em}
@@ -95,13 +85,12 @@ h1.title{font-size:var(--text-2xl);font-weight:750;margin:4px 0 2px;letter-spaci
 .sectionlabel{font-size:var(--text-sm);font-weight:650;color:var(--ink-muted);margin:var(--space-6) 0 var(--space-3);display:flex;gap:8px;align-items:center}
 .srs{font-family:var(--font-mono);font-size:11px;color:var(--ink-muted);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:1px 6px}
 
-/* ---------- cards / buttons ---------- */
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-6)}
 .nextaction{display:flex;align-items:center;gap:var(--space-4);border:1px solid var(--border-strong);margin-bottom:var(--space-4)}
-.nextaction .meta{flex:1} .nextaction .meta b{display:block;font-size:var(--text-lg)}
+.nextaction .meta{flex:1}.nextaction .meta b{display:block;font-size:var(--text-lg)}
 .lockline{display:flex;align-items:center;gap:8px;color:var(--state-locked);font-size:var(--text-sm);margin-top:6px}
 .btn{font-family:inherit;font-size:var(--text-sm);font-weight:650;border-radius:var(--radius-pill);padding:8px 16px;cursor:pointer;
-  border:1px solid var(--border-strong);background:var(--surface-raised);color:var(--ink);transition:all var(--dur-fast) var(--ease-standard);white-space:nowrap}
+  border:1px solid var(--border-strong);background:var(--surface-raised);color:var(--ink);transition:all var(--dur-fast);white-space:nowrap}
 .btn:hover{border-color:var(--ink-muted)}
 .btn.primary{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
 .btn.primary:hover{box-shadow:var(--brand-glow-sh)}
@@ -109,9 +98,9 @@ h1.title{font-size:var(--text-2xl);font-weight:750;margin:4px 0 2px;letter-spaci
 .btn:disabled{opacity:.4;cursor:not-allowed}
 .lockbanner{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px dashed var(--border-strong);border-radius:var(--radius-md);padding:12px var(--space-4);color:var(--state-locked);font-size:var(--text-sm);margin-bottom:var(--space-4)}
 
-/* ---------- My-Turn rows ---------- */
+/* inbox rows */
 .pile{display:flex;flex-direction:column;gap:var(--space-2)}
-.row{display:flex;align-items:center;gap:var(--space-3);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:13px var(--space-4);transition:all var(--dur-fast) var(--ease-standard)}
+.row{display:flex;align-items:center;gap:var(--space-3);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:13px var(--space-4);transition:all var(--dur-fast)}
 .row.actionable:hover{border-color:var(--border-strong);transform:translateX(2px);box-shadow:var(--elev-raised)}
 .row.waiting{opacity:.75}
 .dot{width:10px;height:10px;border-radius:50%;flex:none}
@@ -125,26 +114,47 @@ h1.title{font-size:var(--text-2xl);font-weight:750;margin:4px 0 2px;letter-spaci
 .empty{text-align:center;color:var(--ink-muted);padding:var(--space-8);border:1px dashed var(--border);border-radius:var(--radius-lg);margin-top:var(--space-3)}
 .empty b{color:var(--ink)}
 
-/* ---------- forms / meter ---------- */
-.meter{height:8px;border-radius:var(--radius-pill);background:var(--surface-raised);overflow:hidden;margin:6px 0 14px}
-.meter i{display:block;height:100%;background:linear-gradient(90deg,var(--brand),var(--brand-glow))}
-.q{padding:10px 0;border-bottom:1px solid var(--border)}
-.q label{display:inline-flex;gap:6px;align-items:center;margin-right:16px;font-size:var(--text-sm)}
-.pill{font-size:var(--text-xs);padding:2px 9px;border-radius:var(--radius-pill);border:1px solid var(--border)}
-.pill.done{color:var(--state-done)} .pill.open{color:var(--state-blocked)} .pill.retest{color:var(--state-waiting)}
-.pill.remediated{color:var(--brand-glow)} .pill.closed{color:var(--state-done)}
+/* dashboard tiles */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:var(--space-3)}
+.tile{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-4)}
+.tile .k{font-size:var(--text-xs);color:var(--ink-muted)}
+.tile .v{font-size:var(--text-2xl);font-weight:750;margin-top:4px}
+.tile .t{font-size:var(--text-xs);margin-top:2px}
+.up{color:var(--state-blocked)}.down{color:var(--state-done)}
 
-/* ---------- register table ---------- */
-table{width:100%;border-collapse:collapse;font-size:var(--text-sm)}
-th{text-align:left;color:var(--ink-muted);font-weight:600;font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;padding:8px 10px;border-bottom:1px solid var(--border)}
-td{padding:11px 10px;border-bottom:1px solid var(--border)}
-tr:hover td{background:var(--surface-raised)}
+/* alerts (security events) */
+.alert{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--state-waiting);border-radius:var(--radius-md);padding:11px var(--space-4);font-size:var(--text-sm)}
+.alert.hot{border-left-color:var(--state-blocked)}
+.alert .who{margin-left:auto;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-muted)}
+
+/* capacity board */
+.cap{width:100%;border-collapse:collapse;font-size:var(--text-sm)}
+.cap th{text-align:left;color:var(--ink-muted);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.05em;padding:8px 10px;border-bottom:1px solid var(--border)}
+.cap td{padding:11px 10px;border-bottom:1px solid var(--border)}
+.skill{font-size:10px;color:var(--ink-muted);border:1px solid var(--border);border-radius:var(--radius-pill);padding:1px 7px;margin-right:4px}
+.load{display:inline-block;width:54px;height:7px;border-radius:4px;background:var(--surface-raised);overflow:hidden;vertical-align:middle}
+.load i{display:block;height:100%;background:var(--brand)}
+.fit{font-size:var(--text-xs);font-weight:700}.fit.best{color:var(--state-done)}
+
+/* tables (register / users / audit) */
+table.t{width:100%;border-collapse:collapse;font-size:var(--text-sm)}
+table.t th{text-align:left;color:var(--ink-muted);font-weight:600;font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;padding:8px 10px;border-bottom:1px solid var(--border)}
+table.t td{padding:10px;border-bottom:1px solid var(--border)}
+table.t tr:hover td{background:var(--surface-raised)}
 .sevchip{display:inline-flex;align-items:center;gap:6px;font-size:var(--text-xs);font-weight:700;padding:2px 8px;border-radius:var(--radius-sm)}
 .sevchip::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
 .sevchip.crit{color:var(--sev-critical)}.sevchip.high{color:var(--sev-high)}.sevchip.med{color:var(--sev-medium)}.sevchip.low{color:var(--sev-low)}
+.pill{font-size:var(--text-xs);padding:2px 9px;border-radius:var(--radius-pill);border:1px solid var(--border)}
+.pill.done,.pill.closed,.pill.ok{color:var(--state-done)}.pill.open{color:var(--state-blocked)}.pill.retest{color:var(--state-waiting)}
+.pill.remediated{color:var(--brand-glow)}.pill.guest{color:var(--state-waiting)}.pill.warn{color:var(--sev-high)}
+.q{padding:10px 0;border-bottom:1px solid var(--border)}.q label{display:inline-flex;gap:6px;align-items:center;margin-right:16px;font-size:var(--text-sm)}
+.meter{height:8px;border-radius:var(--radius-pill);background:var(--surface-raised);overflow:hidden;margin:6px 0 14px}
+.meter i{display:block;height:100%;background:linear-gradient(90deg,var(--brand),var(--brand-glow))}
 .maskfield{display:flex;align-items:center;gap:10px;font-family:var(--font-mono);font-size:var(--text-sm);background:var(--surface-raised);border:1px solid var(--border);border-radius:var(--radius-md);padding:10px var(--space-4)}
+.diff{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
+.pass{color:var(--state-done);font-weight:700}.fail{color:var(--state-blocked);font-weight:700}
 
-/* ---------- gate ceremony ---------- */
+/* gate ceremony */
 .scrim{position:fixed;inset:0;background:rgba(4,7,14,.66);backdrop-filter:blur(3px);display:none;place-items:center;z-index:50}
 .scrim.show{display:grid;animation:fadein var(--dur-base)}
 .modal{width:470px;max-width:92vw;background:var(--surface-modal);border:1px solid var(--border-strong);border-radius:var(--radius-lg);box-shadow:var(--elev-modal);padding:var(--space-8);animation:rise var(--dur-base) var(--ease-emphasis)}
@@ -153,10 +163,21 @@ tr:hover td{background:var(--surface-raised)}
 .attest{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:var(--space-4);margin-bottom:var(--space-4)}
 .attest li{list-style:none;padding:4px 0;display:flex;gap:8px}.attest li::before{content:"•";color:var(--brand)}
 .chainline{display:flex;align-items:center;gap:8px;font-size:var(--text-sm);color:var(--ink-muted);margin-bottom:var(--space-6)}
-.tick{color:var(--state-done)} .modal .actions{display:flex;gap:var(--space-3);justify-content:flex-end}
+.tick{color:var(--state-done)}.modal .actions{display:flex;gap:var(--space-3);justify-content:flex-end}
 .reauth{text-align:center;padding:var(--space-6) 0}.reauth .key{font-size:40px}
 .toast{position:fixed;bottom:var(--space-8);left:50%;transform:translateX(-50%) translateY(20px);background:var(--surface-modal);border:1px solid var(--state-done);color:var(--ink);padding:12px 20px;border-radius:var(--radius-pill);box-shadow:var(--elev-modal);opacity:0;pointer-events:none;transition:all var(--dur-base) var(--ease-emphasis);z-index:60;display:flex;gap:10px;align-items:center}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ⌘K palette */
+.palette{position:fixed;inset:0;background:rgba(4,7,14,.55);backdrop-filter:blur(2px);display:none;justify-content:center;align-items:flex-start;z-index:70}
+.palette.show{display:flex}
+.pbox{margin-top:12vh;width:560px;max-width:92vw;background:var(--surface-modal);border:1px solid var(--border-strong);border-radius:var(--radius-lg);box-shadow:var(--elev-modal);overflow:hidden;animation:rise var(--dur-base) var(--ease-emphasis)}
+.pbox input{width:100%;background:transparent;border:none;outline:none;color:var(--ink);font-family:inherit;font-size:var(--text-lg);padding:16px var(--space-6);border-bottom:1px solid var(--border)}
+.presults{max-height:320px;overflow-y:auto;padding:6px}
+.pitem{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:var(--radius-md);cursor:pointer;font-size:var(--text-sm)}
+.pitem .kind{font-size:10px;color:var(--ink-muted);border:1px solid var(--border);border-radius:var(--radius-pill);padding:1px 7px;margin-left:auto}
+.pitem.sel,.pitem:hover{background:var(--brand-soft)}
+.pfoot{padding:8px 14px;border-top:1px solid var(--border);font-size:11px;color:var(--ink-muted);display:flex;gap:14px}
 </style>
 </head>
 <body>
@@ -165,249 +186,349 @@ tr:hover td{background:var(--surface-raised)}
 
 <header class="topbar">
   <div class="engrow">
-    <span class="eyebrow">Engagement</span>
-    <span class="name">Claims Portal</span>
-    <span class="ref mono muted">ENG-2026-0412</span>
-    <span class="chip project">PROJECT</span>
-    <span class="chip crit">High</span>
-    <span class="kbd">⌘K</span>
-    <span class="themebtn" id="themeBtn">◐ Theme</span>
+    <span id="ctxLabel" class="eyebrow">Engagement</span>
+    <span id="ctxBody" style="display:contents"></span>
+    <span class="spacer"></span>
+    <select class="rolesel" id="roleSel"></select>
+    <span class="kbd" id="kbtn">⌘K</span>
+    <span class="kbd" id="themeBtn">◐ Theme</span>
   </div>
   <div class="spine master" id="masterSpine"></div>
 </header>
 
 <nav id="nav"></nav>
-
 <main id="main"></main>
 
 <div class="scrim" id="gate"><div class="modal" id="gateModal"></div></div>
 <div class="toast" id="toast"><span class="tick">🔗✓</span> <span id="toastMsg"></span></div>
+<div class="palette" id="palette"><div class="pbox">
+  <input id="pinput" placeholder="Search engagements, findings, or type an action…" autocomplete="off">
+  <div class="presults" id="presults"></div>
+  <div class="pfoot"><span>↑↓ move</span><span>↵ run</span><span>esc close</span><span style="margin-left:auto">RBAC-scoped to your role · §13</span></div>
+</div></div>
 
 <script>
-/* ============================ STATE (data-driven) ============================ */
-// Master spine = the engagement story. Some stages map to a tab (click-through).
+/* ============================ MODEL ============================ */
+// Master engagement spine — shown for engagement-scoped roles.
 let master = [
-  {k:'intake',  l:'Intake',   s:'done'},
-  {k:'assign',  l:'Assign',   s:'done'},
-  {k:'scope',   l:'Scope',    s:'done',    tab:'assessment'},
-  {k:'sow',     l:'SoW',      s:'current', tab:'sow'},
-  {k:'access',  l:'Access',   s:'locked',  tab:'access'},
-  {k:'test',    l:'Test',     s:'locked'},
-  {k:'findings',l:'Findings', s:'locked',  tab:'findings'},
-  {k:'report',  l:'Report',   s:'locked',  tab:'reports'},
-  {k:'retest',  l:'Retest',   s:'locked'},
+  {k:'intake',l:'Intake',s:'done'},{k:'assign',l:'Assign',s:'done'},
+  {k:'scope',l:'Scope',s:'done',tab:'assessment'},{k:'sow',l:'SoW',s:'current',tab:'sow'},
+  {k:'access',l:'Access',s:'locked',tab:'access'},{k:'test',l:'Test',s:'locked'},
+  {k:'findings',l:'Findings',s:'locked',tab:'findings'},{k:'report',l:'Report',s:'locked',tab:'reports'},
+  {k:'retest',l:'Retest',s:'locked',tab:'retests'},
 ];
 
-// Each tab carries its OWN sub-spine — the fractal pattern.
-let tabs = {
-  mywork:    {icon:'◧', label:'My Work',   locked:false, flow:[
-    {l:'Triage', s:'done'},{l:'Act', s:'current'},{l:'Clear', s:'future'}]},
-  assessment:{icon:'✎', label:'Assessment',locked:false, flow:[
-    {l:'Auth', s:'done'},{l:'Data', s:'done'},{l:'API', s:'done'},{l:'Infra', s:'done'},{l:'Confirm', s:'done'}]},
-  sow:       {icon:'📄', label:'SoW',       locked:false, flow:[
-    {l:'Draft', s:'done'},{l:'DM review', s:'done'},{l:'Acme sign', s:'current'},{l:'Signed', s:'future'}]},
-  access:    {icon:'🔑', label:'Access',    locked:true,  flow:[
-    {l:'Define prereqs', s:'locked'},{l:'Provision', s:'locked'},{l:'Credentials', s:'locked'},{l:'Verify', s:'locked'}]},
-  findings:  {icon:'🐞', label:'Findings',  locked:true,  flow:[
-    {l:'Capture', s:'locked'},{l:'CVSS', s:'locked'},{l:'Register', s:'locked'},{l:'Peer-ready', s:'locked'}]},
-  reports:   {icon:'⚑', label:'Reports',   locked:true,  flow:[
-    {l:'Assemble', s:'locked'},{l:'Draft', s:'locked'},{l:'Peer QA', s:'locked'},{l:'Release', s:'locked'}]},
+const ROLES = {
+  acme:{name:'Acme CA Officer',person:'J. Okafor',scoped:false,
+    tabs:['home','request','engagements','approvals','reports'],landing:'home'},
+  dm:{name:'Delivery Manager',person:'M. Reyes',scoped:false,
+    tabs:['home','requests','assignments','capacity','engagements','approvals'],landing:'home'},
+  tester:{name:'Penetration Tester',person:'A. Khan',scoped:true,
+    tabs:['mywork','assessment','sow','access','findings','reports'],landing:'mywork'},
+  stakeholder:{name:'Application Stakeholder',person:'P. Devlin',scoped:true,
+    tabs:['myassessment','findings','retests'],landing:'myassessment'},
+  admin:{name:'System Administrator',person:'S. Cole',scoped:false,
+    tabs:['users','config','audit','integrations'],landing:'users'},
 };
-const ORDER = ['mywork','assessment','sow','access','findings','reports'];
-let activeTab = 'mywork';
 
-/* ============================ RENDER ============================ */
-function beadGlyph(s){ return s==='done'?'✓' : s==='locked'?'🔒' : ''; }
+// sub-spines per tab (null = no process flow)
+let FLOW = {
+  'tester:mywork':null,
+  'tester:assessment':[{l:'Auth',s:'done'},{l:'Data',s:'done'},{l:'API',s:'done'},{l:'Infra',s:'done'},{l:'Confirm',s:'done'}],
+  'tester:sow':[{l:'Draft',s:'done'},{l:'DM review',s:'done'},{l:'Acme sign',s:'current'},{l:'Signed',s:'future'}],
+  'tester:access':[{l:'Define prereqs',s:'locked'},{l:'Provision',s:'locked'},{l:'Credentials',s:'locked'},{l:'Verify',s:'locked'}],
+  'tester:findings':[{l:'Capture',s:'locked'},{l:'CVSS',s:'locked'},{l:'Register',s:'locked'},{l:'Peer-ready',s:'locked'}],
+  'tester:reports':[{l:'Assemble',s:'locked'},{l:'Draft',s:'locked'},{l:'Peer QA',s:'locked'},{l:'Release',s:'locked'}],
+  'acme:request':[{l:'Type',s:'done'},{l:'Target',s:'done'},{l:'Window',s:'current'},{l:'Contacts',s:'future'},{l:'Submit',s:'future'}],
+  'acme:approvals':[{l:'Pending',s:'done'},{l:'Review',s:'current'},{l:'Sign',s:'future'}],
+  'dm:capacity':[{l:'Select request',s:'done'},{l:'Match skills',s:'current'},{l:'Check load',s:'future'},{l:'Assign',s:'future'}],
+  'dm:approvals':[{l:'Received',s:'done'},{l:'Review',s:'current'},{l:'Approve → Acme',s:'future'}],
+  'stakeholder:myassessment':[{l:'Auth',s:'done'},{l:'Data',s:'current'},{l:'Confirm',s:'future'}],
+  'stakeholder:retests':[{l:'Pick fixed',s:'current'},{l:'Request',s:'future'},{l:'Verified',s:'future'}],
+};
+// locked tabs per role (engagement-gated)
+let LOCKED = {'tester:access':true,'tester:findings':true,'tester:reports':true};
 
-function renderSpine(el, nodes, nav){
-  el.innerHTML = nodes.map(n=>{
-    const cls = ['node', n.s, (nav&&n.tab)?'nav':''].join(' ');
-    const data = n.tab ? `data-tab="${n.tab}"` : '';
-    return `<div class="${cls}" ${data}><div class="connector"></div>
-      <div class="bead">${beadGlyph(n.s)}</div><div class="lbl">${n.l}</div></div>`;
+const ICON={home:'⌂',request:'＋',engagements:'◉',approvals:'✓',reports:'⚑',requests:'▤',assignments:'👥',capacity:'▦',
+  mywork:'◧',assessment:'✎',sow:'📄',access:'🔑',findings:'🐞',myassessment:'✎',retests:'↻',users:'👤',config:'⚙',audit:'🔗',integrations:'🔌'};
+const LABEL={home:'Home',request:'New Request',engagements:'Engagements',approvals:'Approvals',reports:'Reports',
+  requests:'Requests',assignments:'Assignments',capacity:'Capacity',mywork:'My Work',assessment:'Assessment',sow:'SoW',
+  access:'Access',findings:'Findings',myassessment:'My Assessment',retests:'Retests',users:'Users',config:'Configuration',audit:'Audit',integrations:'Integrations'};
+
+let role='tester', tab='mywork';
+const fk=()=>`${role}:${tab}`;
+
+/* ============================ RENDER: spine / nav / context ============================ */
+function glyph(s){return s==='done'?'✓':s==='locked'?'🔒':'';}
+function renderSpine(el,nodes,nav){
+  el.innerHTML=nodes.map(n=>{
+    const navable = nav && n.tab && ROLES[role].tabs.includes(n.tab);
+    return `<div class="node ${n.s} ${navable?'nav':''}" ${navable?`data-tab="${n.tab}"`:''}>
+      <div class="connector"></div><div class="bead">${glyph(n.s)}</div><div class="lbl">${n.l}</div></div>`;
   }).join('');
-  if(nav) el.querySelectorAll('.node.nav').forEach(node=> node.onclick=()=>go(node.dataset.tab));
+  if(nav) el.querySelectorAll('.node.nav').forEach(x=>x.onclick=()=>go(x.dataset.tab));
 }
+function pct(flow){const d=flow.filter(f=>f.s==='done').length;return Math.round(100*d/flow.length);}
 
-function pct(flow){ const d=flow.filter(f=>f.s==='done').length; return Math.round(100*d/flow.length); }
-
+function renderContext(){
+  const ms=document.getElementById('masterSpine'), cl=document.getElementById('ctxLabel'), cb=document.getElementById('ctxBody');
+  if(ROLES[role].scoped){
+    ms.style.display='flex'; cl.textContent='Engagement';
+    cb.innerHTML=`<span class="name">Claims Portal</span><span class="ref mono muted">ENG-2026-0412</span>
+      <span class="chip project">PROJECT</span><span class="chip crit">High</span>`;
+    renderSpine(ms,master,true);
+  } else {
+    ms.style.display='none'; cl.textContent=role==='admin'?'Console':'Portfolio';
+    cb.innerHTML=role==='admin'
+      ? `<span class="name">System health</span><span class="pill ok">all green</span><span class="muted">· 312 users · 14 active engagements</span>`
+      : `<span class="name">14 active engagements</span><span class="muted">· 3 need you · 1 overdue</span>`;
+  }
+}
 function renderNav(){
-  const nav = document.getElementById('nav');
-  nav.innerHTML = ORDER.map(k=>{
-    const t=tabs[k], p=pct(t.flow), active=k===activeTab;
-    const count = k==='mywork' ? '<span class="count">3</span>'
-                : t.locked ? '<span class="count">🔒</span>'
-                : `<span class="count">${p}%</span>`;
-    return `<div class="navtab ${active?'active':''} ${t.locked?'lockedtab':''}" data-tab="${k}">
-      <div class="top"><span class="ico">${t.icon}</span> ${t.label} ${count}</div>
-      <div class="subbar"><i style="width:${t.locked?6:p}%"></i></div>
-    </div>`;
-  }).join('') + `<div class="navfoot">Penetration Tester · A. Khan</div>`;
-  nav.querySelectorAll('.navtab').forEach(n=> n.onclick=()=>go(n.dataset.tab));
+  const nav=document.getElementById('nav');
+  nav.innerHTML=ROLES[role].tabs.map(t=>{
+    const flow=FLOW[`${role}:${t}`], locked=LOCKED[`${role}:${t}`], active=t===tab;
+    const count = locked?'<span class="count">🔒</span>' : flow?`<span class="count">${pct(flow)}%</span>`:'';
+    return `<div class="navtab ${active?'active':''} ${locked?'lockedtab':''}" data-tab="${t}">
+      <div class="top"><span class="ico">${ICON[t]||'•'}</span> ${LABEL[t]} ${count}</div>
+      ${flow?`<div class="subbar"><i style="width:${locked?6:pct(flow)}%"></i></div>`:''}</div>`;
+  }).join('')+`<div class="navfoot">${ROLES[role].name} · ${ROLES[role].person}</div>`;
+  nav.querySelectorAll('.navtab').forEach(n=>n.onclick=()=>go(n.dataset.tab));
 }
-
-/* ---- per-tab body content ---- */
-function nextCard(title, owner, srs, locked, btn, onclick){
-  return `<div class="card nextaction">
-    <div style="font-size:26px">${locked?'🔒':'▸'}</div>
-    <div class="meta"><b>${title}</b><span class="muted">${owner} · <span class="srs">${srs}</span></span>
-    ${locked?'<div class="lockline">Unlocks when the SoW is signed</div>':''}</div>
-    ${btn?`<button class="btn primary" onclick="${onclick}">${btn}</button>`:''}</div>`;
-}
-
-function bodyFor(k){
-  const t=tabs[k];
-  if(k==='mywork') return `
-    <div class="eyebrow">Home · My Turn</div><h1 class="title">Good morning, Asha.</h1>
-    <p class="sub">Two things need you. Three engagements move without you.</p>
-    <div class="sectionlabel">▸ Your turn <span class="srs">FR-NOT-01</span></div>
-    <div class="pile">
-      ${rowHtml('high','Sign the Statement of Work','Claims Portal','ENG-2026-0412','amber','⏱ 2d','Review & Sign ▶',"go('sow')")}
-      ${rowHtml('med','Verify access','Payments API','ENG-2026-0419','green','⏱ 4d','Verify access ▶',"go('access')")}
-      ${rowHtml('crit','Add findings to draft report','Retail Web','ENG-2026-0408','red','⏱ overdue','Open findings ▶',"go('findings')")}
-    </div>
-    <div class="sectionlabel">Waiting on others <span class="srs">FR-NOT-03</span></div>
-    <div class="pile">
-      ${waitHtml('low','Awaiting Acme sign-off','Broker Portal','ENG-2026-0415 · with J. Okafor · 1d')}
-      ${waitHtml('med','Access ticket pending','Mobile App','ENG-2026-0421 · INC-8821 · 5d')}
-    </div>
-    <div class="empty">You're all clear after these. <b>3 engagements moving without you.</b><br>
-      <span style="font-size:var(--text-xs)">Calm. Genuine. No confetti. — §9</span></div>`;
-
-  if(k==='assessment') return tabHead('Assessment','Two-lens questionnaire — completed and confirmed.')+
-    nextCard('Assessment confirmed · 100%','Owner: You (Pentester)','FR-SCO-03',false,'',null)+
-    `<div class="card"><div class="sectionlabel" style="margin-top:0">Completeness <span class="srs">FR-SCO-03</span></div>
-      <div class="meter"><i style="width:100%"></i></div>
-      <div class="q"><b>Authentication</b> — Uses SSO? <span class="pill done">Yes ✓</span></div>
-      <div class="q"><b>Data handling</b> — PII processed? <span class="pill done">Confirmed ✓</span></div>
-      <div class="q"><b>API</b> — Rate-limit thresholds <span class="pill done">Captured ✓</span></div>
-      <div class="q" style="border:none"><b>Infrastructure</b> — Out-of-scope hosts <span class="pill done">Listed ✓</span></div>
-      <p class="muted" style="margin-top:10px;font-size:var(--text-sm)">Prefilled from ENG-2025-0331 · <span class="srs">FR-SCO-04</span></p></div>`;
-
-  if(k==='sow') return tabHead('Statement of Work','Auto-drafted from the assessment — sign to unlock testing.')+
-    nextCard('Sign the Statement of Work','Owner: You (issuing to Acme)','FR-SOW-06',false,'Review & Sign SoW ▶','openGate()')+
-    `<div class="card"><div class="sectionlabel" style="margin-top:0">Draft v3 <span class="srs">FR-SOW-01</span></div>
-      <p><b>1. Scope:</b> Claims Portal web + API · <b>2. Methodology:</b> OWASP ASVS<br>
-      <b>3. Dates:</b> 14–25 Jul 2026 · <b>4. Prerequisites:</b> 3 test accounts, VPN</p>
-      <p class="muted" style="margin-top:8px;font-size:var(--text-sm)">Versions: v1 · v2 · <b style="color:var(--ink)">▸v3</b> &nbsp;<span class="srs">FR-SOW-02</span></p>
-      <div class="lockline" id="sowLock">🔒 Testing stays locked until signed &nbsp;<span class="srs">FR-SOW-06</span></div></div>`;
-
-  if(k==='access') return tabHead('Access & Prerequisites', t.locked?'Locked — this stage opens once the SoW is signed.':'Confirm access before testing begins.')+
-    (t.locked?`<div class="lockbanner">🔒 This tab unlocks when the SoW is signed. Its sub-flow is shown ghosted above.</div>`:'')+
-    nextCard('Verify access works','Owner: You (Pentester)','FR-ACC-04',t.locked,t.locked?'':'Verify access ▶',t.locked?'':'verifyAccess()')+
-    `<div class="card"><div class="sectionlabel" style="margin-top:0">Prerequisite checklist <span class="srs">FR-ACC-01/02</span></div>
-      <div class="q">● Test account A <span class="pill done">provisioned ✓</span></div>
-      <div class="q">◑ Test account B <span class="pill retest">ticket INC-8821</span></div>
-      <div class="q" style="border:none">○ VPN profile <span class="pill open">not requested</span></div>
-      <div class="sectionlabel">Vault-backed credential <span class="srs">SEC-CRD-01</span></div>
-      <div class="maskfield">user: svc_pentest_a &nbsp; pass: ••••••••
-        <button class="btn ghost" style="margin-left:auto" ${t.locked?'disabled':''}>Reveal 🔓</button></div>
-      <p class="muted" style="margin-top:8px;font-size:var(--text-sm)">reveal = re-auth + logged · auto-revoke 26 Jul · <span class="srs">SEC-CRD-02/03</span></p></div>`;
-
-  if(k==='findings') return tabHead('Findings · Live Register', t.locked?'Locked — opens when testing begins.':'Enter once; flows live into the register.')+
-    (t.locked?`<div class="lockbanner">🔒 This tab unlocks after access is verified and testing starts. Sub-flow ghosted above.</div>`:'')+
-    `<div class="card" style="padding:0;overflow:hidden;${t.locked?'opacity:.55':''}">
-      <table><thead><tr><th>Severity</th><th>Finding</th><th>Asset</th><th>CVSS</th><th>Status</th></tr></thead><tbody>
-      <tr><td><span class="sevchip crit">Critical</span></td><td>Auth bypass via JWT confusion</td><td>API</td><td class="mono">9.1</td><td><span class="pill open">open</span></td></tr>
-      <tr><td><span class="sevchip high">High</span></td><td>SQLi in /claims search</td><td>Web</td><td class="mono">8.1</td><td><span class="pill retest">retest-pending</span></td></tr>
-      <tr><td><span class="sevchip high">High</span></td><td>Stored XSS in note field</td><td>Web</td><td class="mono">7.4</td><td><span class="pill open">open</span></td></tr>
-      <tr><td><span class="sevchip med">Medium</span></td><td>Verbose error disclosure</td><td>API</td><td class="mono">5.3</td><td><span class="pill remediated">remediated</span></td></tr>
-      <tr><td><span class="sevchip low">Low</span></td><td>Missing cookie flags</td><td>Web</td><td class="mono">3.1</td><td><span class="pill closed">closed</span></td></tr>
-      </tbody></table></div>
-      <p class="muted" style="margin-top:10px;font-size:var(--text-xs)"><span class="srs">FR-FND-01</span> fixed 5-step scale, never colour alone · <span class="srs">FR-FND-03</span> enter once → live register</p>`;
-
-  if(k==='reports') return tabHead('Reporting', t.locked?'Locked — opens when findings are drafted.':'Assemble, peer-review, release.')+
-    (t.locked?`<div class="lockbanner">🔒 This tab unlocks once findings exist to draft. Sub-flow ghosted above.</div>`:'')+
-    nextCard('Release final report','Owner: You → peer → Acme','FR-REP-02',t.locked,t.locked?'':'Release ▶',t.locked?'':'openGate()')+
-    `<div class="card" style="${t.locked?'opacity:.55':''}"><div class="sectionlabel" style="margin-top:0">Assembled from engagement + findings <span class="srs">FR-REP-01</span></div>
-      <p>Exec summary · 7 findings · register snapshot · appendix</p>
-      <div class="lockline">🔒 QA GATE: peer review required before release <span class="srs">FR-REP-02</span></div></div>`;
-  return '';
-}
-function tabHead(t,s){ return `<div class="eyebrow">Engagement · ${t}</div><h1 class="title">${t}</h1><p class="sub">${s}</p>`; }
-function rowHtml(dot,verb,target,ref,slaCls,sla,btn,onclick){
-  return `<div class="row actionable"><span class="dot ${dot}"></span>
-    <div class="grow"><span class="verb">${verb}</span> · ${target}<br><span class="ref">${ref}</span></div>
-    <span class="sla ${slaCls}">${sla}</span><button class="btn primary" onclick="${onclick}">${btn}</button></div>`;
-}
-function waitHtml(dot,verb,target,meta){
-  return `<div class="row waiting"><span class="dot ${dot}"></span>
-    <div class="grow"><span class="verb">${verb}</span> · ${target}<br><span class="ref">${meta}</span></div>
-    <span class="nudge">Nudge</span></div>`;
-}
-
-/* ---- compose a screen: sub-spine + body ---- */
 function renderMain(){
-  const t=tabs[activeTab];
-  const showSub = activeTab!=='mywork';
-  document.getElementById('main').innerHTML =
-    `<section class="screen active">${
-      showSub ? `<div class="spine sub" id="subSpine"></div>` : ''
-    }${bodyFor(activeTab)}</section>`;
-  if(showSub) renderSpine(document.getElementById('subSpine'), t.flow, false);
+  const flow=FLOW[fk()];
+  document.getElementById('main').innerHTML=
+    `<section class="screen">${flow?`<div class="spine sub" id="subSpine"></div>`:''}${BODY[fk()]?BODY[fk()]():stub()}</section>`;
+  if(flow) renderSpine(document.getElementById('subSpine'),flow,false);
 }
+function go(t){ if(!ROLES[role].tabs.includes(t))return; tab=t; renderNav(); renderMain(); document.getElementById('main').scrollTo({top:0}); }
+function switchRole(r){ role=r; tab=ROLES[r].landing; document.getElementById('roleSel').value=r; renderContext(); renderNav(); renderMain(); }
 
-function go(k){
-  if(!tabs[k]) return;
-  activeTab=k; renderNav(); renderMain();
-  document.getElementById('main').scrollTo({top:0});
-}
+/* ============================ BODIES ============================ */
+const head=(t,s)=>`<div class="eyebrow">${ROLES[role].name}</div><h1 class="title">${t}</h1><p class="sub">${s}</p>`;
+const nextCard=(t,o,srs,locked,btn,fn)=>`<div class="card nextaction"><div style="font-size:26px">${locked?'🔒':'▸'}</div>
+  <div class="meta"><b>${t}</b><span class="muted">${o} · <span class="srs">${srs}</span></span>${locked?'<div class="lockline">Unlocks earlier in the flow</div>':''}</div>
+  ${btn?`<button class="btn primary" onclick="${fn}">${btn}</button>`:''}</div>`;
+const arow=(d,v,t,r,sc,sl,b,fn)=>`<div class="row actionable"><span class="dot ${d}"></span><div class="grow"><span class="verb">${v}</span> · ${t}<br><span class="ref">${r}</span></div><span class="sla ${sc}">${sl}</span><button class="btn primary" onclick="${fn}">${b}</button></div>`;
+const wrow=(d,v,t,m)=>`<div class="row waiting"><span class="dot ${d}"></span><div class="grow"><span class="verb">${v}</span> · ${t}<br><span class="ref">${m}</span></div><span class="nudge">Nudge</span></div>`;
+const tile=(k,v,t,cls)=>`<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="t ${cls||''}">${t}</div></div>`;
+const stub=()=>`<div class="empty">This surface follows the same pattern — sub-spine + one primary action + role-filtered content.<br><span style="font-size:var(--text-xs)">Representative screen.</span></div>`;
+
+const BODY={
+/* ---- TESTER ---- */
+'tester:mywork':()=>`<div class="eyebrow">Home · My Turn</div><h1 class="title">Good morning, Asha.</h1>
+  <p class="sub">Two things need you. Three engagements move without you.</p>
+  <div class="sectionlabel">▸ Your turn <span class="srs">FR-NOT-01</span></div><div class="pile">
+  ${arow('high','Sign the Statement of Work','Claims Portal','ENG-2026-0412','amber','⏱ 2d','Review & Sign ▶',"go('sow')")}
+  ${arow('med','Verify access','Payments API','ENG-2026-0419','green','⏱ 4d','Verify access ▶',"go('access')")}
+  ${arow('crit','Add findings to draft report','Retail Web','ENG-2026-0408','red','⏱ overdue','Open findings ▶',"go('findings')")}</div>
+  <div class="sectionlabel">Waiting on others <span class="srs">FR-NOT-03</span></div><div class="pile">
+  ${wrow('low','Awaiting Acme sign-off','Broker Portal','ENG-2026-0415 · with J. Okafor · 1d')}
+  ${wrow('med','Access ticket pending','Mobile App','ENG-2026-0421 · INC-8821 · 5d')}</div>
+  <div class="empty">You're all clear after these. <b>3 engagements moving without you.</b><br><span style="font-size:var(--text-xs)">Calm. Genuine. No confetti. — §9</span></div>`,
+'tester:assessment':()=>head('Assessment','Two-lens questionnaire — completed and confirmed.')+
+  nextCard('Assessment confirmed · 100%','Owner: You','FR-SCO-03',false,'',null)+
+  `<div class="card"><div class="sectionlabel" style="margin-top:0">Completeness <span class="srs">FR-SCO-03</span></div><div class="meter"><i style="width:100%"></i></div>
+  <div class="q"><b>Authentication</b> — Uses SSO? <span class="pill done">Yes ✓</span></div>
+  <div class="q"><b>Data handling</b> — PII processed? <span class="pill done">Confirmed ✓</span></div>
+  <div class="q" style="border:none"><b>API</b> — Rate-limit thresholds <span class="pill done">Captured ✓</span></div>
+  <p class="muted" style="margin-top:10px;font-size:var(--text-sm)">Prefilled from ENG-2025-0331 · <span class="srs">FR-SCO-04</span></p></div>`,
+'tester:sow':()=>head('Statement of Work','Auto-drafted from the assessment — sign to unlock testing.')+
+  nextCard('Sign the Statement of Work','Owner: You (issuing to Acme)','FR-SOW-06',false,'Review & Sign SoW ▶','openGate("sign")')+
+  `<div class="card"><div class="sectionlabel" style="margin-top:0">Draft v3 <span class="srs">FR-SOW-01</span></div>
+  <p><b>1. Scope:</b> Claims Portal web + API · <b>2. Methodology:</b> OWASP ASVS<br><b>3. Dates:</b> 14–25 Jul 2026 · <b>4. Prerequisites:</b> 3 test accounts, VPN</p>
+  <div class="lockline">🔒 Testing stays locked until signed <span class="srs">FR-SOW-06</span></div></div>`,
+'tester:access':()=>head('Access & Prerequisites',LOCKED['tester:access']?'Locked — opens once the SoW is signed.':'Confirm access before testing begins.')+
+  (LOCKED['tester:access']?`<div class="lockbanner">🔒 Unlocks when the SoW is signed — its sub-flow is ghosted above.</div>`:'')+
+  nextCard('Verify access works','Owner: You','FR-ACC-04',LOCKED['tester:access'],LOCKED['tester:access']?'':'Verify access ▶','verifyAccess()')+
+  `<div class="card"><div class="sectionlabel" style="margin-top:0">Prerequisite checklist <span class="srs">FR-ACC-01/02</span></div>
+  <div class="q">● Test account A <span class="pill done">provisioned ✓</span></div>
+  <div class="q">◑ Test account B <span class="pill retest">ticket INC-8821</span></div>
+  <div class="q" style="border:none">○ VPN profile <span class="pill open">not requested</span></div>
+  <div class="sectionlabel">Vault-backed credential <span class="srs">SEC-CRD-01</span></div>
+  <div class="maskfield">user: svc_pentest_a &nbsp; pass: ••••••••<button class="btn ghost" style="margin-left:auto" ${LOCKED['tester:access']?'disabled':''}>Reveal 🔓</button></div>
+  <p class="muted" style="margin-top:8px;font-size:var(--text-sm)">reveal = re-auth + logged · auto-revoke 26 Jul · <span class="srs">SEC-CRD-02/03</span></p></div>`,
+'tester:findings':()=>head('Findings · Live Register',LOCKED['tester:findings']?'Locked — opens when testing begins.':'Enter once; flows live into the register.')+
+  (LOCKED['tester:findings']?`<div class="lockbanner">🔒 Unlocks after access is verified and testing starts.</div>`:'')+registerTable(LOCKED['tester:findings']),
+'tester:reports':()=>head('Reporting',LOCKED['tester:reports']?'Locked — opens when findings are drafted.':'Assemble, peer-review, release.')+
+  (LOCKED['tester:reports']?`<div class="lockbanner">🔒 Unlocks once findings exist to draft.</div>`:'')+
+  nextCard('Release final report','Owner: You → peer → Acme','FR-REP-02',LOCKED['tester:reports'],LOCKED['tester:reports']?'':'Release ▶','openGate("release")')+
+  `<div class="card" style="${LOCKED['tester:reports']?'opacity:.55':''}"><div class="sectionlabel" style="margin-top:0">Assembled from engagement + findings <span class="srs">FR-REP-01</span></div>
+  <p>Exec summary · 7 findings · register snapshot · appendix</p><div class="lockline">🔒 QA GATE: peer review before release <span class="srs">FR-REP-02</span></div></div>`,
+
+/* ---- ACME CA OFFICER ---- */
+'acme:home':()=>head('Home','Approvals due and reports to read — plus your portfolio at a glance.')+
+  `<div class="tiles">${tile('Open engagements','14','3 need you')}${tile('Overdue (SLA)','1','SoW unsigned 3d','up')}${tile('Mean time-to-remediate','11d','▼ from 14d','down')}${tile('Critical open','2','Auth bypass · SQLi','up')}</div>
+  <div class="sectionlabel">▸ Your turn <span class="srs">FR-NOT-01</span></div><div class="pile">
+  ${arow('high','Sign the Statement of Work','Claims Portal','ENG-2026-0412','amber','⏱ 2d','Review & Sign ▶',"go('approvals')")}
+  ${arow('low','Read final report','Broker Portal','ENG-2026-0399','green','new','Open report ▶',"go('reports')")}</div>
+  <div class="sectionlabel">Portfolio risk <span class="srs">FR-ANL-04</span></div>
+  <div class="card"><div class="q">Claims Portal <span class="pill open">High</span></div><div class="q">Payments API <span class="pill warn">Medium</span></div><div class="q" style="border:none">Broker Portal <span class="pill ok">Low</span></div></div>`,
+'acme:request':()=>head('New Request','A short friendly wizard — not a long form.')+
+  nextCard('Continue request · step 3 of 5','Type: Project · Target: Claims Portal','FR-REQ-01',false,'Next: contacts ▶',"go('engagements')")+
+  `<div class="card"><div class="q"><b>Window</b> &nbsp; [ 14 Jul ] — [ 25 Jul ] &nbsp; Criticality [High ▾] <span class="srs">FR-REQ-02</span></div>
+  <div class="q" style="border:none">Tested 4 months ago (ENG-2025-0331). <button class="btn ghost">Reuse & prefill</button> <span class="srs">FR-REQ-05</span></div></div>`,
+'acme:engagements':()=>head('Engagements','Every engagement, one consistent story.')+engCards(),
+'acme:approvals':()=>head('Approvals','Sign-offs queued — each opens the gate ceremony.')+
+  nextCard('Review & sign SoW','Claims Portal · ENG-2026-0412','FR-SOW-05',false,'Review & Sign SoW ▶','openGate("sign")')+
+  `<div class="card"><div class="q">Claims Portal · v3 <span class="pill retest">awaiting you</span></div><div class="q" style="border:none">Payments API · v1 <span class="pill done">signed ✓</span></div></div>`,
+'acme:reports':()=>head('Reports','Released reports, access-controlled.')+
+  `<div class="card"><table class="t"><thead><tr><th>Engagement</th><th>Version</th><th>Status</th></tr></thead><tbody>
+  <tr><td>Broker Portal</td><td class="mono">final</td><td><span class="pill done">released</span></td></tr>
+  <tr><td>Retail Web</td><td class="mono">draft v2</td><td><span class="pill retest">in QA</span></td></tr></tbody></table></div>`,
+
+/* ---- DELIVERY MANAGER ---- */
+'dm:home':()=>head('Home','Unassigned requests and SoWs to review.')+
+  `<div class="tiles">${tile('Unassigned','2','oldest 1d','up')}${tile('Team load','68%','headroom Thu–Fri','down')}${tile('SoWs to review','1','Claims Portal')}${tile('Active','9','on track')}</div>
+  <div class="sectionlabel">▸ Your turn <span class="srs">FR-NOT-01</span></div><div class="pile">
+  ${arow('high','Assign a tester','Claims Portal','ENG-2026-0412','amber','⏱ 1d','Open capacity ▶',"go('capacity')")}
+  ${arow('med','Review Project SoW','Retail Web','ENG-2026-0408','green','⏱ 2d','Review SoW ▶',"go('approvals')")}</div>`,
+'dm:requests':()=>head('Requests','Incoming from Acme — route to a tester.')+
+  `<div class="card"><div class="q">Claims Portal · Project · WEB, API <span class="pill retest">unassigned</span></div><div class="q" style="border:none">Mobile App · BAU · MOBILE <span class="pill retest">unassigned</span></div></div>`,
+'dm:assignments':()=>head('Assignments','Who is on what.')+engCards(),
+'dm:capacity':()=>head('Capacity Board','Assign like moving a sticky note.')+
+  nextCard('Assign A. Khan (best fit)','Claims Portal · needs WEB, API · 6 days','FR-ASG-02',false,'Assign A. Khan ▶','toast("Assigned A. Khan · scoping unlocked.")')+
+  `<div class="card" style="padding:0;overflow:hidden"><table class="cap"><thead><tr><th>Tester</th><th>Skills</th><th>Load</th><th>Fit</th></tr></thead><tbody>
+  <tr><td>A. Khan ✦</td><td><span class="skill">WEB</span><span class="skill">API</span><span class="skill">CLOUD</span></td><td><span class="load"><i style="width:60%"></i></span> 60%</td><td><span class="fit best">● Best</span></td></tr>
+  <tr><td>R. Patel</td><td><span class="skill">WEB</span><span class="skill">MOBILE</span></td><td><span class="load"><i style="width:85%"></i></span> 85%</td><td><span class="fit">○</span></td></tr>
+  <tr><td>S. Lee</td><td><span class="skill">API</span><span class="skill">CLOUD</span></td><td><span class="load"><i style="width:20%"></i></span> 20%</td><td><span class="fit">○</span></td></tr></tbody></table></div>
+  <p class="muted" style="margin-top:8px;font-size:var(--text-sm)">⚠ Assigning R. Patel would over-allocate Tue–Wed — warns, never blocks · <span class="srs">FR-ASG-04</span></p>`,
+'dm:engagements':()=>head('Engagements','Everything in flight.')+engCards(),
+'dm:approvals':()=>head('Project SoW Review','Review, then pass to Acme for sign-off.')+
+  nextCard('Approve & forward to Acme','Retail Web · v2','FR-SOW-03',false,'Approve → Acme ▶','toast("SoW approved · sent to Acme.")')+
+  `<div class="card"><div class="q" style="border:none">Scope, methodology, dates and prerequisites look complete. <span class="pill done">checks pass ✓</span></div></div>`,
+
+/* ---- STAKEHOLDER (simplest surface) ---- */
+'stakeholder:myassessment':()=>head('My Assessment','Just a few plain questions — we explain why we ask.')+
+  nextCard('3 questions left','Section: Data handling','FR-SCO-03',false,'Continue ▶',"toast('Saved — thanks!')")+
+  `<div class="card"><div class="sectionlabel" style="margin-top:0">70% complete <span class="srs">FR-SCO-03</span></div><div class="meter"><i style="width:70%"></i></div>
+  <div class="q"><b>Does the app use single sign-on?</b><br><label><input type="radio" name="sso" checked> Yes</label><label><input type="radio" name="sso"> No</label> &nbsp;<span class="muted" style="font-size:var(--text-xs)">ⓘ why we ask</span></div>
+  <div class="q" style="border:none"><b>Any test accounts ready?</b><br><label><input type="radio" name="ta"> Yes</label><label><input type="radio" name="ta" checked> Not yet</label></div>
+  <p class="muted" style="margin-top:10px;font-size:var(--text-sm)">Auto-saved ✓ · no jargon, no scoring shown to you</p></div>`,
+'stakeholder:findings':()=>head('Findings','Findings for your app, in plain language.')+
+  `<div class="card"><div class="q"><span class="sevchip high">High</span> &nbsp;Login page can be tricked into running scripts <span class="pill open">being fixed</span></div>
+  <div class="q" style="border:none"><span class="sevchip med">Medium</span> &nbsp;Error pages reveal too much detail <span class="pill remediated">fixed</span></div>
+  <p class="muted" style="margin-top:10px;font-size:var(--text-sm)">You see your own app only · <span class="srs">SEC-AZN-04</span></p></div>`,
+'stakeholder:retests':()=>head('Retests','Ask us to re-check the fixes you shipped.')+
+  nextCard('Request a retest','Pick the fixed findings to re-verify','FR-RET-01',false,'Request retest ▶','toast("Retest requested — a tester will verify.")')+
+  `<div class="card"><div class="q"><label><input type="checkbox" checked> Login script issue (you marked fixed)</label></div>
+  <div class="q" style="border:none"><label><input type="checkbox"> Error detail issue</label></div></div>
+  <div class="sectionlabel">Last retest — before / after <span class="srs">FR-RET-04</span></div>
+  <div class="card"><div class="diff">SQLi in /claims <span class="muted">→</span> <span class="pass">✓ PASS (fixed)</span></div>
+  <div class="diff" style="border:none">Stored XSS <span class="muted">→</span> <span class="fail">✗ FAIL (still present)</span></div></div>`,
+
+/* ---- ADMIN console (§6) ---- */
+'admin:users':()=>head('Users & Roles','Synced from Entra groups — no local password store.')+
+  `<div class="card" style="padding:0;overflow:hidden"><table class="t"><thead><tr><th>Name</th><th>Role (= group)</th><th>Type</th><th>CA posture</th></tr></thead><tbody>
+  <tr><td>A. Khan</td><td>Pentester</td><td>native</td><td><span class="pill ok">✓ compliant</span></td></tr>
+  <tr><td>M. Reyes</td><td>Delivery Manager</td><td><span class="pill guest">B2B guest</span></td><td><span class="pill ok">✓ compliant</span></td></tr>
+  <tr><td>P. Devlin</td><td>Stakeholder</td><td><span class="pill guest">B2B guest</span></td><td><span class="pill warn">⚠ risky sign-in</span></td></tr></tbody></table></div>
+  <p class="muted" style="margin-top:8px;font-size:var(--text-sm)">Roles change in Entra; PEMP reflects + audits · <span class="srs">FR-ADM-01 · SEC-IAM-01/03</span></p>`,
+'admin:config':()=>head('Configuration','Templates, SLA thresholds, feature flags, retention.')+
+  `<div class="card"><div class="q"><b>Templates</b> assessment · SoW · email <button class="btn ghost">Edit</button> <span class="srs">FR-ADM-02</span></div>
+  <div class="q"><b>SLA thresholds</b> assign 2d · sign 2d · QA 1d <span class="muted">→ feed clocks</span> <span class="srs">FR-ANL-01</span></div>
+  <div class="q"><b>Feature flags</b> ⌘K palette <span class="pill ok">on</span> · snooze <span class="pill ok">on</span> <span class="srs">FR-ADM-04</span></div>
+  <div class="q" style="border:none"><b>Retention</b> evidence 7y · creds purge-on-close · secure-delete <span class="srs">FR-DOC-04 · SEC-LIF-01/02</span></div></div>`,
+'admin:audit':()=>head('Audit & Security Events','Append-only, hash-chained — search, verify, and triage.')+
+  `<div class="sectionlabel" style="margin-top:0">Security events <span class="srs">SEC-INS-02/03 · FR-ANL-03</span></div>
+  <div class="pile"><div class="alert hot">⚠ Bulk export — 18 evidence files in 2m <span class="who">A.Khan · ENG-0412</span></div>
+  <div class="alert">⚠ Off-hours credential reveal 02:14 <span class="who">R.Patel · ENG-0419</span></div>
+  <div class="alert hot">⚠ Out-of-scope access attempt <span class="who">blocked · SEC-INS-01</span></div></div>
+  <div class="sectionlabel">Audit search <span class="srs">FR-AUD-03</span></div>
+  <div class="card" style="padding:0;overflow:hidden"><table class="t"><thead><tr><th>Time</th><th>Actor</th><th>Action</th><th>Chain</th></tr></thead><tbody>
+  <tr><td class="mono">14:02</td><td>A.Khan</td><td>revealed credential · ENG-0412</td><td><span class="pill ok">🔗 verified</span></td></tr>
+  <tr><td class="mono">13:51</td><td>J.Okafor</td><td>signed SoW · ENG-0412</td><td><span class="pill ok">🔗 verified</span></td></tr></tbody></table></div>
+  <p class="muted" style="margin-top:8px;font-size:var(--text-sm)">Chain integrity: ✓ continuous · <span class="srs">SEC-AUD-01</span> &nbsp; <button class="btn ghost">Verify chain</button> <button class="btn ghost">Export</button></p>`,
+'admin:integrations':()=>head('Integrations','Connection health at a glance.')+
+  `<div class="card"><div class="q">Entra ID (SSO/SCIM) <span class="pill ok">● connected</span> <span class="srs">FR-AUTH-01</span></div>
+  <div class="q">Mail / Teams <span class="pill ok">● connected</span> <span class="srs">FR-NOT-02</span></div>
+  <div class="q">ITSM ticketing <span class="pill warn">◑ degraded · webhook</span> <span class="srs">FR-ADM-03 · CON-05</span></div>
+  <div class="q" style="border:none">Azure Key Vault <span class="pill ok">● connected (managed id)</span></div></div>`,
+};
+function registerTable(dim){return `<div class="card" style="padding:0;overflow:hidden;${dim?'opacity:.55':''}"><table class="t"><thead><tr><th>Severity</th><th>Finding</th><th>Asset</th><th>CVSS</th><th>Status</th></tr></thead><tbody>
+  <tr><td><span class="sevchip crit">Critical</span></td><td>Auth bypass via JWT confusion</td><td>API</td><td class="mono">9.1</td><td><span class="pill open">open</span></td></tr>
+  <tr><td><span class="sevchip high">High</span></td><td>SQLi in /claims search</td><td>Web</td><td class="mono">8.1</td><td><span class="pill retest">retest-pending</span></td></tr>
+  <tr><td><span class="sevchip high">High</span></td><td>Stored XSS in note field</td><td>Web</td><td class="mono">7.4</td><td><span class="pill open">open</span></td></tr>
+  <tr><td><span class="sevchip med">Medium</span></td><td>Verbose error disclosure</td><td>API</td><td class="mono">5.3</td><td><span class="pill remediated">remediated</span></td></tr>
+  <tr><td><span class="sevchip low">Low</span></td><td>Missing cookie flags</td><td>Web</td><td class="mono">3.1</td><td><span class="pill closed">closed</span></td></tr></tbody></table></div>
+  <p class="muted" style="margin-top:10px;font-size:var(--text-xs)"><span class="srs">FR-FND-01</span> fixed 5-step scale, never colour alone · <span class="srs">FR-FND-03</span> enter once → live register</p>`;}
+function engCards(){return `<div class="card"><div class="q">Claims Portal · ENG-2026-0412 <span class="pill retest">SoW</span> <span class="muted">▸ A. Khan</span></div>
+  <div class="q">Payments API · ENG-2026-0419 <span class="pill ok">Access</span> <span class="muted">▸ S. Lee</span></div>
+  <div class="q" style="border:none">Retail Web · ENG-2026-0408 <span class="pill open">Findings</span> <span class="muted">▸ R. Patel</span></div></div>`;}
 
 /* ============================ GATE CEREMONY ============================ */
-const gate=document.getElementById('gate'), modal=document.getElementById('gateModal');
-function openGate(){ gate.classList.add('show'); frameAttest(); }
-function closeGate(){ gate.classList.remove('show'); }
-gate.onclick=e=>{ if(e.target===gate) closeGate(); };
-function frameAttest(){ modal.innerHTML=`<h3>Sign Statement of Work</h3>
-  <p class="muted" style="margin-bottom:12px">You are agreeing to:</p>
-  <ul class="attest"><li>Scope: Claims Portal web + API</li><li>Dates: 14–25 Jul 2026</li><li>Prerequisites: 3 test accounts, VPN</li></ul>
-  <div class="chainline"><span class="tick">🔗</span> This creates an immutable, hash-chained record &nbsp;<span class="srs">SEC-AUD-01</span></div>
-  <div class="actions"><button class="btn ghost" onclick="closeGate()">Cancel</button><button class="btn primary" onclick="frameReauth()">Confirm sign</button></div>`; }
-function frameReauth(){ modal.innerHTML=`<h3>Confirm it's you</h3>
-  <div class="reauth"><div class="key">🔐</div><p class="muted">Re-authenticate via Entra MFA for this privileged action.<br><span class="srs">SEC-IAM-04</span></p></div>
-  <div class="actions"><button class="btn ghost" onclick="closeGate()">Cancel</button><button class="btn primary" onclick="frameCommit()">Verify with Entra ▶</button></div>`; }
-function frameCommit(){ modal.innerHTML=`<h3>Signing…</h3>
-  <div class="reauth"><div class="key" style="animation:pulse 1s infinite">✍️</div>
-  <p class="muted">1) signed record · 2) hash-chain append · 3) state transition #5</p></div>`;
-  setTimeout(payoffSign, 900); }
+const gate=document.getElementById('gate'),modal=document.getElementById('gateModal');
+let gateKind='sign';
+function openGate(kind){gateKind=kind||'sign';gate.classList.add('show');frameAttest();}
+function closeGate(){gate.classList.remove('show');}
+gate.onclick=e=>{if(e.target===gate)closeGate();};
+function frameAttest(){const sign=gateKind==='sign';
+  modal.innerHTML=`<h3>${sign?'Sign Statement of Work':'Release final report'}</h3>
+  <p class="muted" style="margin-bottom:12px">${sign?'You are agreeing to:':'You are releasing:'}</p>
+  <ul class="attest">${sign?'<li>Scope: Claims Portal web + API</li><li>Dates: 14–25 Jul 2026</li><li>Prerequisites: 3 test accounts, VPN</li>':'<li>Final report v-final</li><li>7 findings · register snapshot</li><li>Peer QA: passed (R. Patel)</li>'}</ul>
+  <div class="chainline"><span class="tick">🔗</span> Creates an immutable, hash-chained record &nbsp;<span class="srs">SEC-AUD-01</span></div>
+  <div class="actions"><button class="btn ghost" onclick="closeGate()">Cancel</button><button class="btn primary" onclick="frameReauth()">${sign?'Confirm sign':'Confirm release'}</button></div>`;}
+function frameReauth(){modal.innerHTML=`<h3>Confirm it's you</h3><div class="reauth"><div class="key">🔐</div>
+  <p class="muted">Re-authenticate via Entra MFA for this privileged action.<br><span class="srs">SEC-IAM-04</span></p></div>
+  <div class="actions"><button class="btn ghost" onclick="closeGate()">Cancel</button><button class="btn primary" onclick="frameCommit()">Verify with Entra ▶</button></div>`;}
+function frameCommit(){modal.innerHTML=`<h3>${gateKind==='sign'?'Signing…':'Releasing…'}</h3><div class="reauth"><div class="key" style="animation:pulse 1s infinite">${gateKind==='sign'?'✍️':'📤'}</div>
+  <p class="muted">1) record · 2) hash-chain append · 3) state transition</p></div>`;setTimeout(()=>gateKind==='sign'?payoffSign():payoffRelease(),900);}
 
-/* The fractal payoff: advance BOTH the master spine AND the next tab's sub-flow */
-function payoffSign(){
-  closeGate();
-  // master spine: SoW done, Access current
-  master.find(n=>n.k==='sow').s='done';
-  master.find(n=>n.k==='access').s='current';
-  // SoW tab sub-flow completes
-  tabs.sow.flow.forEach(f=>f.s='done');
-  // Access tab unlocks; its sub-flow activates
-  tabs.access.locked=false;
-  tabs.access.flow=[{l:'Define prereqs',s:'done'},{l:'Provision',s:'current'},{l:'Credentials',s:'future'},{l:'Verify',s:'future'}];
-  renderSpine(document.getElementById('masterSpine'), master, true);
-  // glow the newly-unlocked master node
-  const accNode=[...document.querySelectorAll('#masterSpine .node')].find(n=>n.dataset.tab==='access');
-  if(accNode) accNode.classList.add('justunlocked');
-  renderNav();
-  if(activeTab==='sow'){ activeTab='access'; renderNav(); }
-  renderMain();
-  toast('SoW signed. Testing unlocked.');
+function payoffSign(){closeGate();
+  master.find(n=>n.k==='sow').s='done'; master.find(n=>n.k==='access').s='current';
+  if(FLOW['tester:sow']) FLOW['tester:sow'].forEach(f=>f.s='done');
+  LOCKED['tester:access']=false;
+  FLOW['tester:access']=[{l:'Define prereqs',s:'done'},{l:'Provision',s:'current'},{l:'Credentials',s:'future'},{l:'Verify',s:'future'}];
+  if(ROLES[role].scoped) renderSpine(document.getElementById('masterSpine'),master,true);
+  const acc=[...document.querySelectorAll('#masterSpine .node')].find(n=>n.dataset.tab==='access'); if(acc)acc.classList.add('justunlocked');
+  if(role==='tester'&&(tab==='sow')){tab='access';}
+  renderNav(); renderMain(); toast('SoW signed. Testing unlocked.');}
+function payoffRelease(){closeGate(); master.find(n=>n.k==='report').s='done';
+  if(ROLES[role].scoped) renderSpine(document.getElementById('masterSpine'),master,true);
+  renderNav(); renderMain(); toast('Report released. Stored immutable.');}
+function verifyAccess(){FLOW['tester:access']=[{l:'Define prereqs',s:'done'},{l:'Provision',s:'done'},{l:'Credentials',s:'done'},{l:'Verify',s:'done'}];
+  master.find(n=>n.k==='access').s='done'; master.find(n=>n.k==='test').s='current';
+  LOCKED['tester:findings']=false; FLOW['tester:findings']=[{l:'Capture',s:'current'},{l:'CVSS',s:'future'},{l:'Register',s:'future'},{l:'Peer-ready',s:'future'}];
+  if(ROLES[role].scoped) renderSpine(document.getElementById('masterSpine'),master,true);
+  renderNav(); renderMain(); toast('Access verified. Test window open.');}
+function toast(m){const t=document.getElementById('toast');document.getElementById('toastMsg').textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000);}
+
+/* ============================ ⌘K PALETTE (RBAC-scoped) ============================ */
+const pal=document.getElementById('palette'),pin=document.getElementById('pinput'),pres=document.getElementById('presults');
+let pidx=0,pcmds=[];
+function buildCmds(){
+  const nav=ROLES[role].tabs.map(t=>({kind:'Go',label:`Go to ${LABEL[t]}`,run:()=>go(t)}));
+  const acts=[];
+  if(role==='tester'){acts.push({kind:'Act',label:'Sign SoW · Claims Portal',run:()=>{go('sow');openGate('sign');}},{kind:'Act',label:'Verify access · Payments API',run:()=>go('access')},{kind:'Act',label:'Add finding',run:()=>go('findings')});}
+  if(role==='acme'){acts.push({kind:'Act',label:'Sign SoW · Claims Portal',run:()=>{go('approvals');openGate('sign');}},{kind:'Act',label:'Raise new request',run:()=>go('request')});}
+  if(role==='dm'){acts.push({kind:'Act',label:'Assign tester · Claims Portal',run:()=>go('capacity')});}
+  if(role==='stakeholder'){acts.push({kind:'Act',label:'Request retest',run:()=>go('retests')});}
+  if(role==='admin'){acts.push({kind:'Act',label:'Verify audit chain',run:()=>go('audit')},{kind:'Act',label:'Search audit log',run:()=>go('audit')});}
+  const search=[{kind:'Find',label:'ENG-2026-0412 · Claims Portal',run:()=>{if(ROLES[role].scoped)go(ROLES[role].landing);else go('engagements'in LABEL&&ROLES[role].tabs.includes('engagements')?'engagements':ROLES[role].landing);}}];
+  return [...acts,...nav,...search];
 }
-function verifyAccess(){
-  tabs.access.flow=[{l:'Define prereqs',s:'done'},{l:'Provision',s:'done'},{l:'Credentials',s:'done'},{l:'Verify',s:'done'}];
-  master.find(n=>n.k==='access').s='done';
-  master.find(n=>n.k==='test').s='current';
-  tabs.findings.locked=false;
-  tabs.findings.flow=[{l:'Capture',s:'current'},{l:'CVSS',s:'future'},{l:'Register',s:'future'},{l:'Peer-ready',s:'future'}];
-  renderSpine(document.getElementById('masterSpine'), master, true);
-  renderNav(); renderMain(); toast('Access verified. Test window open.');
-}
-function toast(msg){ const t=document.getElementById('toast'); document.getElementById('toastMsg').textContent=msg;
-  t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),3000); }
+function openPalette(){pcmds=buildCmds();pidx=0;pin.value='';pal.classList.add('show');renderPal();setTimeout(()=>pin.focus(),30);}
+function closePalette(){pal.classList.remove('show');}
+function renderPal(){const q=pin.value.toLowerCase();const f=pcmds.filter(c=>c.label.toLowerCase().includes(q));
+  if(pidx>=f.length)pidx=Math.max(0,f.length-1);
+  pres.innerHTML=f.map((c,i)=>`<div class="pitem ${i===pidx?'sel':''}" data-i="${i}"><span>${c.label}</span><span class="kind">${c.kind}</span></div>`).join('')||`<div class="pitem muted">No matches</div>`;
+  pres.querySelectorAll('.pitem[data-i]').forEach(el=>el.onclick=()=>{f[+el.dataset.i].run();closePalette();});
+  pres._f=f;}
+pin.addEventListener('input',()=>{pidx=0;renderPal();});
+pin.addEventListener('keydown',e=>{const f=pres._f||[];
+  if(e.key==='ArrowDown'){e.preventDefault();pidx=Math.min(f.length-1,pidx+1);renderPal();}
+  else if(e.key==='ArrowUp'){e.preventDefault();pidx=Math.max(0,pidx-1);renderPal();}
+  else if(e.key==='Enter'){e.preventDefault();if(f[pidx]){f[pidx].run();closePalette();}}
+  else if(e.key==='Escape'){closePalette();}});
 
 /* ============================ INIT ============================ */
-document.getElementById('themeBtn').onclick=()=>{ const h=document.documentElement; h.dataset.theme=h.dataset.theme==='dark'?'light':'dark'; };
-document.addEventListener('keydown',e=>{ if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();alert('⌘K command palette — DESIGN_PLAN §13');} if(e.key==='Escape')closeGate(); });
-renderSpine(document.getElementById('masterSpine'), master, true);
-renderNav(); renderMain();
+const rs=document.getElementById('roleSel');
+rs.innerHTML=Object.entries(ROLES).map(([k,v])=>`<option value="${k}">${v.name}</option>`).join('');
+rs.value='tester'; rs.onchange=()=>switchRole(rs.value);
+document.getElementById('themeBtn').onclick=()=>{const h=document.documentElement;h.dataset.theme=h.dataset.theme==='dark'?'light':'dark';};
+document.getElementById('kbtn').onclick=openPalette;
+document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();openPalette();}if(e.key==='Escape'){closeGate();closePalette();}});
+renderContext(); renderNav(); renderMain();
 </script>
 </body>
 </html>
