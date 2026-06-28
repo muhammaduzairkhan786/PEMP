@@ -37,6 +37,8 @@ Intake  Assign  Scope   SoW    Access  Test   Findings  Report  Retest
 ```
 - **Done** = solid + ✓. **Current** = pulses softly, names the owner. **Future** = ghosted. **Gated** = 🔒 with the unmet precondition on hover ("Locked — needs signed SoW", `FR-SOW-06`).
 - One consistent story for all roles; only the controls below change per role.
+
+**The spine is fractal.** The master rail tells the *engagement* story; **each tab carries its own sub-spine** for that stage's internal steps — same component, "compact" variant, same five states. SoW → `Draft · DM review · Acme sign · Signed`; Access → `Define prereqs · Provision · Credentials · Verify`; Findings → `Capture · CVSS · Register · Peer-ready`; Reports → `Assemble · Draft · Peer QA · Release`. The two levels **lock together**: clicking a master stage opens its tab, and completing a gate advances the master rail *and* unlocks the next tab's sub-flow in one beat (the SoW ceremony marks SoW ✓ on the master rail, fills the SoW sub-spine to Signed, and lights the Access tab's sub-spine — §8/§10). Each sidebar tab shows a thin progress bar = its sub-spine completion, so a role always sees, at two zoom levels, *whose turn it is and what's next*. Implemented in `design/prototype/`.
 - Clicking a past stage = read-only replay drawn from the audit log (`FR-AUD-02`).
 
 ### 1.2 "My Turn" — the home inbox
