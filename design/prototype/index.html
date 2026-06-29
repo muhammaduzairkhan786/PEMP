@@ -10,12 +10,20 @@
    PEMP prototype — all 5 roles, the fractal spine, ⌘K palette, admin & analytics.
    Data-driven: roles → tabs → sub-spines render from one model.
    DESIGN_PLAN v0.3.
+   Signature-look pass 1: ambient canvas depth, luminous primary-action card,
+   tinted status chips (colour-on-status discipline kept), tile hover lift.
    ============================================================================ */
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
-body{font-family:var(--font-sans);background:var(--canvas);color:var(--ink);font-size:var(--text-base);line-height:1.5;
+body{font-family:var(--font-sans);color:var(--ink);font-size:var(--text-base);line-height:1.5;
   -webkit-font-smoothing:antialiased;display:grid;grid-template-columns:244px 1fr;grid-template-rows:auto 1fr;
   grid-template-areas:"brand topbar" "nav main";height:100vh;overflow:hidden;
+  /* ambient depth: two faint brand glows over the canvas — the "art-piece" calm (§2.1) */
+  background:
+    radial-gradient(1100px 560px at 2% -12%, color-mix(in srgb,var(--brand) 10%,transparent), transparent 60%),
+    radial-gradient(900px 520px at 102% -4%, color-mix(in srgb,var(--brand-glow) 7%,transparent), transparent 55%),
+    var(--canvas);
+  background-attachment:fixed;
   transition:background var(--dur-base),color var(--dur-base)}
 .mono{font-family:var(--font-mono)}.muted{color:var(--ink-muted)}
 /* a11y: visible focus + screen-reader-only text */
@@ -92,7 +100,12 @@ h1.title{font-size:var(--text-2xl);font-weight:750;margin:4px 0 2px;letter-spaci
 .srs{font-family:var(--font-mono);font-size:11px;color:var(--ink-muted);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:1px 6px}
 
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-6)}
-.nextaction{display:flex;align-items:center;gap:var(--space-4);border:1px solid var(--border-strong);margin-bottom:var(--space-4)}
+/* the one primary action — the single "bright thing to press" (§1.3/§2.1): luminous accent + soft glow */
+.nextaction{display:flex;align-items:center;gap:var(--space-4);margin-bottom:var(--space-4);position:relative;overflow:hidden;
+  border:1px solid color-mix(in srgb,var(--brand) 36%,var(--border-strong));
+  background:linear-gradient(180deg,color-mix(in srgb,var(--brand) 7%,var(--surface)),var(--surface));
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--brand) 16%,transparent),0 10px 26px -14px color-mix(in srgb,var(--brand) 60%,transparent)}
+.nextaction::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:linear-gradient(var(--brand),var(--brand-glow))}
 .nextaction .meta{flex:1}.nextaction .meta b{display:block;font-size:var(--text-lg)}
 .lockline{display:flex;align-items:center;gap:8px;color:var(--state-locked);font-size:var(--text-sm);margin-top:6px}
 .btn{font-family:inherit;font-size:var(--text-sm);font-weight:650;border-radius:var(--radius-pill);padding:8px 16px;cursor:pointer;
@@ -116,13 +129,15 @@ h1.title{font-size:var(--text-2xl);font-weight:750;margin:4px 0 2px;letter-spaci
 .sla.green{color:var(--state-done);border-color:color-mix(in srgb,var(--state-done) 40%,transparent)}
 .sla.amber{color:var(--state-waiting);border-color:color-mix(in srgb,var(--state-waiting) 40%,transparent)}
 .sla.red{color:var(--state-blocked);border-color:color-mix(in srgb,var(--state-blocked) 40%,transparent)}
+.sla.green,.sla.amber,.sla.red{background:color-mix(in srgb,currentColor 11%,transparent)}
 .nudge{font-size:var(--text-xs);color:var(--ink-muted);border:1px solid var(--border);border-radius:var(--radius-pill);padding:4px 10px}
 .empty{text-align:center;color:var(--ink-muted);padding:var(--space-8);border:1px dashed var(--border);border-radius:var(--radius-lg);margin-top:var(--space-3)}
 .empty b{color:var(--ink)}
 
 /* dashboard tiles */
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:var(--space-3)}
-.tile{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-4)}
+.tile{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-4);transition:transform var(--dur-fast),border-color var(--dur-fast),box-shadow var(--dur-fast)}
+.tile:hover{transform:translateY(-2px);border-color:var(--border-strong);box-shadow:var(--elev-raised)}
 .tile .k{font-size:var(--text-xs);color:var(--ink-muted)}
 .tile .v{font-size:var(--text-2xl);font-weight:750;margin-top:4px}
 .tile .t{font-size:var(--text-xs);margin-top:2px}
@@ -150,9 +165,13 @@ table.t tr:hover td{background:var(--surface-raised)}
 .sevchip{display:inline-flex;align-items:center;gap:6px;font-size:var(--text-xs);font-weight:700;padding:2px 8px;border-radius:var(--radius-sm)}
 .sevchip::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
 .sevchip.crit{color:var(--sev-critical)}.sevchip.high{color:var(--sev-high)}.sevchip.med{color:var(--sev-medium)}.sevchip.low{color:var(--sev-low)}
+.sevchip.crit,.sevchip.high,.sevchip.med,.sevchip.low{background:color-mix(in srgb,currentColor 13%,transparent)}
 .pill{font-size:var(--text-xs);padding:2px 9px;border-radius:var(--radius-pill);border:1px solid var(--border)}
 .pill.done,.pill.closed,.pill.ok{color:var(--state-done)}.pill.open{color:var(--state-blocked)}.pill.retest{color:var(--state-waiting)}
 .pill.remediated{color:var(--brand-glow)}.pill.guest{color:var(--state-waiting)}.pill.warn{color:var(--sev-high)}
+/* status pills carry a faint tint of their own status colour — scannable, still colour+text (NFR-USA-03) */
+.pill.done,.pill.closed,.pill.ok,.pill.open,.pill.retest,.pill.remediated,.pill.guest,.pill.warn{
+  background:color-mix(in srgb,currentColor 13%,transparent);border-color:color-mix(in srgb,currentColor 32%,transparent)}
 .q{padding:10px 0;border-bottom:1px solid var(--border)}.q label{display:inline-flex;gap:6px;align-items:center;margin-right:16px;font-size:var(--text-sm)}
 .meter{height:8px;border-radius:var(--radius-pill);background:var(--surface-raised);overflow:hidden;margin:6px 0 14px}
 .meter i{display:block;height:100%;background:linear-gradient(90deg,var(--brand),var(--brand-glow))}
