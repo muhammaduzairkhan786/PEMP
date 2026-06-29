@@ -19,3 +19,6 @@
 [Oo]bj/
 *.user
 TestResults/
+
+# Git transfer bundles (used to move history between clones; not source)
+*.bundle

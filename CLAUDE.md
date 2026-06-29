@@ -4,9 +4,49 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state
 
-This repository is at **Phase 1 (Requirements) complete, pre-implementation**. It currently contains a single artifact: `PEMP_SRS_v1.0_Master.docx` — the released v1.0 Software Requirements Specification baseline. There is no source code, build, lint, or test tooling yet; those arrive in Phase 3 (Implementation). The SRS is the controlled input to Phase 2 (Design) and the baseline against which everything built later is measured.
+**Phase 2 (Design) substantially complete; Phase 3 (Implementation) in progress — at the domain core.** See `IMPLEMENTATION_PLAN.md` for the per-phase status and exit criteria.
 
-When implementation begins, update this file with build/test/run commands.
+| Phase | Stage | Status |
+|-------|-------|--------|
+| 1 | Requirements | ✅ `PEMP_SRS_v1.0_Master.docx` (released baseline) |
+| 2 | Design | ✅ `DESIGN_PLAN.md` v0.3, `design/architecture.md`, `design/state-machine.md`, `design/prototype/`, `design/compliance/*` |
+| 3 | Implementation | 🟡 domain core landed (`src/Pemp.Domain` + tests) → application → API → infrastructure next |
+| 4–6 | Testing / Security / Deploy | ⬜ not started |
+
+> ⚠️ **The C# domain code has never been compiled or run.** It was authored in a cloud sandbox with no .NET SDK (egress blocked installing one), so `src/Pemp.Domain` and its tests are **review-grade but unverified** — first `dotnet build` / `dotnet test` is pending (and this dev machine currently has no SDK either; see Environment setup). Treat a clean build + green guard tests as the immediate next gate before adding layers.
+
+### Repository structure
+```
+PEMP_SRS_v1.0_Master.docx   Requirements baseline (Phase 1)
+DESIGN_PLAN.md              Experience & UI design plan (v0.3)
+IMPLEMENTATION_PLAN.md      SDLC phase tracker + exit criteria
+design/                     Phase-2 artifacts
+  architecture.md             layered backend, SPA decision, data model
+  state-machine.md / .svg     the enforced engagement state machine (the core)
+  tokens.css                  design tokens (dark-first) — SPA theme source
+  prototype/index.html        self-contained clickable prototype (open in a browser)
+  compliance/                 traceability.md · dpia.md · threat-model.md
+PEMP.sln                    Solution
+Directory.Build.props       Shared build settings (net8.0, C#12, nullable, warnings-as-errors)
+src/Pemp.Domain/            Domain core: Engagement state machine + guards, hash-chained Audit, Result
+tests/Pemp.Domain.Tests/    xUnit — encodes the guard table + audit invariants
+```
+The application, API, and infrastructure projects in the structure (`Pemp.Application/Api/Infrastructure`) are planned but **not yet created** — build order is Musts-first per `design/architecture.md §6`.
+
+## Environment setup
+
+- **.NET 8 SDK (LTS)** — required to build/test the C# solution. Not currently installed on this machine. macOS: `brew install --cask dotnet-sdk`, or the official installer at <https://dotnet.microsoft.com/download/dotnet/8.0>. Verify with `dotnet --version`.
+- **A web browser** — the prototype (`design/prototype/index.html`) is fully self-contained; just open it. No Node/build step.
+- **Python 3** — only for reading the SRS `.docx` (snippet below). Already present on macOS.
+
+## Build / test / run
+
+```bash
+dotnet build PEMP.sln                 # strict: warnings are errors (Directory.Build.props)
+dotnet test                           # runs Pemp.Domain.Tests — guard table + audit-chain invariants
+dotnet run --project src/Pemp.Api     # once the API layer exists (not yet created)
+open design/prototype/index.html      # the clickable prototype
+```
 
 To read the SRS as text (it is a Word `.docx`, i.e. a zip of XML):
 ```bash
@@ -26,7 +66,7 @@ The **Pentest Engagement Management Platform (PEMP)** is a secure web app that r
 
 - **Hosting:** Microsoft Azure, **UK region only** — no data egress outside the approved boundary.
 - **App / API:** ASP.NET Core (C#).
-- **Front end:** Blazor or a SPA — *finalised in Phase 2 design* (the one open stack decision).
+- **Front end:** **SPA** — decided in Phase 2 (`design/architecture.md`, `DESIGN_PLAN §16`), driven by the optimistic-UI / ⌘K / drawer-heavy model. The React-vs-Blazor-WASM choice *within* the SPA posture is the one item still to ratify.
 - **Data:** Azure SQL Database with Entity Framework Core.
 - **Identity:** Microsoft Entra ID (Acme's tenant) via Microsoft Identity / MSAL, OIDC SSO, **no local password store**. Acme staff are native identities; CloudKonsult delivery staff (Delivery Manager, testers) and external stakeholders are **Entra B2B guests** with scoped least-privilege access. Enforced MFA via Conditional Access.
 - **Secrets/keys:** Azure Key Vault with managed identities — no secrets in code or config.
