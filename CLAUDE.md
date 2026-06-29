@@ -13,7 +13,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | 3 | Implementation | 🟡 domain core landed (`src/Pemp.Domain` + tests) → application → API → infrastructure next |
 | 4–6 | Testing / Security / Deploy | ⬜ not started |
 
-> ⚠️ **The C# domain code has never been compiled or run.** It was authored in a cloud sandbox with no .NET SDK (egress blocked installing one), so `src/Pemp.Domain` and its tests are **review-grade but unverified** — first `dotnet build` / `dotnet test` is pending (and this dev machine currently has no SDK either; see Environment setup). Treat a clean build + green guard tests as the immediate next gate before adding layers.
+> ✅ **Domain core verified.** First `dotnet build` / `dotnet test` (2026-06-29, .NET 8.0.422) passes clean: 0 warnings (warnings-as-errors) and **15/15 guard tests green**. The first run surfaced — and fixed — a real dead-state bug in the peer-review reject loop (`GenerateDraft` can now re-draft from `Report` to recover a returned report). Next gate is adding the application layer (see `design/architecture.md §6`).
 
 ### Repository structure
 ```

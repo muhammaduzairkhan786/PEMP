@@ -124,9 +124,18 @@ public sealed class Engagement
                 : Result.Fail("Send the IR advance notice before ending the test (FR-EXE-01)."),
             "Exe.Ended", actor, source, () => CurrentStage = Stage.Findings);
 
-    /// <summary>Findings → Report: a draft is generated from the findings (FR-REP-01).</summary>
+    /// <summary>
+    /// Findings → Report: a draft is generated from the findings (FR-REP-01). Also the
+    /// recovery path after a peer-review rejection — re-drafting from Report (where the
+    /// reject path leaves the engagement with no current draft) so a returned report can
+    /// be addressed and re-submitted (FR-REP-02).
+    /// </summary>
     public Result GenerateDraft(string actor, string source = "api") =>
-        Guarded(Stage.Findings, () => Result.Success(), "Report.Drafted", actor, source, () =>
+        GuardedTransition(() =>
+            CurrentStage == Stage.Findings || (CurrentStage == Stage.Report && !DraftGenerated)
+                ? Result.Success()
+                : Result.Fail($"Report.Drafted requires stage Findings, or Report pending re-draft (currently {CurrentStage})."),
+            "Report.Drafted", actor, source, () =>
         {
             DraftGenerated = true;
             CurrentStage = Stage.Report;
@@ -191,18 +200,24 @@ public sealed class Engagement
 
     // ---- guard helper ------------------------------------------------------
 
-    private Result Guarded(Stage required, Func<Result> guard, string action, string actor, string source, Action apply)
-    {
-        if (CurrentStage != required)
-            return Result.Fail($"Action '{action}' requires stage {required} (currently {CurrentStage}).");
+    // Fixed-stage transition: the action is legal only from a single required stage.
+    private Result Guarded(Stage required, Func<Result> guard, string action, string actor, string source, Action apply) =>
+        GuardedTransition(
+            () => CurrentStage != required
+                ? Result.Fail($"Action '{action}' requires stage {required} (currently {CurrentStage}).")
+                : guard(),
+            action, actor, source, apply);
 
+    // Core transition: the guard fully decides legality (including any stage check),
+    // the state change and the hash-chain append commit as one logical transaction.
+    private Result GuardedTransition(Func<Result> guard, string action, string actor, string source, Action apply)
+    {
         var g = guard();
         if (g.Failed) return g;
 
         var before = CurrentStage.ToString();
         apply();
         var after = CurrentStage.ToString();
-        // Audit append is part of the same logical transaction as the state change.
         _chain.Append(Id, actor, action, before, after, source, _clock());
         return Result.Success();
     }
