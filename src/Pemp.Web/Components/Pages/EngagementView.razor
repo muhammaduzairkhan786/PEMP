@@ -46,6 +46,10 @@ else
                     <button class="btn" @onclick="Cancel">Cancel</button>
                     <button class="btn primary" @onclick="() => Run(next.Kind, true)">🔐 Confirm via Entra MFA ▶</button>
                 }
+                else if (next.Kind == ActionKind.CompleteAssessment)
+                {
+                    <a class="btn primary" href="@($"engagement/{Id}/assessment")">Open assessment form ▶</a>
+                }
                 else
                 {
                     <button class="btn primary" @onclick="() => OnAct(next.Kind)">@next.Label ▶</button>

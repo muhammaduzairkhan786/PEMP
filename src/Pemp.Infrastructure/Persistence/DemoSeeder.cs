@@ -62,6 +62,12 @@ public static class DemoSeeder
         broker.ReleaseFinal(acme, reAuthenticated: true);
         db.Engagements.Add(EngagementRecord.FromDomain(broker, "Broker Portal", "Low", "A. Khan"));
 
+        // Mobile App — BAU, at Scoping (assessment questionnaire to be completed).
+        var mobile = Engagement.Raise("ENG-2026-0421", EngagementType.Bau, "system", chain, clock);
+        mobile.RouteToDeliveryManager(dm);
+        mobile.AssignTester(TesterLee, dm);
+        db.Engagements.Add(EngagementRecord.FromDomain(mobile, "Mobile App", "Medium", "S. Lee"));
+
         // Live register (FR-FND): findings for the engagements that have reached testing.
         FindingRecord F(Guid eng, string title, Severity sev, string cvss, string asset, FindingStatus status)
             => new() { Id = Guid.NewGuid(), EngagementId = eng, Title = title, Severity = sev, Cvss = cvss, Asset = asset, Status = status };

@@ -27,6 +27,21 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
 
     public bool VerifyChain() => new EfAuditChain(db).Verify();
 
+    // ---- Assessment answers (workbook Tab 1 / FR-SCO) ----------------------
+    public Task<Dictionary<string, string>> AssessmentAnswersAsync(Guid id) =>
+        db.AssessmentAnswers.AsNoTracking().Where(a => a.EngagementId == id)
+          .ToDictionaryAsync(a => a.QuestionId, a => a.Value);
+
+    public async Task SaveAssessmentAnswerAsync(Guid id, string questionId, string value)
+    {
+        var row = await db.AssessmentAnswers.FirstOrDefaultAsync(a => a.EngagementId == id && a.QuestionId == questionId);
+        if (row is null)
+            db.AssessmentAnswers.Add(new AssessmentAnswerRecord { Id = Guid.NewGuid(), EngagementId = id, QuestionId = questionId, Value = value });
+        else
+            row.Value = value;
+        await db.SaveChangesAsync();
+    }
+
     /// <summary>
     /// Run a guarded transition on the aggregate. The action invokes a domain method
     /// (e.g. <c>e =&gt; e.SignSow(actor, reAuth: true)</c>). State + audit persist only if it succeeds.

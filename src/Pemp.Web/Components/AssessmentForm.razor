@@ -1,0 +1,103 @@
+@* Conditional assessment questionnaire (workbook Tab 1 / FR-SCO-01). Auto-saves answers. *@
+@inject EngagementStore Store
+
+<div class="sectionlabel" style="margin-top:0">
+    Completeness <span class="srs">FR-SCO-03</span>
+    <span class="muted" style="margin-left:8px">@_answered / @_visible answered (@Pct%)</span>
+</div>
+<div class="meter"><i style="width:@Pct%"></i></div>
+
+@foreach (var section in VisibleSections())
+{
+    <div class="card">
+        <div class="sectionlabel" style="margin-top:0">@section.Name</div>
+        @foreach (var q in VisibleQuestions(section))
+        {
+            <div class="q">
+                <label class="qlabel">@q.Text</label>
+                @switch (q.Type)
+                {
+                    case QType.YesNo:
+                        <select class="inp" value="@Val(q.Id)" @onchange="e => Save(q.Id, e)">
+                            <option value="">—</option><option>Yes</option><option>No</option>
+                        </select>
+                        break;
+                    case QType.Radio:
+                        <select class="inp" value="@Val(q.Id)" @onchange="e => Save(q.Id, e)">
+                            <option value="">—</option>
+                            @foreach (var o in q.Options!){ <option>@o</option> }
+                        </select>
+                        break;
+                    case QType.Checkbox:
+                        <div class="opts">
+                            @foreach (var o in q.Options!)
+                            {
+                                <label class="opt"><input type="checkbox" checked="@HasOpt(q.Id, o)" @onchange="e => ToggleOpt(q.Id, o, e)" /> @o</label>
+                            }
+                        </div>
+                        break;
+                    case QType.LongText:
+                        <textarea class="inp" rows="2" value="@Val(q.Id)" @onchange="e => Save(q.Id, e)"></textarea>
+                        break;
+                    default:
+                        <input class="inp" value="@Val(q.Id)" @onchange="e => Save(q.Id, e)" />
+                        break;
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public Guid EngagementId { get; set; }
+    [Parameter] public Dictionary<string, string> Answers { get; set; } = new();
+    [Parameter] public bool ReadOnly { get; set; }
+
+    int _visible, _answered;
+    int Pct => _visible == 0 ? 0 : (int)Math.Round(100.0 * _answered / _visible);
+
+    protected override void OnParametersSet() => Recount();
+
+    string Val(string id) => Answers.TryGetValue(id, out var v) ? v : "";
+    bool HasOpt(string id, string opt) => Val(id).Split('|', StringSplitOptions.RemoveEmptyEntries).Contains(opt);
+
+    bool Show(string? showIf)
+    {
+        if (string.IsNullOrEmpty(showIf)) return true;
+        foreach (var clause in showIf.Split('|'))
+        {
+            var parts = clause.Split(':', 2);
+            if (parts.Length != 2 || !AssessmentTemplate.Drivers.TryGetValue(parts[0], out var driver)) continue;
+            if (Val(driver).Contains(parts[1], StringComparison.OrdinalIgnoreCase)) return true;
+        }
+        return false;
+    }
+
+    IEnumerable<AssessSection> VisibleSections() => AssessmentTemplate.Sections.Where(s => Show(s.ShowIf));
+    IEnumerable<AssessQuestion> VisibleQuestions(AssessSection s) => s.Questions.Where(q => Show(q.ShowIf));
+
+    void Recount()
+    {
+        _visible = VisibleSections().Sum(s => VisibleQuestions(s).Count());
+        _answered = VisibleSections().SelectMany(VisibleQuestions).Count(q => !string.IsNullOrWhiteSpace(Val(q.Id)));
+    }
+
+    async Task Save(string id, ChangeEventArgs e)
+    {
+        if (ReadOnly) return;
+        Answers[id] = e.Value?.ToString() ?? "";
+        await Store.SaveAssessmentAnswerAsync(EngagementId, id, Answers[id]);
+        Recount();
+    }
+
+    async Task ToggleOpt(string id, string opt, ChangeEventArgs e)
+    {
+        if (ReadOnly) return;
+        var set = Val(id).Split('|', StringSplitOptions.RemoveEmptyEntries).ToList();
+        if (e.Value is true) { if (!set.Contains(opt)) set.Add(opt); }
+        else set.Remove(opt);
+        Answers[id] = string.Join('|', set);
+        await Store.SaveAssessmentAnswerAsync(EngagementId, id, Answers[id]);
+        Recount();
+    }
+}
