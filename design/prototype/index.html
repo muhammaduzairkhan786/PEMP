@@ -15,6 +15,7 @@
    Pass 2: inline sparklines in dashboard tiles.
    Pass 3: right slide-over drawer rail (Documents/Findings/Comms/Audit, §4).
    Pass 4: responsive tablet/phone layout (NFR-USA-04) — desktop untouched.
+   Pass 5: real engagement cards with mini-spine (kit #2) for list views.
    ============================================================================ */
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
@@ -136,6 +137,24 @@ h1.title{font-size:var(--text-2xl);font-weight:750;margin:4px 0 2px;letter-spaci
 .nudge{font-size:var(--text-xs);color:var(--ink-muted);border:1px solid var(--border);border-radius:var(--radius-pill);padding:4px 10px}
 .empty{text-align:center;color:var(--ink-muted);padding:var(--space-8);border:1px dashed var(--border);border-radius:var(--radius-lg);margin-top:var(--space-3)}
 .empty b{color:var(--ink)}
+
+/* engagement cards (kit #2) — list/grid unit with mini-spine */
+.enggrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(296px,1fr));gap:var(--space-3)}
+.engcard{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-4);cursor:pointer;
+  transition:transform var(--dur-fast),border-color var(--dur-fast),box-shadow var(--dur-fast)}
+.engcard:hover{transform:translateY(-2px);border-color:var(--border-strong);box-shadow:var(--elev-raised)}
+.engcard .top{display:flex;align-items:center;gap:8px}
+.engcard .nm{font-weight:700}
+.engcard .rf{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-muted);margin-top:2px}
+.engcard .foot{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:var(--text-sm);color:var(--ink-muted)}
+.minispine{display:flex;align-items:center;margin-top:12px}
+.minispine .b{width:9px;height:9px;border-radius:50%;border:1.5px solid var(--border-strong);background:var(--canvas);flex:none}
+.minispine .b.done{background:var(--state-done);border-color:var(--state-done)}
+.minispine .b.cur{background:var(--brand);border-color:var(--brand-glow);box-shadow:var(--brand-glow-sh)}
+.minispine .c{height:1.5px;flex:1;background:var(--border-strong)}
+.minispine .c.done{background:var(--state-done)}
+.chip.bau{color:var(--ink-muted)}
+.chip.retest{color:var(--state-waiting);border-color:color-mix(in srgb,var(--state-waiting) 45%,transparent)}
 
 /* dashboard tiles */
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:var(--space-3)}
@@ -529,9 +548,22 @@ function registerTable(dim){return `<div class="card" style="padding:0;overflow:
   <tr><td><span class="sevchip med">Medium</span></td><td>Verbose error disclosure</td><td>API</td><td class="mono">5.3</td><td><span class="pill remediated">remediated</span></td></tr>
   <tr><td><span class="sevchip low">Low</span></td><td>Missing cookie flags</td><td>Web</td><td class="mono">3.1</td><td><span class="pill closed">closed</span></td></tr></tbody></table></div>
   <p class="muted" style="margin-top:10px;font-size:var(--text-xs)"><span class="srs">FR-FND-01</span> fixed 5-step scale, never colour alone · <span class="srs">FR-FND-03</span> enter once → live register</p>`;}
-function engCards(){return `<div class="card"><div class="q">Claims Portal · ENG-2026-0412 <span class="pill retest">SoW</span> <span class="muted">▸ A. Khan</span></div>
-  <div class="q">Payments API · ENG-2026-0419 <span class="pill ok">Access</span> <span class="muted">▸ S. Lee</span></div>
-  <div class="q" style="border:none">Retail Web · ENG-2026-0408 <span class="pill open">Findings</span> <span class="muted">▸ R. Patel</span></div></div>`;}
+const STAGES=['Intake','Assign','Scope','SoW','Access','Test','Findings','Report','Retest'];
+const ENGS=[
+  {name:'Claims Portal',ref:'ENG-2026-0412',type:'project',stage:3,owner:'A. Khan',sla:['amber','2d']},
+  {name:'Payments API',ref:'ENG-2026-0419',type:'bau',stage:4,owner:'S. Lee',sla:['green','4d']},
+  {name:'Retail Web',ref:'ENG-2026-0408',type:'project',stage:6,owner:'R. Patel',sla:['red','overdue']},
+  {name:'Broker Portal',ref:'ENG-2026-0399',type:'retest',stage:8,owner:'R. Patel',sla:['green','—']},
+];
+const TYPEB={project:'<span class="chip project">PROJECT</span>',bau:'<span class="chip bau">BAU</span>',retest:'<span class="chip retest">RETEST</span>'};
+function minispine(stage){let h='';for(let i=0;i<STAGES.length;i++){const cls=i<stage?'done':i===stage?'cur':'';h+=`<span class="b ${cls}"></span>`;if(i<STAGES.length-1)h+=`<span class="c ${i<stage?'done':''}"></span>`;}
+  return `<div class="minispine" role="img" aria-label="At stage ${STAGES[stage]}">${h}</div>`;}
+function engCards(){return `<div class="enggrid">`+ENGS.map(e=>`
+  <div class="engcard" role="button" tabindex="0" aria-label="${e.name} ${e.ref}, at ${STAGES[e.stage]}" onclick="toast('Open ${e.ref} · ${e.name}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
+    <div class="top"><span class="nm">${e.name}</span>${TYPEB[e.type]||''}</div>
+    <div class="rf">${e.ref}</div>${minispine(e.stage)}
+    <div class="foot"><span>▸ ${e.owner}</span><span class="muted">· ${STAGES[e.stage]}</span><span class="sla ${e.sla[0]}" style="margin-left:auto">⏱ ${e.sla[1]}</span></div>
+  </div>`).join('')+`</div>`;}
 
 /* ============================ GATE CEREMONY ============================ */
 const gate=document.getElementById('gate'),modal=document.getElementById('gateModal');
