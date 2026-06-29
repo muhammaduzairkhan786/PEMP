@@ -25,6 +25,20 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
         db.Findings.AsNoTracking().Where(f => f.EngagementId == id)
           .OrderBy(f => f.Severity).ThenBy(f => f.Title).ToListAsync();
 
+    // ---- Evidence (FR-FND-02 / SEC-EVD) ------------------------------------
+    public Task<List<EvidenceRecord>> EvidenceForAsync(Guid id) =>
+        db.Evidence.AsNoTracking().Where(e => e.EngagementId == id).ToListAsync();
+
+    public async Task AddEvidenceAsync(Guid engagementId, Guid findingId, string fileName, EvidenceKind kind, string note)
+    {
+        db.Evidence.Add(new EvidenceRecord
+        {
+            Id = Guid.NewGuid(), EngagementId = engagementId, FindingId = findingId,
+            FileName = fileName, Kind = kind, Note = note, EncryptedAtRest = true,
+        });
+        await db.SaveChangesAsync();
+    }
+
     public bool VerifyChain() => new EfAuditChain(db).Verify();
 
     // ---- Assessment answers (workbook Tab 1 / FR-SCO) ----------------------

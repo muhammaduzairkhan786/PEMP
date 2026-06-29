@@ -109,6 +109,13 @@ textarea.inp{resize:vertical}
 .opts{display:flex;flex-wrap:wrap;gap:10px 18px}
 .opt{display:inline-flex;align-items:center;gap:6px;font-size:var(--text-sm);color:var(--ink-muted)}
 
+/* evidence */
+.evgrp{padding:8px 0;border-bottom:1px solid var(--border)}
+.evgrp:last-child{border-bottom:none}
+.evtitle{font-weight:600;font-size:var(--text-sm);margin-bottom:6px}
+.evtile{display:flex;align-items:center;gap:10px;font-size:var(--text-sm);padding:5px 0}
+.evkind{width:18px;text-align:center}
+
 /* tester checklist */
 .chkrow{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:var(--text-sm)}
 .chkrow:last-child{border-bottom:none}

@@ -71,14 +71,24 @@ public static class DemoSeeder
         // Live register (FR-FND): findings for the engagements that have reached testing.
         FindingRecord F(Guid eng, string title, Severity sev, string cvss, string asset, FindingStatus status)
             => new() { Id = Guid.NewGuid(), EngagementId = eng, Title = title, Severity = sev, Cvss = cvss, Asset = asset, Status = status };
+        var fSqli = F(retail.Id, "SQLi in /claims search", Severity.High, "8.1", "Web", FindingStatus.RetestPending);
+        var fXss = F(retail.Id, "Stored XSS in note field", Severity.High, "7.4", "Web", FindingStatus.Open);
         db.Findings.AddRange(
             F(retail.Id, "Auth bypass via JWT confusion", Severity.Critical, "9.1", "API", FindingStatus.Open),
-            F(retail.Id, "SQLi in /claims search", Severity.High, "8.1", "Web", FindingStatus.RetestPending),
-            F(retail.Id, "Stored XSS in note field", Severity.High, "7.4", "Web", FindingStatus.Open),
+            fSqli, fXss,
             F(retail.Id, "Verbose error disclosure", Severity.Medium, "5.3", "API", FindingStatus.Remediated),
             F(retail.Id, "Missing cookie security flags", Severity.Low, "3.1", "Web", FindingStatus.Open),
             F(broker.Id, "Insecure direct object reference", Severity.High, "7.7", "Web", FindingStatus.Closed),
             F(broker.Id, "Weak password policy", Severity.Medium, "4.8", "Web", FindingStatus.Closed)
+        );
+
+        // Evidence (FR-FND-02 / SEC-EVD): artifacts attached to findings.
+        EvidenceRecord Ev(Guid eng, Guid find, string file, EvidenceKind kind, string note)
+            => new() { Id = Guid.NewGuid(), EngagementId = eng, FindingId = find, FileName = file, Kind = kind, Note = note, EncryptedAtRest = true };
+        db.Evidence.AddRange(
+            Ev(retail.Id, fSqli.Id, "sqli-claims-poc.png", EvidenceKind.Screenshot, "UNION-based extraction PoC"),
+            Ev(retail.Id, fSqli.Id, "sqli-request-response.txt", EvidenceKind.RequestResponse, "Injected payload + DB error"),
+            Ev(retail.Id, fXss.Id, "stored-xss-note.png", EvidenceKind.Screenshot, "Payload fires on note view")
         );
 
         // Access requirements (FR-ACC-01) for Payments API (at the Access stage).

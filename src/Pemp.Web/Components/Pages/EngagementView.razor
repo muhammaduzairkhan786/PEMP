@@ -86,6 +86,8 @@ else
 
         <FindingsRegister Findings="_findings" />
 
+        <EvidencePanel EngagementId="Id" Findings="_findings" Editable="@(Session.Role == "Tester" && _rec.CurrentStage != Stage.Closed)" />
+
         @if ((int)_rec.CurrentStage >= (int)Stage.Access)
         {
             <ChecklistPanel EngagementId="Id" Done="_checklist"
