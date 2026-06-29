@@ -126,9 +126,15 @@ public sealed class Engagement
             CurrentStage = Stage.Access;
         });
 
-    /// <summary>Access → Execution: access verified before the start date (FR-ACC-04).</summary>
-    public Result VerifyAccess(string actor, string source = "api") =>
-        Guarded(Stage.Access, () => Result.Success(), "Access.Verified", actor, source, () =>
+    /// <summary>
+    /// Access → Execution: access verified before the start date (FR-ACC-04). Re-auth-gated
+    /// privileged action (SEC-IAM-04); the param defaults true for non-UI callers.
+    /// </summary>
+    public Result VerifyAccess(string actor, bool reAuthenticated = true, string source = "api") =>
+        Guarded(Stage.Access, () => reAuthenticated
+                ? Result.Success()
+                : Result.Fail("Re-authentication required to verify access (SEC-IAM-04)."),
+            "Access.Verified", actor, source, () =>
         {
             AccessVerified = true;
             CurrentStage = Stage.Execution;

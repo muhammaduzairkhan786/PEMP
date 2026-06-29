@@ -72,6 +72,6 @@ else
         var result = await Store.ExecuteAsync(Id, e => e.CompleteAssessment(Session.Actor));
         _done = result.Ok;
         _err = result.Error;
-        _rec = await Store.GetAsync(Id);
+        _rec = await Store.GetScopedAsync(Id, Session.AppScope, Session.TesterScope);
     }
 }

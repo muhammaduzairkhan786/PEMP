@@ -61,7 +61,8 @@ public static class Workflow
         Stage.Report when !r.DraftGenerated => (ActionKind.GenerateDraft, "Re-draft report (address QA comments)", "Tester"),
         Stage.Report when !r.PeerReviewPassed => (ActionKind.PeerReview, "Peer QA review", "Tester"),
         Stage.Report => (ActionKind.ReleaseFinal, "Release final report", "Tester"),
-        Stage.Closed when !r.RetestRequested => (ActionKind.RequestRetest, "Request a retest", "Acme CA Officer"),
+        // Closed is terminal/"done" — a retest is an OPTIONAL action offered on the page,
+        // not a mandatory My-Turn item. Retest child has its own owned action.
         Stage.Retest => (ActionKind.CompleteRetest, "Re-verify findings & complete retest", "Tester"),
         _ => (ActionKind.None, "—", ""),
     };

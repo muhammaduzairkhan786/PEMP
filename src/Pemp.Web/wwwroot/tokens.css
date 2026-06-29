@@ -9,7 +9,6 @@
   /* ---- Colour: canvas / surface / ink ---- */
   --canvas:        #0a0e17;   /* deep slate app background */
   --surface:       #121826;   /* raised slate — cards/drawers */
-  --surface-2:     #18203200; /* (unused alpha placeholder) */
   --surface-raised:#1a2235;
   --surface-modal: #1c2740;
   --ink:           #e7ecf5;   /* near-white primary text */

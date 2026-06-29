@@ -67,19 +67,19 @@ else
             <div class="card"><b>Engagement closed.</b> Final report released and stored immutable (FR-REP-04).
                 @if (_rec.RetestRequested){<span class="muted"> · ↻ a retest child engagement was created.</span>}
             </div>
+            @if (_rec.CurrentStage == Stage.Closed && !_rec.RetestRequested && (Session.Role is "Acme CA Officer" or "Stakeholder"))
+            {
+                <div style="margin-top:var(--space-2)"><button class="btn ghost" @onclick="Retest">↻ Request a retest (optional) · FR-RET-01</button></div>
+            }
         }
         else if (mine)
         {
             <div class="card nextaction">
-                <div style="font-size:26px">@(next.Kind == ActionKind.RequestRetest ? "↻" : "▸")</div>
+                <div style="font-size:26px">▸</div>
                 <div class="meta"><b>@next.Label</b><span class="muted">Owner: You (@Session.Role)@(Workflow.NeedsReauth(next.Kind) ? " · re-auth required (SEC-IAM-04)" : "")</span></div>
                 @if (next.Kind == ActionKind.CompleteAssessment)
                 {
                     <a class="btn primary" href="@($"engagement/{Id}/assessment")">Open assessment form ▶</a>
-                }
-                else if (next.Kind == ActionKind.RequestRetest)
-                {
-                    <button class="btn primary" @onclick="Retest">@next.Label ▶</button>
                 }
                 else if (next.Kind == ActionKind.PeerReview)
                 {
@@ -90,14 +90,6 @@ else
                 {
                     <button class="btn primary" @onclick="() => OnAct(next.Kind)">@next.Label ▶</button>
                 }
-            </div>
-        }
-        else if (next.Kind == ActionKind.RequestRetest && Session.Role == "Stakeholder")
-        {
-            <div class="card nextaction">
-                <div style="font-size:26px">↻</div>
-                <div class="meta"><b>@next.Label</b><span class="muted">Owner: You (Stakeholder) · FR-RET-01</span></div>
-                <button class="btn primary" @onclick="Retest">@next.Label ▶</button>
             </div>
         }
         else
@@ -164,6 +156,7 @@ else
 
     // QA peer reviewer must differ from the assigned tester (no self-review, FR-REP-02).
     Guid Reviewer() => _rec!.AssignedTesterId == DemoSeeder.TesterPatel ? DemoSeeder.TesterKhan : DemoSeeder.TesterPatel;
+    string ReviewerName() => Reviewer() == DemoSeeder.TesterKhan ? "A. Khan" : "R. Patel";
 
     Guid _loadedId;
     bool _loaded;
@@ -221,7 +214,7 @@ else
     string[] ModalLines() => _reauthFor switch
     {
         ActionKind.SignSow => new[] { $"Scope: {_rec!.AppName} ({_rec.Type})", "Methodology & dates per the SoW draft", "Prerequisites & test accounts" },
-        ActionKind.VerifyAccess => new[] { "Access to the in-scope environments is provisioned and working", "An IR advance notice will be sent", "The testing window opens on confirm" },
+        ActionKind.VerifyAccess => new[] { "Access to the in-scope environments is provisioned and working", "Credentials are valid and time-boxed", "Access is verified — testing can then begin (IR notice next)" },
         _ => new[] { "Final report — peer QA passed", "Vulnerability register snapshot", "Stored immutable on release" },
     };
 
@@ -238,12 +231,12 @@ else
             ActionKind.CompleteAssessment => await Store.ExecuteAsync(Id, e => e.CompleteAssessment(actor)),
             ActionKind.ReviewSow        => await Store.ExecuteAsync(Id, e => e.ReviewSowAsDeliveryManager(actor)),
             ActionKind.SignSow          => await Store.ExecuteAsync(Id, e => e.SignSow(actor, reauth)),
-            ActionKind.VerifyAccess     => await Store.ExecuteAsync(Id, e => e.VerifyAccess(actor)),
+            ActionKind.VerifyAccess     => await Store.ExecuteAsync(Id, e => e.VerifyAccess(actor, reauth)),
             ActionKind.SendIr           => await Store.ExecuteAsync(Id, e => e.SendIrNotice(actor)),
             ActionKind.EndTest          => await Store.ExecuteAsync(Id, e => e.EndTest(actor)),
             ActionKind.GenerateDraft    => await Store.ExecuteAsync(Id, e => e.GenerateDraft(actor)),
-            ActionKind.PeerReview       => await Store.ExecuteAsync(Id, e => e.PeerReview(Reviewer(), true, actor)),
-            ActionKind.PeerReviewReject => await Store.ExecuteAsync(Id, e => e.PeerReview(Reviewer(), false, actor)),
+            ActionKind.PeerReview       => await Store.ExecuteAsync(Id, e => e.PeerReview(Reviewer(), true, ReviewerName())),
+            ActionKind.PeerReviewReject => await Store.ExecuteAsync(Id, e => e.PeerReview(Reviewer(), false, ReviewerName())),
             ActionKind.ReleaseFinal     => await Store.ExecuteAsync(Id, e => e.ReleaseFinal(actor, reauth)),
             ActionKind.CompleteRetest   => await Store.ExecuteAsync(Id, e => e.CompleteRetest(actor)),
             _ => Result.Fail("Unsupported action."),

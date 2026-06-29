@@ -23,7 +23,7 @@
                 </select>
             </div>
             <div class="q"><b>Application</b><br>
-                <input class="inp" @bind="_app" placeholder="e.g. Claims Portal" />
+                <input class="inp" @bind="_app" @bind:event="oninput" placeholder="e.g. Claims Portal" />
             </div>
             <div class="q" style="border:none"><b>Criticality</b><br>
                 <select class="inp" @bind="_crit"><option>High</option><option>Medium</option><option>Low</option></select>

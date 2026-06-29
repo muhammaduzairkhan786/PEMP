@@ -6,9 +6,10 @@
     @for (var i = 0; i < Workflow.Spine.Length; i++)
     {
         var s = Workflow.Spine[i];
-        var cls = i < curIdx ? "done" : i == curIdx ? "current" : i == curIdx + 1 ? "locked" : "future";
-        var glyph = i < curIdx ? "✓" : i == curIdx + 1 ? "🔒" : "";
-        var locked = i == curIdx + 1;
+        var terminal = Current is Stage.Closed or Stage.Retest;   // no "next locked" cue at terminal stages
+        var cls = i < curIdx ? "done" : i == curIdx ? "current" : (!terminal && i == curIdx + 1) ? "locked" : "future";
+        var glyph = i < curIdx ? "✓" : (!terminal && i == curIdx + 1) ? "🔒" : "";
+        var locked = !terminal && i == curIdx + 1;
         <div class="node @cls" title="@(locked ? $"Locked — finish {Workflow.Label(Current)} first" : Workflow.Label(s))">
             <div class="connector"></div>
             <div class="bead">@glyph</div>
