@@ -73,6 +73,11 @@ else
                 {
                     <button class="btn primary" @onclick="Retest">@next.Label ▶</button>
                 }
+                else if (next.Kind == ActionKind.PeerReview)
+                {
+                    <button class="btn" @onclick="() => OnAct(ActionKind.PeerReviewReject)">Return to draft</button>
+                    <button class="btn primary" @onclick="() => OnAct(ActionKind.PeerReview)">Pass QA ▶</button>
+                }
                 else
                 {
                     <button class="btn primary" @onclick="() => OnAct(next.Kind)">@next.Label ▶</button>
@@ -89,7 +94,12 @@ else
         }
         else
         {
-            <div class="card">⏳ Waiting on <b>@next.OwnerRole</b> — "@next.Label". <span class="muted">You're viewing as @Session.Role.</span></div>
+            <div class="card">⏳ Waiting on <b>@next.OwnerRole</b> — "@next.Label". <span class="muted">You're viewing as @Session.Role.</span>
+                @if (next.Kind == ActionKind.CompleteAssessment && Session.Role == "Tester")
+                {
+                    <div style="margin-top:10px"><a class="btn ghost" href="@($"engagement/{Id}/assessment")">Open assessment form (assist)</a></div>
+                }
+            </div>
         }
 
         <AccessRequirements EngagementId="Id" Reqs="_access" Editable="@(_rec.CurrentStage == Stage.Access && Session.Role == "Tester")" />
@@ -144,7 +154,8 @@ else
     bool? _chainOk;
     ActionKind _reauthFor = ActionKind.None;
 
-    static readonly Guid PeerReviewer = Guid.Parse("99999999-9999-9999-9999-999999999999");
+    // QA peer reviewer must differ from the assigned tester (no self-review, FR-REP-02).
+    Guid Reviewer() => _rec!.AssignedTesterId == DemoSeeder.TesterPatel ? DemoSeeder.TesterKhan : DemoSeeder.TesterPatel;
 
     Guid _loadedId;
 
@@ -201,7 +212,8 @@ else
             ActionKind.SendIr           => await Store.ExecuteAsync(Id, e => e.SendIrNotice(actor)),
             ActionKind.EndTest          => await Store.ExecuteAsync(Id, e => e.EndTest(actor)),
             ActionKind.GenerateDraft    => await Store.ExecuteAsync(Id, e => e.GenerateDraft(actor)),
-            ActionKind.PeerReview       => await Store.ExecuteAsync(Id, e => e.PeerReview(PeerReviewer, true, actor)),
+            ActionKind.PeerReview       => await Store.ExecuteAsync(Id, e => e.PeerReview(Reviewer(), true, actor)),
+            ActionKind.PeerReviewReject => await Store.ExecuteAsync(Id, e => e.PeerReview(Reviewer(), false, actor)),
             ActionKind.ReleaseFinal     => await Store.ExecuteAsync(Id, e => e.ReleaseFinal(actor, reauth)),
             ActionKind.CompleteRetest   => await Store.ExecuteAsync(Id, e => e.CompleteRetest(actor)),
             _ => Result.Fail("Unsupported action."),
