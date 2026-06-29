@@ -69,6 +69,12 @@ else
 
         <FindingsRegister Findings="_findings" />
 
+        @if ((int)_rec.CurrentStage >= (int)Stage.Access)
+        {
+            <ChecklistPanel EngagementId="Id" Done="_checklist"
+                            Editable="@(Session.Role == "Tester" && (int)_rec.CurrentStage >= (int)Stage.Access && _rec.CurrentStage != Stage.Closed)" />
+        }
+
         <div class="sectionlabel">
             Audit trail <span class="srs">SEC-AUD-01</span>
             <button class="btn ghost" style="margin-left:8px" @onclick="Verify">Verify chain</button>
@@ -104,6 +110,7 @@ else
     List<AuditEntryRow> _audit = new();
     List<FindingRecord> _findings = new();
     List<AccessRequirementRecord> _access = new();
+    HashSet<string> _checklist = new();
     string? _error, _ok;
     bool? _chainOk;
     ActionKind _reauthFor = ActionKind.None;
@@ -120,6 +127,7 @@ else
             _audit = await Store.AuditForAsync(Id);
             _findings = await Store.FindingsForAsync(Id);
             _access = await Store.AccessReqsForAsync(Id);
+            _checklist = await Store.ChecklistDoneAsync(Id);
         }
     }
 

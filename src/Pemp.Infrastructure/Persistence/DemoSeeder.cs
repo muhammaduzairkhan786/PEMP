@@ -91,6 +91,10 @@ public static class DemoSeeder
             A(pay.Id, "APIs / Postman collection", "token + subscription key", "Other", AccessStatus.AppTeamToProvision)
         );
 
+        // Tester checklist (Tab 4): Retail Web is mid-test — pre-reqs done, some during-test done.
+        foreach (var code in new[] { "PRE-01", "PRE-02", "PRE-03", "PRE-04", "PRE-05", "PRE-06", "DUR-01", "DUR-02", "DUR-03" })
+            db.ChecklistTicks.Add(new ChecklistTickRecord { Id = Guid.NewGuid(), EngagementId = retail.Id, Code = code, Done = true });
+
         db.SaveChanges();
     }
 }

@@ -54,6 +54,20 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
         await db.SaveChangesAsync();
     }
 
+    // ---- Tester checklists (workbook Tab 4) --------------------------------
+    public async Task<HashSet<string>> ChecklistDoneAsync(Guid id) =>
+        (await db.ChecklistTicks.AsNoTracking().Where(c => c.EngagementId == id && c.Done).Select(c => c.Code).ToListAsync()).ToHashSet();
+
+    public async Task SetChecklistAsync(Guid id, string code, bool done)
+    {
+        var row = await db.ChecklistTicks.FirstOrDefaultAsync(c => c.EngagementId == id && c.Code == code);
+        if (row is null)
+            db.ChecklistTicks.Add(new ChecklistTickRecord { Id = Guid.NewGuid(), EngagementId = id, Code = code, Done = done });
+        else
+            row.Done = done;
+        await db.SaveChangesAsync();
+    }
+
     /// <summary>
     /// Run a guarded transition on the aggregate. The action invokes a domain method
     /// (e.g. <c>e =&gt; e.SignSow(actor, reAuth: true)</c>). State + audit persist only if it succeeds.

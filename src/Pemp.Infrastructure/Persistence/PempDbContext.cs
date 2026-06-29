@@ -9,6 +9,7 @@ public sealed class PempDbContext(DbContextOptions<PempDbContext> options) : DbC
     public DbSet<FindingRecord> Findings => Set<FindingRecord>();
     public DbSet<AssessmentAnswerRecord> AssessmentAnswers => Set<AssessmentAnswerRecord>();
     public DbSet<AccessRequirementRecord> AccessRequirements => Set<AccessRequirementRecord>();
+    public DbSet<ChecklistTickRecord> ChecklistTicks => Set<ChecklistTickRecord>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -40,5 +41,9 @@ public sealed class PempDbContext(DbContextOptions<PempDbContext> options) : DbC
         acc.HasKey(a => a.Id);
         acc.HasIndex(a => a.EngagementId);
         acc.Property(a => a.Status).HasConversion<string>();
+
+        var chk = b.Entity<ChecklistTickRecord>();
+        chk.HasKey(c => c.Id);
+        chk.HasIndex(c => new { c.EngagementId, c.Code }).IsUnique();
     }
 }

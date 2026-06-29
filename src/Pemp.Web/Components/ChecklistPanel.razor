@@ -1,0 +1,43 @@
+@* Tester action checklists (workbook Tab 4): pre-requisites / during / end-of-test *@
+@inject EngagementStore Store
+
+<div class="sectionlabel">
+    Tester checklist <span class="srs">SOP Tab 4</span>
+    <span class="muted" style="margin-left:8px">@_done.Count / @ChecklistTemplate.TotalItems done</span>
+</div>
+<div class="meter"><i style="width:@Pct%"></i></div>
+
+@foreach (var g in ChecklistTemplate.Groups)
+{
+    var gdone = g.Items.Count(i => _done.Contains(i.Code));
+    <div class="card">
+        <div class="sectionlabel" style="margin-top:0">@g.Name <span class="muted">(@gdone / @g.Items.Length)</span></div>
+        @foreach (var item in g.Items)
+        {
+            <label class="chkrow">
+                <input type="checkbox" checked="@_done.Contains(item.Code)" disabled="@(!Editable)" @onchange="e => Toggle(item.Code, e)" />
+                <span class="ref">@item.Code</span>
+                <span class="@(_done.Contains(item.Code) ? "chkdone" : "")">@item.Text</span>
+            </label>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public Guid EngagementId { get; set; }
+    [Parameter] public HashSet<string> Done { get; set; } = new();
+    [Parameter] public bool Editable { get; set; }
+
+    HashSet<string> _done = new();
+    int Pct => ChecklistTemplate.TotalItems == 0 ? 0 : (int)Math.Round(100.0 * _done.Count / ChecklistTemplate.TotalItems);
+
+    protected override void OnParametersSet() => _done = new HashSet<string>(Done);
+
+    async Task Toggle(string code, ChangeEventArgs e)
+    {
+        if (!Editable) return;
+        var on = e.Value is true;
+        if (on) _done.Add(code); else _done.Remove(code);
+        await Store.SetChecklistAsync(EngagementId, code, on);
+    }
+}
