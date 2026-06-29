@@ -6,6 +6,7 @@ public sealed class PempDbContext(DbContextOptions<PempDbContext> options) : DbC
 {
     public DbSet<EngagementRecord> Engagements => Set<EngagementRecord>();
     public DbSet<AuditEntryRow> AuditEntries => Set<AuditEntryRow>();
+    public DbSet<FindingRecord> Findings => Set<FindingRecord>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -22,5 +23,11 @@ public sealed class PempDbContext(DbContextOptions<PempDbContext> options) : DbC
         aud.HasKey(a => a.Sequence);
         aud.Property(a => a.Sequence).ValueGeneratedNever(); // sequence is chain-assigned, not DB identity
         aud.HasIndex(a => a.EngagementId);
+
+        var fnd = b.Entity<FindingRecord>();
+        fnd.HasKey(f => f.Id);
+        fnd.HasIndex(f => f.EngagementId);
+        fnd.Property(f => f.Severity).HasConversion<string>();
+        fnd.Property(f => f.Status).HasConversion<string>();
     }
 }

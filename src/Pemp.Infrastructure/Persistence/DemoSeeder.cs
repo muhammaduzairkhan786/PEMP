@@ -62,6 +62,19 @@ public static class DemoSeeder
         broker.ReleaseFinal(acme, reAuthenticated: true);
         db.Engagements.Add(EngagementRecord.FromDomain(broker, "Broker Portal", "Low", "A. Khan"));
 
+        // Live register (FR-FND): findings for the engagements that have reached testing.
+        FindingRecord F(Guid eng, string title, Severity sev, string cvss, string asset, FindingStatus status)
+            => new() { Id = Guid.NewGuid(), EngagementId = eng, Title = title, Severity = sev, Cvss = cvss, Asset = asset, Status = status };
+        db.Findings.AddRange(
+            F(retail.Id, "Auth bypass via JWT confusion", Severity.Critical, "9.1", "API", FindingStatus.Open),
+            F(retail.Id, "SQLi in /claims search", Severity.High, "8.1", "Web", FindingStatus.RetestPending),
+            F(retail.Id, "Stored XSS in note field", Severity.High, "7.4", "Web", FindingStatus.Open),
+            F(retail.Id, "Verbose error disclosure", Severity.Medium, "5.3", "API", FindingStatus.Remediated),
+            F(retail.Id, "Missing cookie security flags", Severity.Low, "3.1", "Web", FindingStatus.Open),
+            F(broker.Id, "Insecure direct object reference", Severity.High, "7.7", "Web", FindingStatus.Closed),
+            F(broker.Id, "Weak password policy", Severity.Medium, "4.8", "Web", FindingStatus.Closed)
+        );
+
         db.SaveChanges();
     }
 }

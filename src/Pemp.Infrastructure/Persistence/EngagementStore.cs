@@ -21,6 +21,10 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
     public Task<List<AuditEntryRow>> AuditForAsync(Guid id) =>
         db.AuditEntries.AsNoTracking().Where(a => a.EngagementId == id).OrderBy(a => a.Sequence).ToListAsync();
 
+    public Task<List<FindingRecord>> FindingsForAsync(Guid id) =>
+        db.Findings.AsNoTracking().Where(f => f.EngagementId == id)
+          .OrderBy(f => f.Severity).ThenBy(f => f.Title).ToListAsync();
+
     public bool VerifyChain() => new EfAuditChain(db).Verify();
 
     /// <summary>
