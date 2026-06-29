@@ -78,7 +78,7 @@ public static class DemoSeeder
             fSqli, fXss,
             F(retail.Id, "Verbose error disclosure", Severity.Medium, "5.3", "API", FindingStatus.Remediated),
             F(retail.Id, "Missing cookie security flags", Severity.Low, "3.1", "Web", FindingStatus.Open),
-            F(broker.Id, "Insecure direct object reference", Severity.High, "7.7", "Web", FindingStatus.Closed),
+            F(broker.Id, "Insecure direct object reference", Severity.High, "7.7", "Web", FindingStatus.RetestPending),
             F(broker.Id, "Weak password policy", Severity.Medium, "4.8", "Web", FindingStatus.Closed)
         );
 

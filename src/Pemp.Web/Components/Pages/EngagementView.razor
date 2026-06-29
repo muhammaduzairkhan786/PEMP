@@ -56,33 +56,35 @@ else
 
         @if (next.Kind == ActionKind.None)
         {
-            <div class="card"><b>Engagement closed.</b> Final report released and stored immutable (FR-REP-04).</div>
-            @if (_rec.CurrentStage == Stage.Closed && _rec.RetestRequested)
-            {
-                <div class="card muted">↻ Retest already requested — a linked child engagement was created.</div>
-            }
-            else if (_rec.CurrentStage == Stage.Closed && (Session.Role is "Stakeholder" or "Acme CA Officer"))
-            {
-                <div class="card nextaction">
-                    <div style="font-size:26px">↻</div>
-                    <div class="meta"><b>Request a retest</b><span class="muted">Owner: You (@Session.Role) · FR-RET-01</span></div>
-                    <button class="btn primary" @onclick="Retest">Request retest ▶</button>
-                </div>
-            }
+            <div class="card"><b>Engagement closed.</b> Final report released and stored immutable (FR-REP-04).
+                @if (_rec.RetestRequested){<span class="muted"> · ↻ a retest child engagement was created.</span>}
+            </div>
         }
         else if (mine)
         {
             <div class="card nextaction">
-                <div style="font-size:26px">▸</div>
+                <div style="font-size:26px">@(next.Kind == ActionKind.RequestRetest ? "↻" : "▸")</div>
                 <div class="meta"><b>@next.Label</b><span class="muted">Owner: You (@Session.Role)@(Workflow.NeedsReauth(next.Kind) ? " · re-auth required (SEC-IAM-04)" : "")</span></div>
                 @if (next.Kind == ActionKind.CompleteAssessment)
                 {
                     <a class="btn primary" href="@($"engagement/{Id}/assessment")">Open assessment form ▶</a>
                 }
+                else if (next.Kind == ActionKind.RequestRetest)
+                {
+                    <button class="btn primary" @onclick="Retest">@next.Label ▶</button>
+                }
                 else
                 {
                     <button class="btn primary" @onclick="() => OnAct(next.Kind)">@next.Label ▶</button>
                 }
+            </div>
+        }
+        else if (next.Kind == ActionKind.RequestRetest && Session.Role == "Stakeholder")
+        {
+            <div class="card nextaction">
+                <div style="font-size:26px">↻</div>
+                <div class="meta"><b>@next.Label</b><span class="muted">Owner: You (Stakeholder) · FR-RET-01</span></div>
+                <button class="btn primary" @onclick="Retest">@next.Label ▶</button>
             </div>
         }
         else
@@ -144,7 +146,16 @@ else
 
     static readonly Guid PeerReviewer = Guid.Parse("99999999-9999-9999-9999-999999999999");
 
-    protected override async Task OnInitializedAsync() => await Load();
+    Guid _loadedId;
+
+    // Load on parameter set (guarded on Id change) so EngagementView→EngagementView
+    // navigation (e.g. opening a spawned retest child) refreshes instead of showing stale data.
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Id == _loadedId) return;
+        _loadedId = Id;
+        await Load();
+    }
 
     async Task Load()
     {
@@ -192,7 +203,8 @@ else
             ActionKind.GenerateDraft    => await Store.ExecuteAsync(Id, e => e.GenerateDraft(actor)),
             ActionKind.PeerReview       => await Store.ExecuteAsync(Id, e => e.PeerReview(PeerReviewer, true, actor)),
             ActionKind.ReleaseFinal     => await Store.ExecuteAsync(Id, e => e.ReleaseFinal(actor, reauth)),
-            _ => Result.Fail("Retest spawns a child engagement — wired in a later pass."),
+            ActionKind.CompleteRetest   => await Store.ExecuteAsync(Id, e => e.CompleteRetest(actor)),
+            _ => Result.Fail("Unsupported action."),
         };
 
         if (result.Failed) _error = result.Error;

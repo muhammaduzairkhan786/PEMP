@@ -45,8 +45,12 @@ else
     bool? _done;
     string? _err;
 
-    protected override async Task OnInitializedAsync()
+    Guid _loadedId;
+
+    protected override async Task OnParametersSetAsync()
     {
+        if (Id == _loadedId) return;
+        _loadedId = Id;
         _rec = await Store.GetAsync(Id);
         _answers = await Store.AssessmentAnswersAsync(Id);
     }

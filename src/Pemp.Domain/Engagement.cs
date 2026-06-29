@@ -205,6 +205,8 @@ public sealed class Engagement
         child = null;
         if (CurrentStage != Stage.Closed)
             return Result.Fail($"Retest can only be requested on a closed engagement (currently {CurrentStage}).");
+        if (RetestRequested)
+            return Result.Fail("A retest has already been requested for this engagement.");
         if (string.IsNullOrWhiteSpace(childReference))
             return Result.Fail("Child reference must be minted for the retest.");
 
@@ -219,6 +221,14 @@ public sealed class Engagement
         child = c;
         return Result.Success();
     }
+
+    /// <summary>
+    /// Retest child: the tester has re-verified the in-scope findings (pass/fail each) →
+    /// close the child with its retest report (FR-RET-03/04).
+    /// </summary>
+    public Result CompleteRetest(string actor, string source = "api") =>
+        Guarded(Stage.Retest, () => Result.Success(), "Retest.Completed", actor, source,
+            () => CurrentStage = Stage.Closed);
 
     // ---- guard helper ------------------------------------------------------
 

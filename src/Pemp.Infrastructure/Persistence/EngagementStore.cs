@@ -106,6 +106,18 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
         parent.CopyFrom(aggregate);
         var childRec = EngagementRecord.FromDomain(child, $"{parent.AppName} (retest)", parent.Criticality, parent.AssignedTesterName);
         db.Engagements.Add(childRec);
+
+        // Carry the unresolved (in-scope) findings into the child to be re-verified (FR-RET-03).
+        var inScope = await db.Findings.AsNoTracking()
+            .Where(f => f.EngagementId == parentId && (f.Status == FindingStatus.Open || f.Status == FindingStatus.RetestPending))
+            .ToListAsync();
+        foreach (var f in inScope)
+            db.Findings.Add(new FindingRecord
+            {
+                Id = Guid.NewGuid(), EngagementId = child.Id, Title = f.Title,
+                Severity = f.Severity, Cvss = f.Cvss, Asset = f.Asset, Status = FindingStatus.RetestPending,
+            });
+
         await db.SaveChangesAsync();
         return (result, child.Id);
     }

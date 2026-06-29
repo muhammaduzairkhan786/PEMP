@@ -105,6 +105,21 @@ public sealed class PersistenceTests : IDisposable
         Assert.Equal(Stage.Retest, child.CurrentStage);
         Assert.True((await _store.GetAsync(parentId))!.RetestRequested);
         Assert.True(new EfAuditChain(_db).Verify());
+
+        // in-scope (unresolved) findings are carried into the child to re-verify
+        var childFindings = await _store.FindingsForAsync(childId.Value);
+        Assert.NotEmpty(childFindings);
+        Assert.All(childFindings, f => Assert.Equal(FindingStatus.RetestPending, f.Status));
+
+        // double retest is rejected by the domain
+        var second = await _store.RequestRetestAsync(parentId, "stakeholder");
+        Assert.True(second.Result.Failed);
+
+        // the child re-verifies and closes
+        var done = await _store.ExecuteAsync(childId.Value, e => e.CompleteRetest("tester"));
+        Assert.False(done.Failed);
+        Assert.Equal(Stage.Closed, (await _store.GetAsync(childId.Value))!.CurrentStage);
+        Assert.True(new EfAuditChain(_db).Verify());
     }
 
     public void Dispose()

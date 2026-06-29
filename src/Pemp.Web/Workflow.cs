@@ -6,7 +6,8 @@ namespace Pemp.Web;
 public enum ActionKind
 {
     None, RouteToDm, AssignTester, CompleteAssessment, ReviewSow, SignSow,
-    VerifyAccess, SendIr, EndTest, GenerateDraft, PeerReview, ReleaseFinal, RequestRetest
+    VerifyAccess, SendIr, EndTest, GenerateDraft, PeerReview, PeerReviewReject,
+    ReleaseFinal, RequestRetest, CompleteRetest
 }
 
 /// <summary>
@@ -19,7 +20,7 @@ public static class Workflow
     /// <summary>The linear master spine shown in the UI (Retest is a child engagement).</summary>
     public static readonly Stage[] Spine =
         { Stage.Intake, Stage.Assignment, Stage.Scoping, Stage.Sow, Stage.Access,
-          Stage.Execution, Stage.Findings, Stage.Report, Stage.Closed };
+          Stage.Execution, Stage.Findings, Stage.Report, Stage.Closed, Stage.Retest };
 
     public static string Label(Stage s) => s switch
     {
@@ -58,7 +59,8 @@ public static class Workflow
         Stage.Findings => (ActionKind.GenerateDraft, "Generate draft report", "Tester"),
         Stage.Report when !r.PeerReviewPassed => (ActionKind.PeerReview, "Peer QA review", "Tester"),
         Stage.Report => (ActionKind.ReleaseFinal, "Release final report", "Acme CA Officer"),
-        // Closed: retest (child engagement) is a later pass — show the closed state for now.
+        Stage.Closed when !r.RetestRequested => (ActionKind.RequestRetest, "Request a retest", "Acme CA Officer"),
+        Stage.Retest => (ActionKind.CompleteRetest, "Re-verify findings & complete retest", "Tester"),
         _ => (ActionKind.None, "—", ""),
     };
 }
