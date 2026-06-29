@@ -103,6 +103,24 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
     }
 
     /// <summary>
+    /// Assign a tester (FR-ASG-03) and record the display name together, so the card/header
+    /// don't show a stale "—" after assignment.
+    /// </summary>
+    public async Task<Result> AssignTesterAsync(Guid id, Guid testerId, string testerName, string actor)
+    {
+        var rec = await db.Engagements.FirstOrDefaultAsync(e => e.Id == id);
+        if (rec is null) return Result.Fail("Engagement not found.");
+        var chain = new EfAuditChain(db);
+        var aggregate = rec.ToDomain(chain, clock);
+        var result = aggregate.AssignTester(testerId, actor);
+        if (result.Failed) return result;
+        rec.CopyFrom(aggregate);
+        rec.AssignedTesterName = testerName;
+        await db.SaveChangesAsync();
+        return result;
+    }
+
+    /// <summary>
     /// Request a retest on a closed engagement (FR-RET-01/02): spawns a linked child that
     /// re-verifies remediated findings. Persists the parent (RetestRequested) + the new
     /// child record + the audit entries together. Returns the child id on success.

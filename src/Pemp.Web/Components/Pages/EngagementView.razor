@@ -204,7 +204,7 @@ else
         var result = k switch
         {
             ActionKind.RouteToDm        => await Store.ExecuteAsync(Id, e => e.RouteToDeliveryManager(actor)),
-            ActionKind.AssignTester     => await Store.ExecuteAsync(Id, e => e.AssignTester(DemoSeeder.TesterKhan, actor)),
+            ActionKind.AssignTester     => await Store.AssignTesterAsync(Id, DemoSeeder.TesterKhan, "A. Khan", actor),
             ActionKind.CompleteAssessment => await Store.ExecuteAsync(Id, e => e.CompleteAssessment(actor)),
             ActionKind.ReviewSow        => await Store.ExecuteAsync(Id, e => e.ReviewSowAsDeliveryManager(actor)),
             ActionKind.SignSow          => await Store.ExecuteAsync(Id, e => e.SignSow(actor, reauth)),

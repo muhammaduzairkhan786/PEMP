@@ -68,6 +68,15 @@ public static class DemoSeeder
         mobile.AssignTester(TesterLee, dm);
         db.Engagements.Add(EngagementRecord.FromDomain(mobile, "Mobile App", "Medium", "S. Lee"));
 
+        // Partner Portal — freshly raised, at Intake (DM to route).
+        var intake = Engagement.Raise("ENG-2026-0422", EngagementType.Bau, "system", chain, clock);
+        db.Engagements.Add(EngagementRecord.FromDomain(intake, "Partner Portal", "Medium", null));
+
+        // Quote Engine — routed, awaiting tester assignment (DM's turn).
+        var assign = Engagement.Raise("ENG-2026-0423", EngagementType.Project, "system", chain, clock);
+        assign.RouteToDeliveryManager(dm);
+        db.Engagements.Add(EngagementRecord.FromDomain(assign, "Quote Engine", "High", null));
+
         // Live register (FR-FND): findings for the engagements that have reached testing.
         FindingRecord F(Guid eng, string title, Severity sev, string cvss, string asset, FindingStatus status)
             => new() { Id = Guid.NewGuid(), EngagementId = eng, Title = title, Severity = sev, Cvss = cvss, Asset = asset, Status = status };

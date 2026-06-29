@@ -21,7 +21,8 @@ else
             <div class="banner @(_done.Value ? "ok" : "err")">@(_done.Value ? "✓ Assessment marked complete — Scoping advances to SoW." : "⛔ " + _err)</div>
         }
 
-        <AssessmentForm EngagementId="Id" Answers="_answers" ReadOnly="@(_rec.CurrentStage != Stage.Scoping)" />
+        <AssessmentForm EngagementId="Id" Answers="_answers"
+                        ReadOnly="@(_rec.CurrentStage != Stage.Scoping || !(Session.Role is "Stakeholder" or "Tester"))" />
 
         @if (canComplete)
         {
