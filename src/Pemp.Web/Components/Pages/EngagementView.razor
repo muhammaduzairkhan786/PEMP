@@ -33,7 +33,7 @@ else
             <div class="scrim" @onclick="Cancel">
                 <div class="modal" @onclick:stopPropagation="true">
                     <h3>@ModalTitle()</h3>
-                    <p class="muted" style="margin-bottom:12px">@(_reauthFor == ActionKind.SignSow ? "You are agreeing to:" : "You are releasing:")</p>
+                    <p class="muted" style="margin-bottom:12px">@ModalIntro()</p>
                     <ul class="attest">@foreach (var l in ModalLines()){<li>@l</li>}</ul>
                     <div class="chainline"><span class="tick">🔗</span> Creates an immutable, hash-chained record · <span class="srs">SEC-AUD-01</span></div>
                     <div class="reauthnote">🔐 Re-authenticate via Entra MFA before it commits · <span class="srs">SEC-IAM-04</span></div>
@@ -189,11 +189,26 @@ else
 
     void Cancel() => _reauthFor = ActionKind.None;
 
-    string ModalTitle() => _reauthFor == ActionKind.SignSow ? "Sign Statement of Work" : "Release final report";
+    string ModalTitle() => _reauthFor switch
+    {
+        ActionKind.SignSow => "Sign Statement of Work",
+        ActionKind.VerifyAccess => "Verify access & start testing",
+        _ => "Release final report",
+    };
 
-    string[] ModalLines() => _reauthFor == ActionKind.SignSow
-        ? new[] { $"Scope: {_rec!.AppName} ({_rec.Type})", "Methodology & dates per the SoW draft", "Prerequisites & test accounts" }
-        : new[] { "Final report — peer QA passed", "Vulnerability register snapshot", "Stored immutable on release" };
+    string ModalIntro() => _reauthFor switch
+    {
+        ActionKind.SignSow => "You are agreeing to:",
+        ActionKind.VerifyAccess => "You are confirming:",
+        _ => "You are releasing:",
+    };
+
+    string[] ModalLines() => _reauthFor switch
+    {
+        ActionKind.SignSow => new[] { $"Scope: {_rec!.AppName} ({_rec.Type})", "Methodology & dates per the SoW draft", "Prerequisites & test accounts" },
+        ActionKind.VerifyAccess => new[] { "Access to the in-scope environments is provisioned and working", "An IR advance notice will be sent", "The testing window opens on confirm" },
+        _ => new[] { "Final report — peer QA passed", "Vulnerability register snapshot", "Stored immutable on release" },
+    };
 
     async Task Run(ActionKind k, bool reauth)
     {

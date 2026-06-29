@@ -42,8 +42,9 @@ public static class Workflow
         _ => "",
     };
 
-    /// <summary>Re-auth-gated privileged actions (SEC-IAM-04): credential view, sign, release.</summary>
-    public static bool NeedsReauth(ActionKind k) => k is ActionKind.SignSow or ActionKind.ReleaseFinal;
+    /// <summary>Privileged gate actions that open the attestation + re-auth ceremony (SEC-IAM-04).</summary>
+    public static bool NeedsReauth(ActionKind k) =>
+        k is ActionKind.SignSow or ActionKind.ReleaseFinal or ActionKind.VerifyAccess;
 
     public static (ActionKind Kind, string Label, string OwnerRole) Next(EngagementRecord r) => r.CurrentStage switch
     {
