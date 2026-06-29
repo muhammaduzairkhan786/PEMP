@@ -62,7 +62,16 @@
     EvidenceKind _kind = EvidenceKind.Screenshot;
     string? _msg;
 
-    protected override async Task OnInitializedAsync() => _evidence = await Store.EvidenceForAsync(EngagementId);
+    Guid _loadedId;
+
+    // Reload when the engagement changes (e.g. navigating to a spawned retest child),
+    // not just once per instance — same fix as EngagementView/Assessment.
+    protected override async Task OnParametersSetAsync()
+    {
+        if (EngagementId == _loadedId) return;
+        _loadedId = EngagementId;
+        _evidence = await Store.EvidenceForAsync(EngagementId);
+    }
 
     async Task Add()
     {

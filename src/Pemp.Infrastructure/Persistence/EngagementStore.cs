@@ -30,6 +30,20 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
     public Task<EngagementRecord?> GetAsync(Guid id) =>
         db.Engagements.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id);
 
+    /// <summary>
+    /// Object-level authorized fetch (anti-BOLA/IDOR, SEC-AZN-02): returns null if the
+    /// record is outside the caller's scope, so a direct URL can't reach another app's
+    /// or another tester's engagement. Null filters = unrestricted (Acme/DM/Admin).
+    /// </summary>
+    public async Task<EngagementRecord?> GetScopedAsync(Guid id, string? appName, string? assignedToName)
+    {
+        var rec = await db.Engagements.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id);
+        if (rec is null) return null;
+        if (appName is not null && rec.AppName != appName && rec.AppName != appName + " (retest)") return null;
+        if (assignedToName is not null && rec.AssignedTesterName != assignedToName) return null;
+        return rec;
+    }
+
     /// <summary>All findings across the portfolio (FR-ANL-04 analytics).</summary>
     public Task<List<FindingRecord>> AllFindingsAsync() =>
         db.Findings.AsNoTracking().ToListAsync();

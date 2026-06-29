@@ -7,7 +7,7 @@
 <div class="wrap">
     <div class="eyebrow">Acme CA Officer</div>
     <h1 class="title">New request</h1>
-    <p class="sub">A short request, not a long form. It enters Intake and routes to the Delivery Manager.</p>
+    <p class="sub">A short request, not a long form. It enters Intake; the Delivery Manager picks it up next.</p>
 
     @if (Session.Role != "Acme CA Officer")
     {
@@ -32,7 +32,7 @@
 
         <div class="card nextaction">
             <div style="font-size:26px">＋</div>
-            <div class="meta"><b>Raise request</b><span class="muted">FR-REQ-01/04 · reference minted, routed to the DM</span></div>
+            <div class="meta"><b>Raise request</b><span class="muted">FR-REQ-01/04 · reference minted, enters Intake</span></div>
             <button class="btn primary" @onclick="Raise" disabled="@string.IsNullOrWhiteSpace(_app)">Raise request ▶</button>
         </div>
 

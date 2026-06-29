@@ -30,10 +30,10 @@ public static class DemoSeeder
         // Payments API — BAU, signed, awaiting access verification.
         var pay = Engagement.Raise("ENG-2026-0419", EngagementType.Bau, "system", chain, clock);
         pay.RouteToDeliveryManager(dm);
-        pay.AssignTester(TesterLee, dm);
-        pay.CompleteAssessment("S. Lee");
+        pay.AssignTester(TesterKhan, dm);                 // A. Khan (default Tester persona) → real work at Access
+        pay.CompleteAssessment("A. Khan");
         pay.SignSow(acme, reAuthenticated: true);
-        db.Engagements.Add(EngagementRecord.FromDomain(pay, "Payments API", "Medium", "S. Lee"));
+        db.Engagements.Add(EngagementRecord.FromDomain(pay, "Payments API", "Medium", "A. Khan"));
 
         // Retail Web — Project, in the testing/findings window.
         var retail = Engagement.Raise("ENG-2026-0408", EngagementType.Project, "system", chain, clock);

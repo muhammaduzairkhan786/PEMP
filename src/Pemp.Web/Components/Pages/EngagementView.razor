@@ -4,9 +4,17 @@
 @inject NavigationManager Nav
 <PageTitle>Engagement · PEMP</PageTitle>
 
-@if (_rec is null)
+@if (!_loaded)
 {
     <div class="wrap"><Skeleton Rows="5" /></div>
+}
+else if (_rec is null)
+{
+    <div class="wrap">
+        <h1 class="title">Not available</h1>
+        <p class="sub">This engagement doesn't exist, or it isn't in your scope.</p>
+        <a class="btn primary" href="">⌂ Back to My Turn</a>
+    </div>
 }
 else
 {
@@ -158,6 +166,7 @@ else
     Guid Reviewer() => _rec!.AssignedTesterId == DemoSeeder.TesterPatel ? DemoSeeder.TesterKhan : DemoSeeder.TesterPatel;
 
     Guid _loadedId;
+    bool _loaded;
 
     // Load on parameter set (guarded on Id change) so EngagementView→EngagementView
     // navigation (e.g. opening a spawned retest child) refreshes instead of showing stale data.
@@ -165,12 +174,13 @@ else
     {
         if (Id == _loadedId) return;
         _loadedId = Id;
+        _loaded = false;
         await Load();
     }
 
     async Task Load()
     {
-        _rec = await Store.GetAsync(Id);
+        _rec = await Store.GetScopedAsync(Id, Session.AppScope, Session.TesterScope); // anti-BOLA
         if (_rec is not null)
         {
             _audit = await Store.AuditForAsync(Id);
@@ -178,6 +188,11 @@ else
             _access = await Store.AccessReqsForAsync(Id);
             _checklist = await Store.ChecklistDoneAsync(Id);
         }
+        else
+        {
+            _audit = new(); _findings = new(); _access = new(); _checklist = new();
+        }
+        _loaded = true;
     }
 
     async Task OnAct(ActionKind k)
