@@ -17,6 +17,7 @@
    Pass 4: responsive tablet/phone layout (NFR-USA-04) — desktop untouched.
    Pass 5: real engagement cards with mini-spine (kit #2) for list views.
    Pass 6: skeleton loading on async report generation (NFR-PER-03).
+   Pass 7: capacity-board Mon–Fri load heatmap (FR-ASG-04).
    ============================================================================ */
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
@@ -187,6 +188,12 @@ h1.title{font-size:var(--text-2xl);font-weight:750;margin:4px 0 2px;letter-spaci
 .load{display:inline-block;width:54px;height:7px;border-radius:4px;background:var(--surface-raised);overflow:hidden;vertical-align:middle}
 .load i{display:block;height:100%;background:var(--brand)}
 .fit{font-size:var(--text-xs);font-weight:700}.fit.best{color:var(--state-done)}
+.heat{display:inline-flex;gap:3px}
+.heat .d{width:22px;height:18px;border-radius:4px;border:1px solid var(--border)}
+.heatlbl{display:inline-flex;gap:3px;font-size:9px;color:var(--ink-muted)}
+.heatlbl span{width:22px;text-align:center}
+.heatleg{display:inline-flex;align-items:center;gap:6px;font-size:var(--text-xs);color:var(--ink-muted)}
+.heatleg .d{width:14px;height:10px;border-radius:3px;border:1px solid var(--border)}
 
 /* tables (register / users / audit) */
 table.t{width:100%;border-collapse:collapse;font-size:var(--text-sm)}
@@ -416,6 +423,10 @@ const spark=(pts,cls)=>{const w=100,h=26,mx=Math.max(...pts),mn=Math.min(...pts)
     <polyline points="${d}" fill="none" stroke="${col}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
     <circle cx="${lx}" cy="${ly}" r="1.8" fill="${col}"/></svg>`;};
 const tile=(k,v,t,cls,sp)=>`<div class="tile"><div class="k">${k}</div><div class="v">${v}</div>${sp?spark(sp,cls):''}<div class="t ${cls||''}">${t}</div></div>`;
+// weekly load heatmap (Mon–Fri) — busier days run hotter (FR-ASG-04)
+const DOW=['Mon','Tue','Wed','Thu','Fri'];
+const heat=(days)=>`<div class="heat" role="img" aria-label="Weekly load: ${days.map((v,i)=>DOW[i]+' '+v+'%').join(', ')}">${days.map((v,i)=>`<span class="d" title="${DOW[i]} ${v}%" style="background:color-mix(in srgb,var(--sev-high) ${v}%,var(--surface-raised))"></span>`).join('')}</div>`;
+const heatHdr=`<div class="heatlbl">${DOW.map(d=>`<span>${d[0]}</span>`).join('')}</div>`;
 const stub=()=>`<div class="empty">This surface follows the same pattern — sub-spine + one primary action + role-filtered content.<br><span style="font-size:var(--text-xs)">Representative screen.</span></div>`;
 
 const BODY={
@@ -493,11 +504,12 @@ const BODY={
 'dm:assignments':()=>head('Assignments','Who is on what.')+engCards(),
 'dm:capacity':()=>head('Capacity Board','Assign like moving a sticky note.')+
   nextCard('Assign A. Khan (best fit)','Claims Portal · needs WEB, API · 6 days','FR-ASG-02',false,'Assign A. Khan ▶',"toast('Assigned A. Khan · scoping unlocked.')")+
-  `<div class="card" style="padding:0;overflow:hidden"><table class="cap"><thead><tr><th>Tester</th><th>Skills</th><th>Load</th><th>Fit</th></tr></thead><tbody>
-  <tr><td>A. Khan ✦</td><td><span class="skill">WEB</span><span class="skill">API</span><span class="skill">CLOUD</span></td><td><span class="load"><i style="width:60%"></i></span> 60%</td><td><span class="fit best">● Best</span></td></tr>
-  <tr><td>R. Patel</td><td><span class="skill">WEB</span><span class="skill">MOBILE</span></td><td><span class="load"><i style="width:85%"></i></span> 85%</td><td><span class="fit">○</span></td></tr>
-  <tr><td>S. Lee</td><td><span class="skill">API</span><span class="skill">CLOUD</span></td><td><span class="load"><i style="width:20%"></i></span> 20%</td><td><span class="fit">○</span></td></tr></tbody></table></div>
-  <p class="muted" style="margin-top:8px;font-size:var(--text-sm)">⚠ Assigning R. Patel would over-allocate Tue–Wed — warns, never blocks · <span class="srs">FR-ASG-04</span></p>`,
+  `<div class="card" style="padding:0;overflow:hidden"><table class="cap"><thead><tr><th>Tester</th><th>Skills</th><th>This week ${heatHdr}</th><th>Load</th><th>Fit</th></tr></thead><tbody>
+  <tr><td>A. Khan ✦</td><td><span class="skill">WEB</span><span class="skill">API</span><span class="skill">CLOUD</span></td><td>${heat([40,30,20,90,90])}</td><td><span class="load"><i style="width:60%"></i></span> 60%</td><td><span class="fit best">● Best</span></td></tr>
+  <tr><td>R. Patel</td><td><span class="skill">WEB</span><span class="skill">MOBILE</span></td><td>${heat([80,90,95,40,20])}</td><td><span class="load"><i style="width:85%"></i></span> 85%</td><td><span class="fit">○</span></td></tr>
+  <tr><td>S. Lee</td><td><span class="skill">API</span><span class="skill">CLOUD</span></td><td>${heat([10,20,10,30,20])}</td><td><span class="load"><i style="width:20%"></i></span> 20%</td><td><span class="fit">○</span></td></tr></tbody></table></div>
+  <div style="display:flex;align-items:center;gap:14px;margin-top:8px"><span class="heatleg"><span class="d" style="background:var(--surface-raised)"></span>free<span class="d" style="background:color-mix(in srgb,var(--sev-high) 90%,var(--surface-raised))"></span>busy</span>
+  <p class="muted" style="margin:0;font-size:var(--text-sm)">⚠ R. Patel would over-allocate Tue–Wed — warns, never blocks · <span class="srs">FR-ASG-04</span></p></div>`,
 'dm:engagements':()=>head('Engagements','Everything in flight.')+engCards(),
 'dm:approvals':()=>head('Project SoW Review','Review, then pass to Acme for sign-off.')+
   nextCard('Approve & forward to Acme','Retail Web · v2','FR-SOW-03',false,'Approve → Acme ▶',"toast('SoW approved · sent to Acme.')")+
