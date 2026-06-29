@@ -1,0 +1,61 @@
+@page "/engagement/{Id:guid}/assessment"
+@inject EngagementStore Store
+@inject DemoSession Session
+@inject NavigationManager Nav
+<PageTitle>Assessment · PEMP</PageTitle>
+
+@if (_rec is null)
+{
+    <p class="muted">Loading…</p>
+}
+else
+{
+    var canComplete = _rec.CurrentStage == Stage.Scoping && (Session.Role is "Tester" or "Stakeholder");
+    <div class="wrap">
+        <div class="eyebrow"><a href="@($"engagement/{Id}")">← @_rec.AppName</a></div>
+        <h1 class="title">Assessment &amp; prerequisites</h1>
+        <p class="sub">App-team questionnaire (workbook Tab 1). Conditional questions appear based on app type, hosting, and exposure. Auto-saved.</p>
+
+        @if (_done is not null)
+        {
+            <div class="banner @(_done.Value ? "ok" : "err")">@(_done.Value ? "✓ Assessment marked complete — Scoping advances to SoW." : "⛔ " + _err)</div>
+        }
+
+        <AssessmentForm EngagementId="Id" Answers="_answers" ReadOnly="@(_rec.CurrentStage != Stage.Scoping)" />
+
+        @if (canComplete)
+        {
+            <div class="card nextaction" style="margin-top:var(--space-4)">
+                <div style="font-size:26px">▸</div>
+                <div class="meta"><b>Complete &amp; confirm assessment</b><span class="muted">Owner: You (@Session.Role) · FR-SCO-03</span></div>
+                <button class="btn primary" @onclick="Complete">Complete &amp; confirm ▶</button>
+            </div>
+        }
+        else if (_rec.CurrentStage != Stage.Scoping)
+        {
+            <div class="card muted" style="margin-top:var(--space-4)">Assessment was completed — this engagement has moved past Scoping (read-only).</div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    EngagementRecord? _rec;
+    Dictionary<string, string> _answers = new();
+    bool? _done;
+    string? _err;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _rec = await Store.GetAsync(Id);
+        _answers = await Store.AssessmentAnswersAsync(Id);
+    }
+
+    async Task Complete()
+    {
+        var result = await Store.ExecuteAsync(Id, e => e.CompleteAssessment(Session.Actor));
+        _done = result.Ok;
+        _err = result.Error;
+        _rec = await Store.GetAsync(Id);
+    }
+}

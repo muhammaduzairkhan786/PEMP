@@ -4,16 +4,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state
 
-**Phase 2 (Design) substantially complete; Phase 3 (Implementation) in progress — at the domain core.** See `IMPLEMENTATION_PLAN.md` for the per-phase status and exit criteria.
+**Phase 2 (Design) complete; Phase 3 (Implementation) — a runnable demo vertical slice is built.** See `IMPLEMENTATION_PLAN.md` for the per-phase status. A demo branch (`feature/blazor-demo`) holds the app; `main` is the pre-app baseline (requirements + design + domain core) until that PR merges.
 
 | Phase | Stage | Status |
 |-------|-------|--------|
 | 1 | Requirements | ✅ `PEMP_SRS_v1.0_Master.docx` (released baseline) |
-| 2 | Design | ✅ `DESIGN_PLAN.md` v0.3, `design/architecture.md`, `design/state-machine.md`, `design/prototype/`, `design/compliance/*` |
-| 3 | Implementation | 🟡 domain core landed (`src/Pemp.Domain` + tests) → application → API → infrastructure next |
-| 4–6 | Testing / Security / Deploy | ⬜ not started |
+| 2 | Design | ✅ `DESIGN_PLAN.md` v0.3, `design/*`, prototype, compliance |
+| 3 | Implementation | 🟢 domain + EF persistence + Blazor UI + Entra wiring + Bicep IaC (demo vertical slice). Findings register / evidence / retest-child UI still to build |
+| 4–6 | Testing / Security / Deploy | ⬜ domain unit tests only so far |
 
-> ⚠️ **The C# domain code has never been compiled or run.** It was authored in a cloud sandbox with no .NET SDK (egress blocked installing one), so `src/Pemp.Domain` and its tests are **review-grade but unverified** — first `dotnet build` / `dotnet test` is pending (and this dev machine currently has no SDK either; see Environment setup). Treat a clean build + green guard tests as the immediate next gate before adding layers.
+> ✅ **Built on .NET 10** (Homebrew `dotnet` is 10.x; target bumped from net8 → **net10.0**, still LTS). `dotnet test` = **15/15 domain guard tests green**, 0 code warnings. The demo runs end-to-end on SQLite with a role switcher; Entra + Azure SQL activate via config (see below).
+>
+> **Defining trait stays enforcement:** all UI actions route through the domain guards in `src/Pemp.Domain/Engagement.cs` — a failed guard changes and persists nothing. The hash-chained audit append is atomic with each transition (`EngagementStore.ExecuteAsync`).
 
 ### Repository structure
 ```
@@ -26,27 +28,32 @@ design/                     Phase-2 artifacts
   tokens.css                  design tokens (dark-first) — SPA theme source
   prototype/index.html        self-contained clickable prototype (open in a browser)
   compliance/                 traceability.md · dpia.md · threat-model.md
+infra/                      Bicep IaC (UK Azure) + sample parameters
+docs/azure-entra-setup.md   The user-only Azure/Entra setup steps (app reg, consent, deploy)
 PEMP.sln                    Solution
-Directory.Build.props       Shared build settings (net8.0, C#12, nullable, warnings-as-errors)
+Directory.Build.props       Shared build settings (net10.0, latest C#, nullable, warnings-as-errors)
 src/Pemp.Domain/            Domain core: Engagement state machine + guards, hash-chained Audit, Result
+src/Pemp.Infrastructure/    EF Core (SQLite local / Azure SQL), EfAuditChain, EngagementStore, DemoSeeder
+src/Pemp.Web/               Blazor Web App (interactive server): My-Turn, engagements, spine, gated actions
 tests/Pemp.Domain.Tests/    xUnit — encodes the guard table + audit invariants
 ```
-The application, API, and infrastructure projects in the structure (`Pemp.Application/Api/Infrastructure`) are planned but **not yet created** — build order is Musts-first per `design/architecture.md §6`.
+Application/API layers were collapsed for the demo: `Pemp.Web` calls `EngagementStore` (in Infrastructure) directly. A dedicated `Pemp.Application` use-case layer is the clean next refactor per `design/architecture.md §6`.
 
 ## Environment setup
 
-- **.NET 8 SDK (LTS)** — required to build/test the C# solution. Not currently installed on this machine. macOS: `brew install --cask dotnet-sdk`, or the official installer at <https://dotnet.microsoft.com/download/dotnet/8.0>. Verify with `dotnet --version`.
-- **A web browser** — the prototype (`design/prototype/index.html`) is fully self-contained; just open it. No Node/build step.
-- **Python 3** — only for reading the SRS `.docx` (snippet below). Already present on macOS.
+- **.NET 10 SDK** — installed via Homebrew (`brew install dotnet`). `dotnet` is on PATH; if a tool can't find the runtime, `export DOTNET_ROOT="/opt/homebrew/opt/dotnet/libexec"`. Verify with `dotnet --version`.
+- **A web browser** — for the running app and the self-contained `design/prototype/index.html`.
+- **(Cloud only)** `az` CLI for the Bicep deploy; an Azure subscription + Entra tenant admin — see `docs/azure-entra-setup.md`.
 
 ## Build / test / run
 
 ```bash
-dotnet build PEMP.sln                 # strict: warnings are errors (Directory.Build.props)
-dotnet test                           # runs Pemp.Domain.Tests — guard table + audit-chain invariants
-dotnet run --project src/Pemp.Api     # once the API layer exists (not yet created)
-open design/prototype/index.html      # the clickable prototype
+dotnet build PEMP.sln                 # strict: code warnings are errors (NuGet audit advisories stay warnings)
+dotnet test                           # Pemp.Domain.Tests — guard table + audit-chain invariants (15)
+dotnet run --project src/Pemp.Web     # the demo app → open the printed URL (SQLite, seeded, role switcher)
+open design/prototype/index.html      # the static clickable prototype
 ```
+Local demo needs no cloud. For Entra SSO + Azure SQL, set `UseSqlite:false`, a SqlServer `ConnectionStrings:Pemp`, and `AzureAd:*` (per the setup guide); the app auto-falls back to the role switcher when `AzureAd:ClientId` is blank.
 
 To read the SRS as text (it is a Word `.docx`, i.e. a zip of XML):
 ```bash

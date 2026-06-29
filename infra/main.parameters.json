@@ -1,0 +1,11 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "namePrefix": { "value": "pemp" },
+    "location": { "value": "uksouth" },
+    "sqlAdminLogin": { "value": "PEMP SQL Admins" },
+    "sqlAdminObjectId": { "value": "<entra-object-id-of-admin-user-or-group>" },
+    "entraClientId": { "value": "<entra-app-client-id-from-step-1>" }
+  }
+}

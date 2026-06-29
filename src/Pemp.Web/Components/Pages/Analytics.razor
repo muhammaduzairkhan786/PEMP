@@ -1,0 +1,102 @@
+@page "/analytics"
+@inject EngagementStore Store
+<PageTitle>Analytics · PEMP</PageTitle>
+
+<div class="wrap">
+    <div class="eyebrow">Portfolio</div>
+    <h1 class="title">Analytics</h1>
+    <p class="sub">Across all engagements — exposure at a glance.</p>
+
+    @if (_engs is null)
+    {
+        <p class="muted">Loading…</p>
+    }
+    else
+    {
+        var active = _engs.Count(e => e.CurrentStage != Stage.Closed && e.CurrentStage != Stage.Retest);
+        var closed = _engs.Count(e => e.CurrentStage == Stage.Closed);
+        var open = _findings.Where(f => f.Status is FindingStatus.Open or FindingStatus.RetestPending).ToList();
+        var critOpen = open.Count(f => f.Severity == Severity.Critical);
+
+        <div class="tiles">
+            <div class="tile"><div class="k">Active engagements</div><div class="v">@active</div></div>
+            <div class="tile"><div class="k">Open findings</div><div class="v">@open.Count</div></div>
+            <div class="tile"><div class="k">Critical open</div><div class="v">@critOpen</div></div>
+            <div class="tile"><div class="k">Closed</div><div class="v">@closed</div></div>
+        </div>
+
+        <div class="sectionlabel">Severity distribution — open findings <span class="srs">FR-ANL-04</span></div>
+        @if (open.Count == 0)
+        {
+            <div class="card muted">No open findings.</div>
+        }
+        else
+        {
+            <div class="distbar" role="img" aria-label="@DistLabel(open)">
+                @foreach (var s in SevOrder)
+                {
+                    var n = open.Count(f => f.Severity == s);
+                    if (n > 0)
+                    {
+                        <span title="@s @n" style="width:@(100 * n / open.Count)%;background:@SevVar(s)"></span>
+                    }
+                }
+            </div>
+            <div class="fchips">
+                @foreach (var s in SevOrder)
+                {
+                    var n = open.Count(f => f.Severity == s);
+                    if (n > 0)
+                    {
+                        <span class="sevchip @s.ToString().ToLowerInvariant()">@s @n</span>
+                    }
+                }
+            </div>
+        }
+
+        <div class="sectionlabel">By application</div>
+        <div class="card" style="padding:0;overflow:hidden">
+            <table class="t">
+                <thead><tr><th>Application</th><th>Stage</th><th>Open findings</th><th>Worst severity</th></tr></thead>
+                <tbody>
+                    @foreach (var e in _engs)
+                    {
+                        var of = _findings.Where(f => f.EngagementId == e.Id && (f.Status is FindingStatus.Open or FindingStatus.RetestPending)).ToList();
+                        var worst = of.Count == 0 ? (Severity?)null : of.Min(f => f.Severity);
+                        <tr>
+                            <td>@e.AppName</td>
+                            <td class="muted">@Workflow.Label(e.CurrentStage)</td>
+                            <td class="mono">@of.Count</td>
+                            <td>@if (worst is not null){<span class="sevchip @worst.ToString()!.ToLowerInvariant()">@worst</span>}else{<span class="muted">—</span>}</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    List<EngagementRecord>? _engs;
+    List<FindingRecord> _findings = new();
+
+    static readonly Severity[] SevOrder = { Severity.Critical, Severity.High, Severity.Medium, Severity.Low, Severity.Info };
+
+    protected override async Task OnInitializedAsync()
+    {
+        _engs = await Store.ListAsync();
+        _findings = await Store.AllFindingsAsync();
+    }
+
+    static string SevVar(Severity s) => s switch
+    {
+        Severity.Critical => "var(--sev-critical)",
+        Severity.High => "var(--sev-high)",
+        Severity.Medium => "var(--sev-medium)",
+        Severity.Low => "var(--sev-low)",
+        _ => "var(--sev-info)",
+    };
+
+    static string DistLabel(List<FindingRecord> open) =>
+        string.Join(", ", SevOrder.Select(s => (s, n: open.Count(f => f.Severity == s))).Where(x => x.n > 0).Select(x => $"{x.s} {x.n}"));
+}

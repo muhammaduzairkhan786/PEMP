@@ -10,12 +10,27 @@
    PEMP prototype — all 5 roles, the fractal spine, ⌘K palette, admin & analytics.
    Data-driven: roles → tabs → sub-spines render from one model.
    DESIGN_PLAN v0.3.
+   Signature-look pass 1: ambient canvas depth, luminous primary-action card,
+   tinted status chips (colour-on-status discipline kept), tile hover lift.
+   Pass 2: inline sparklines in dashboard tiles.
+   Pass 3: right slide-over drawer rail (Documents/Findings/Comms/Audit, §4).
+   Pass 4: responsive tablet/phone layout (NFR-USA-04) — desktop untouched.
+   Pass 5: real engagement cards with mini-spine (kit #2) for list views.
+   Pass 6: skeleton loading on async report generation (NFR-PER-03).
+   Pass 7: capacity-board Mon–Fri load heatmap (FR-ASG-04).
+   Pass 8: live register — severity-distribution bar + working filter chips.
    ============================================================================ */
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
-body{font-family:var(--font-sans);background:var(--canvas);color:var(--ink);font-size:var(--text-base);line-height:1.5;
+body{font-family:var(--font-sans);color:var(--ink);font-size:var(--text-base);line-height:1.5;
   -webkit-font-smoothing:antialiased;display:grid;grid-template-columns:244px 1fr;grid-template-rows:auto 1fr;
   grid-template-areas:"brand topbar" "nav main";height:100vh;overflow:hidden;
+  /* ambient depth: two faint brand glows over the canvas — the "art-piece" calm (§2.1) */
+  background:
+    radial-gradient(1100px 560px at 2% -12%, color-mix(in srgb,var(--brand) 10%,transparent), transparent 60%),
+    radial-gradient(900px 520px at 102% -4%, color-mix(in srgb,var(--brand-glow) 7%,transparent), transparent 55%),
+    var(--canvas);
+  background-attachment:fixed;
   transition:background var(--dur-base),color var(--dur-base)}
 .mono{font-family:var(--font-mono)}.muted{color:var(--ink-muted)}
 /* a11y: visible focus + screen-reader-only text */
@@ -92,7 +107,12 @@ h1.title{font-size:var(--text-2xl);font-weight:750;margin:4px 0 2px;letter-spaci
 .srs{font-family:var(--font-mono);font-size:11px;color:var(--ink-muted);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:1px 6px}
 
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-6)}
-.nextaction{display:flex;align-items:center;gap:var(--space-4);border:1px solid var(--border-strong);margin-bottom:var(--space-4)}
+/* the one primary action — the single "bright thing to press" (§1.3/§2.1): luminous accent + soft glow */
+.nextaction{display:flex;align-items:center;gap:var(--space-4);margin-bottom:var(--space-4);position:relative;overflow:hidden;
+  border:1px solid color-mix(in srgb,var(--brand) 36%,var(--border-strong));
+  background:linear-gradient(180deg,color-mix(in srgb,var(--brand) 7%,var(--surface)),var(--surface));
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--brand) 16%,transparent),0 10px 26px -14px color-mix(in srgb,var(--brand) 60%,transparent)}
+.nextaction::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:linear-gradient(var(--brand),var(--brand-glow))}
 .nextaction .meta{flex:1}.nextaction .meta b{display:block;font-size:var(--text-lg)}
 .lockline{display:flex;align-items:center;gap:8px;color:var(--state-locked);font-size:var(--text-sm);margin-top:6px}
 .btn{font-family:inherit;font-size:var(--text-sm);font-weight:650;border-radius:var(--radius-pill);padding:8px 16px;cursor:pointer;
@@ -116,16 +136,52 @@ h1.title{font-size:var(--text-2xl);font-weight:750;margin:4px 0 2px;letter-spaci
 .sla.green{color:var(--state-done);border-color:color-mix(in srgb,var(--state-done) 40%,transparent)}
 .sla.amber{color:var(--state-waiting);border-color:color-mix(in srgb,var(--state-waiting) 40%,transparent)}
 .sla.red{color:var(--state-blocked);border-color:color-mix(in srgb,var(--state-blocked) 40%,transparent)}
+.sla.green,.sla.amber,.sla.red{background:color-mix(in srgb,currentColor 11%,transparent)}
 .nudge{font-size:var(--text-xs);color:var(--ink-muted);border:1px solid var(--border);border-radius:var(--radius-pill);padding:4px 10px}
 .empty{text-align:center;color:var(--ink-muted);padding:var(--space-8);border:1px dashed var(--border);border-radius:var(--radius-lg);margin-top:var(--space-3)}
 .empty b{color:var(--ink)}
 
+/* engagement cards (kit #2) — list/grid unit with mini-spine */
+.enggrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(296px,1fr));gap:var(--space-3)}
+.engcard{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-4);cursor:pointer;
+  transition:transform var(--dur-fast),border-color var(--dur-fast),box-shadow var(--dur-fast)}
+.engcard:hover{transform:translateY(-2px);border-color:var(--border-strong);box-shadow:var(--elev-raised)}
+.engcard .top{display:flex;align-items:center;gap:8px}
+.engcard .nm{font-weight:700}
+.engcard .rf{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-muted);margin-top:2px}
+.engcard .foot{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:var(--text-sm);color:var(--ink-muted)}
+.minispine{display:flex;align-items:center;margin-top:12px}
+.minispine .b{width:9px;height:9px;border-radius:50%;border:1.5px solid var(--border-strong);background:var(--canvas);flex:none}
+.minispine .b.done{background:var(--state-done);border-color:var(--state-done)}
+.minispine .b.cur{background:var(--brand);border-color:var(--brand-glow);box-shadow:var(--brand-glow-sh)}
+.minispine .c{height:1.5px;flex:1;background:var(--border-strong)}
+.minispine .c.done{background:var(--state-done)}
+.chip.bau{color:var(--ink-muted)}
+.chip.retest{color:var(--state-waiting);border-color:color-mix(in srgb,var(--state-waiting) 45%,transparent)}
+
+/* skeleton loading — only on genuinely-async surfaces (report gen, NFR-PER-03) */
+.skel{background:linear-gradient(90deg,var(--surface-raised) 25%,color-mix(in srgb,var(--ink) 9%,var(--surface-raised)) 37%,var(--surface-raised) 63%);
+  background-size:400% 100%;border-radius:var(--radius-sm);animation:shimmer 1.4s ease infinite}
+.skel-line{height:12px;margin:10px 0}
+@keyframes shimmer{0%{background-position:100% 0}100%{background-position:-100% 0}}
+@media (prefers-reduced-motion: reduce){.skel{animation:none}}
+
+/* live register: severity distribution + filter chips */
+.distbar{display:flex;height:10px;border-radius:var(--radius-pill);overflow:hidden;background:var(--surface-raised);margin:6px 0 14px}
+.distbar span{display:block}
+.fchips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:var(--space-3)}
+.fchip{font:inherit;font-size:var(--text-xs);padding:5px 12px;border-radius:var(--radius-pill);border:1px solid var(--border);color:var(--ink-muted);cursor:pointer;background:transparent;transition:all var(--dur-fast)}
+.fchip:hover{color:var(--ink);border-color:var(--border-strong)}
+.fchip.on{color:var(--ink);background:var(--brand-soft);border-color:var(--border-strong)}
+
 /* dashboard tiles */
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:var(--space-3)}
-.tile{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-4)}
+.tile{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-4);transition:transform var(--dur-fast),border-color var(--dur-fast),box-shadow var(--dur-fast)}
+.tile:hover{transform:translateY(-2px);border-color:var(--border-strong);box-shadow:var(--elev-raised)}
 .tile .k{font-size:var(--text-xs);color:var(--ink-muted)}
 .tile .v{font-size:var(--text-2xl);font-weight:750;margin-top:4px}
 .tile .t{font-size:var(--text-xs);margin-top:2px}
+.spark{display:block;width:100%;height:26px;margin:8px 0 2px;opacity:.9}
 .up{color:var(--state-blocked)}.down{color:var(--state-done)}
 
 /* alerts (security events) */
@@ -141,6 +197,12 @@ h1.title{font-size:var(--text-2xl);font-weight:750;margin:4px 0 2px;letter-spaci
 .load{display:inline-block;width:54px;height:7px;border-radius:4px;background:var(--surface-raised);overflow:hidden;vertical-align:middle}
 .load i{display:block;height:100%;background:var(--brand)}
 .fit{font-size:var(--text-xs);font-weight:700}.fit.best{color:var(--state-done)}
+.heat{display:inline-flex;gap:3px}
+.heat .d{width:22px;height:18px;border-radius:4px;border:1px solid var(--border)}
+.heatlbl{display:inline-flex;gap:3px;font-size:9px;color:var(--ink-muted)}
+.heatlbl span{width:22px;text-align:center}
+.heatleg{display:inline-flex;align-items:center;gap:6px;font-size:var(--text-xs);color:var(--ink-muted)}
+.heatleg .d{width:14px;height:10px;border-radius:3px;border:1px solid var(--border)}
 
 /* tables (register / users / audit) */
 table.t{width:100%;border-collapse:collapse;font-size:var(--text-sm)}
@@ -150,9 +212,13 @@ table.t tr:hover td{background:var(--surface-raised)}
 .sevchip{display:inline-flex;align-items:center;gap:6px;font-size:var(--text-xs);font-weight:700;padding:2px 8px;border-radius:var(--radius-sm)}
 .sevchip::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
 .sevchip.crit{color:var(--sev-critical)}.sevchip.high{color:var(--sev-high)}.sevchip.med{color:var(--sev-medium)}.sevchip.low{color:var(--sev-low)}
+.sevchip.crit,.sevchip.high,.sevchip.med,.sevchip.low{background:color-mix(in srgb,currentColor 13%,transparent)}
 .pill{font-size:var(--text-xs);padding:2px 9px;border-radius:var(--radius-pill);border:1px solid var(--border)}
 .pill.done,.pill.closed,.pill.ok{color:var(--state-done)}.pill.open{color:var(--state-blocked)}.pill.retest{color:var(--state-waiting)}
 .pill.remediated{color:var(--brand-glow)}.pill.guest{color:var(--state-waiting)}.pill.warn{color:var(--sev-high)}
+/* status pills carry a faint tint of their own status colour — scannable, still colour+text (NFR-USA-03) */
+.pill.done,.pill.closed,.pill.ok,.pill.open,.pill.retest,.pill.remediated,.pill.guest,.pill.warn{
+  background:color-mix(in srgb,currentColor 13%,transparent);border-color:color-mix(in srgb,currentColor 32%,transparent)}
 .q{padding:10px 0;border-bottom:1px solid var(--border)}.q label{display:inline-flex;gap:6px;align-items:center;margin-right:16px;font-size:var(--text-sm)}
 .meter{height:8px;border-radius:var(--radius-pill);background:var(--surface-raised);overflow:hidden;margin:6px 0 14px}
 .meter i{display:block;height:100%;background:linear-gradient(90deg,var(--brand),var(--brand-glow))}
@@ -184,6 +250,38 @@ table.t tr:hover td{background:var(--surface-raised)}
 .pitem .kind{font-size:10px;color:var(--ink-muted);border:1px solid var(--border);border-radius:var(--radius-pill);padding:1px 7px;margin-left:auto}
 .pitem.sel,.pitem:hover{background:var(--brand-soft)}
 .pfoot{padding:8px 14px;border-top:1px solid var(--border);font-size:11px;color:var(--ink-muted);display:flex;gap:14px}
+
+/* drawer rail + right slide-over — the universal engagement view's depth-on-demand (§4) */
+.drawerrail{position:fixed;bottom:var(--space-6);left:calc(50% + 122px);transform:translateX(-50%);display:flex;gap:4px;
+  background:color-mix(in srgb,var(--surface-modal) 92%,transparent);border:1px solid var(--border-strong);border-radius:var(--radius-pill);
+  padding:5px;box-shadow:var(--elev-modal);backdrop-filter:blur(8px);z-index:40}
+.drawerrail button{font:inherit;font-size:var(--text-xs);color:var(--ink-muted);background:transparent;border:none;border-radius:var(--radius-pill);
+  padding:7px 13px;cursor:pointer;display:flex;gap:6px;align-items:center;transition:all var(--dur-fast)}
+.drawerrail button:hover{color:var(--ink);background:var(--surface-raised)}
+.drawerscrim{position:fixed;inset:0;background:rgba(4,7,14,.5);backdrop-filter:blur(2px);display:none;z-index:45}
+.drawerscrim.show{display:block;animation:fadein var(--dur-base)}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:432px;max-width:92vw;background:var(--surface);border-left:1px solid var(--border-strong);
+  box-shadow:var(--elev-drawer);z-index:46;transform:translateX(100%);transition:transform var(--dur-base) var(--ease-standard);display:flex;flex-direction:column}
+.drawer.show{transform:none}
+.drawer header{display:flex;align-items:center;gap:10px;padding:var(--space-6);border-bottom:1px solid var(--border)}
+.drawer header b{font-size:var(--text-lg)}
+.drawer .dbody{padding:var(--space-4) var(--space-6);overflow-y:auto}
+.drawer .x{margin-left:auto;cursor:pointer;color:var(--ink-muted);background:transparent;border:none;font-size:17px;line-height:1;padding:4px}
+.drawer .x:hover{color:var(--ink)}
+
+/* responsive: tablet/phone graceful degradation (NFR-USA-04, §15) — desktop rules untouched */
+@media (max-width:760px){
+  body{grid-template-columns:1fr;grid-template-rows:auto auto auto 1fr;grid-template-areas:"brand" "topbar" "nav" "main"}
+  .brandcell{border-right:none}
+  nav{flex-direction:row;overflow-x:auto;overflow-y:hidden;border-right:none;border-bottom:1px solid var(--border);gap:6px;padding:8px var(--space-3)}
+  .navtab{flex:none}
+  .navtab .subbar,.navfoot{display:none}
+  main{padding:var(--space-6) var(--space-4)}
+  .tiles{grid-template-columns:repeat(2,1fr)}
+  .drawer{width:100%}
+  .drawerrail{left:50%;bottom:var(--space-4)}
+  .modal,.pbox{width:94vw}
+}
 </style>
 </head>
 <body>
@@ -213,6 +311,10 @@ table.t tr:hover td{background:var(--surface-raised)}
   <div class="presults" id="presults" role="listbox" aria-label="Results"></div>
   <div class="pfoot"><span>↑↓ move</span><span>↵ run</span><span>esc close</span><span style="margin-left:auto">RBAC-scoped to your role · §13</span></div>
 </div></div>
+
+<div class="drawerscrim" id="drawerScrim"></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle"></aside>
+<div class="drawerrail" id="drawerRail" role="toolbar" aria-label="Engagement drawers" style="display:none"></div>
 
 <script>
 /* ============================ MODEL ============================ */
@@ -291,6 +393,7 @@ function renderContext(){
       ? `<span class="name">System health</span><span class="pill ok">all green</span><span class="muted">· 312 users · 14 active engagements</span>`
       : `<span class="name">14 active engagements</span><span class="muted">· 3 need you · 1 overdue</span>`;
   }
+  updateRail();
 }
 function renderNav(){
   const nav=document.getElementById('nav');
@@ -320,7 +423,19 @@ const nextCard=(t,o,srs,locked,btn,fn)=>`<div class="card nextaction"><div style
 const PRI={crit:'Critical',high:'High',med:'Medium',low:'Low'};
 const arow=(d,v,t,r,sc,sl,b,fn)=>`<div class="row actionable"><span class="dot ${d}" role="img" aria-label="${PRI[d]} priority"></span><div class="grow"><span class="verb">${v}</span> · ${t}<br><span class="ref">${r}</span></div><span class="sla ${sc}">${sl}</span><button class="btn primary" onclick="${fn}">${b}</button></div>`;
 const wrow=(d,v,t,m)=>`<div class="row waiting"><span class="dot ${d}" role="img" aria-label="${PRI[d]} priority"></span><div class="grow"><span class="verb">${v}</span> · ${t}<br><span class="ref">${m}</span></div><span class="nudge">Nudge</span></div>`;
-const tile=(k,v,t,cls)=>`<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="t ${cls||''}">${t}</div></div>`;
+// tiny inline sparkline — trend made legible; colour follows the up/down status (NFR-USA-03)
+const spark=(pts,cls)=>{const w=100,h=26,mx=Math.max(...pts),mn=Math.min(...pts),rng=(mx-mn)||1;
+  const d=pts.map((p,i)=>`${(i/(pts.length-1)*w).toFixed(1)},${(h-3-(p-mn)/rng*(h-6)).toFixed(1)}`).join(' ');
+  const col=cls==='up'?'var(--state-blocked)':cls==='down'?'var(--state-done)':'var(--brand-glow)';
+  const lx=(w).toFixed(1),ly=(h-3-(pts[pts.length-1]-mn)/rng*(h-6)).toFixed(1);
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
+    <polyline points="${d}" fill="none" stroke="${col}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="${lx}" cy="${ly}" r="1.8" fill="${col}"/></svg>`;};
+const tile=(k,v,t,cls,sp)=>`<div class="tile"><div class="k">${k}</div><div class="v">${v}</div>${sp?spark(sp,cls):''}<div class="t ${cls||''}">${t}</div></div>`;
+// weekly load heatmap (Mon–Fri) — busier days run hotter (FR-ASG-04)
+const DOW=['Mon','Tue','Wed','Thu','Fri'];
+const heat=(days)=>`<div class="heat" role="img" aria-label="Weekly load: ${days.map((v,i)=>DOW[i]+' '+v+'%').join(', ')}">${days.map((v,i)=>`<span class="d" title="${DOW[i]} ${v}%" style="background:color-mix(in srgb,var(--sev-high) ${v}%,var(--surface-raised))"></span>`).join('')}</div>`;
+const heatHdr=`<div class="heatlbl">${DOW.map(d=>`<span>${d[0]}</span>`).join('')}</div>`;
 const stub=()=>`<div class="empty">This surface follows the same pattern — sub-spine + one primary action + role-filtered content.<br><span style="font-size:var(--text-xs)">Representative screen.</span></div>`;
 
 const BODY={
@@ -362,12 +477,13 @@ const BODY={
 'tester:reports':()=>head('Reporting',LOCKED['tester:reports']?'Locked — opens when findings are drafted.':'Assemble, peer-review, release.')+
   (LOCKED['tester:reports']?`<div class="lockbanner">🔒 Unlocks once findings exist to draft.</div>`:'')+
   nextCard('Release final report','Owner: You → peer → Acme','FR-REP-02',LOCKED['tester:reports'],LOCKED['tester:reports']?'':'Release ▶',"openGate('release')")+
-  `<div class="card" style="${LOCKED['tester:reports']?'opacity:.55':''}"><div class="sectionlabel" style="margin-top:0">Assembled from engagement + findings <span class="srs">FR-REP-01</span></div>
-  <p>Exec summary · 7 findings · register snapshot · appendix</p><div class="lockline">🔒 QA GATE: peer review before release <span class="srs">FR-REP-02</span></div></div>`,
+  `<div style="display:flex;gap:10px;align-items:center;margin-bottom:var(--space-4)"><button class="btn" onclick="genDraft()" ${LOCKED['tester:reports']?'disabled':''}>↻ Generate draft</button><span class="muted" style="font-size:var(--text-xs)">report generation runs async — never a frozen screen · <span class="srs">NFR-PER-03</span></span></div>
+  <div id="reportOut"><div class="card" style="${LOCKED['tester:reports']?'opacity:.55':''}"><div class="sectionlabel" style="margin-top:0">Assembled from engagement + findings <span class="srs">FR-REP-01</span></div>
+  <p>Exec summary · 7 findings · register snapshot · appendix</p><div class="lockline">🔒 QA GATE: peer review before release <span class="srs">FR-REP-02</span></div></div></div>`,
 
 /* ---- ACME CA OFFICER ---- */
 'acme:home':()=>head('Home','Approvals due and reports to read — plus your portfolio at a glance.')+
-  `<div class="tiles">${tile('Open engagements','14','3 need you')}${tile('Overdue (SLA)','1','SoW unsigned 3d','up')}${tile('Mean time-to-remediate','11d','▼ from 14d','down')}${tile('Critical open','2','Auth bypass · SQLi','up')}</div>
+  `<div class="tiles">${tile('Open engagements','14','3 need you','',[10,11,9,12,13,14])}${tile('Overdue (SLA)','1','SoW unsigned 3d','up',[0,1,0,2,1,1])}${tile('Mean time-to-remediate','11d','▼ from 14d','down',[14,14,13,12,11,11])}${tile('Critical open','2','Auth bypass · SQLi','up',[1,1,2,1,2,2])}</div>
   <div class="sectionlabel">▸ Your turn <span class="srs">FR-NOT-01</span></div><div class="pile">
   ${arow('high','Sign the Statement of Work','Claims Portal','ENG-2026-0412','amber','⏱ 2d','Review & Sign ▶',"go('approvals')")}
   ${arow('low','Read final report','Broker Portal','ENG-2026-0399','green','new','Open report ▶',"go('reports')")}</div>
@@ -388,7 +504,7 @@ const BODY={
 
 /* ---- DELIVERY MANAGER ---- */
 'dm:home':()=>head('Home','Unassigned requests and SoWs to review.')+
-  `<div class="tiles">${tile('Unassigned','2','oldest 1d','up')}${tile('Team load','68%','headroom Thu–Fri','down')}${tile('SoWs to review','1','Claims Portal')}${tile('Active','9','on track')}</div>
+  `<div class="tiles">${tile('Unassigned','2','oldest 1d','up',[1,0,2,1,3,2])}${tile('Team load','68%','headroom Thu–Fri','down',[82,79,74,71,69,68])}${tile('SoWs to review','1','Claims Portal','',[2,1,2,0,1,1])}${tile('Active','9','on track','',[7,8,8,9,9,9])}</div>
   <div class="sectionlabel">▸ Your turn <span class="srs">FR-NOT-01</span></div><div class="pile">
   ${arow('high','Assign a tester','Claims Portal','ENG-2026-0412','amber','⏱ 1d','Open capacity ▶',"go('capacity')")}
   ${arow('med','Review Project SoW','Retail Web','ENG-2026-0408','green','⏱ 2d','Review SoW ▶',"go('approvals')")}</div>`,
@@ -397,11 +513,12 @@ const BODY={
 'dm:assignments':()=>head('Assignments','Who is on what.')+engCards(),
 'dm:capacity':()=>head('Capacity Board','Assign like moving a sticky note.')+
   nextCard('Assign A. Khan (best fit)','Claims Portal · needs WEB, API · 6 days','FR-ASG-02',false,'Assign A. Khan ▶',"toast('Assigned A. Khan · scoping unlocked.')")+
-  `<div class="card" style="padding:0;overflow:hidden"><table class="cap"><thead><tr><th>Tester</th><th>Skills</th><th>Load</th><th>Fit</th></tr></thead><tbody>
-  <tr><td>A. Khan ✦</td><td><span class="skill">WEB</span><span class="skill">API</span><span class="skill">CLOUD</span></td><td><span class="load"><i style="width:60%"></i></span> 60%</td><td><span class="fit best">● Best</span></td></tr>
-  <tr><td>R. Patel</td><td><span class="skill">WEB</span><span class="skill">MOBILE</span></td><td><span class="load"><i style="width:85%"></i></span> 85%</td><td><span class="fit">○</span></td></tr>
-  <tr><td>S. Lee</td><td><span class="skill">API</span><span class="skill">CLOUD</span></td><td><span class="load"><i style="width:20%"></i></span> 20%</td><td><span class="fit">○</span></td></tr></tbody></table></div>
-  <p class="muted" style="margin-top:8px;font-size:var(--text-sm)">⚠ Assigning R. Patel would over-allocate Tue–Wed — warns, never blocks · <span class="srs">FR-ASG-04</span></p>`,
+  `<div class="card" style="padding:0;overflow:hidden"><table class="cap"><thead><tr><th>Tester</th><th>Skills</th><th>This week ${heatHdr}</th><th>Load</th><th>Fit</th></tr></thead><tbody>
+  <tr><td>A. Khan ✦</td><td><span class="skill">WEB</span><span class="skill">API</span><span class="skill">CLOUD</span></td><td>${heat([40,30,20,90,90])}</td><td><span class="load"><i style="width:60%"></i></span> 60%</td><td><span class="fit best">● Best</span></td></tr>
+  <tr><td>R. Patel</td><td><span class="skill">WEB</span><span class="skill">MOBILE</span></td><td>${heat([80,90,95,40,20])}</td><td><span class="load"><i style="width:85%"></i></span> 85%</td><td><span class="fit">○</span></td></tr>
+  <tr><td>S. Lee</td><td><span class="skill">API</span><span class="skill">CLOUD</span></td><td>${heat([10,20,10,30,20])}</td><td><span class="load"><i style="width:20%"></i></span> 20%</td><td><span class="fit">○</span></td></tr></tbody></table></div>
+  <div style="display:flex;align-items:center;gap:14px;margin-top:8px"><span class="heatleg"><span class="d" style="background:var(--surface-raised)"></span>free<span class="d" style="background:color-mix(in srgb,var(--sev-high) 90%,var(--surface-raised))"></span>busy</span>
+  <p class="muted" style="margin:0;font-size:var(--text-sm)">⚠ R. Patel would over-allocate Tue–Wed — warns, never blocks · <span class="srs">FR-ASG-04</span></p></div>`,
 'dm:engagements':()=>head('Engagements','Everything in flight.')+engCards(),
 'dm:approvals':()=>head('Project SoW Review','Review, then pass to Acme for sign-off.')+
   nextCard('Approve & forward to Acme','Retail Web · v2','FR-SOW-03',false,'Approve → Acme ▶',"toast('SoW approved · sent to Acme.')")+
@@ -454,16 +571,46 @@ const BODY={
   <div class="q">ITSM ticketing <span class="pill warn">◑ degraded · webhook</span> <span class="srs">FR-ADM-03 · CON-05</span></div>
   <div class="q" style="border:none">Azure Key Vault <span class="pill ok">● connected (managed id)</span></div></div>`,
 };
-function registerTable(dim){return `<div class="card" style="padding:0;overflow:hidden;${dim?'opacity:.55':''}"><table class="t"><thead><tr><th>Severity</th><th>Finding</th><th>Asset</th><th>CVSS</th><th>Status</th></tr></thead><tbody>
-  <tr><td><span class="sevchip crit">Critical</span></td><td>Auth bypass via JWT confusion</td><td>API</td><td class="mono">9.1</td><td><span class="pill open">open</span></td></tr>
-  <tr><td><span class="sevchip high">High</span></td><td>SQLi in /claims search</td><td>Web</td><td class="mono">8.1</td><td><span class="pill retest">retest-pending</span></td></tr>
-  <tr><td><span class="sevchip high">High</span></td><td>Stored XSS in note field</td><td>Web</td><td class="mono">7.4</td><td><span class="pill open">open</span></td></tr>
-  <tr><td><span class="sevchip med">Medium</span></td><td>Verbose error disclosure</td><td>API</td><td class="mono">5.3</td><td><span class="pill remediated">remediated</span></td></tr>
-  <tr><td><span class="sevchip low">Low</span></td><td>Missing cookie flags</td><td>Web</td><td class="mono">3.1</td><td><span class="pill closed">closed</span></td></tr></tbody></table></div>
-  <p class="muted" style="margin-top:10px;font-size:var(--text-xs)"><span class="srs">FR-FND-01</span> fixed 5-step scale, never colour alone · <span class="srs">FR-FND-03</span> enter once → live register</p>`;}
-function engCards(){return `<div class="card"><div class="q">Claims Portal · ENG-2026-0412 <span class="pill retest">SoW</span> <span class="muted">▸ A. Khan</span></div>
-  <div class="q">Payments API · ENG-2026-0419 <span class="pill ok">Access</span> <span class="muted">▸ S. Lee</span></div>
-  <div class="q" style="border:none">Retail Web · ENG-2026-0408 <span class="pill open">Findings</span> <span class="muted">▸ R. Patel</span></div></div>`;}
+const SEVL={crit:'Critical',high:'High',med:'Medium',low:'Low'};
+const STATL={open:'open',retest:'retest-pending',remediated:'remediated',closed:'closed'};
+const FINDINGS=[
+  {sev:'crit',name:'Auth bypass via JWT confusion',asset:'API',cvss:'9.1',status:'open'},
+  {sev:'high',name:'SQLi in /claims search',asset:'Web',cvss:'8.1',status:'retest'},
+  {sev:'high',name:'Stored XSS in note field',asset:'Web',cvss:'7.4',status:'open'},
+  {sev:'med',name:'Verbose error disclosure',asset:'API',cvss:'5.3',status:'remediated'},
+  {sev:'low',name:'Missing cookie flags',asset:'Web',cvss:'3.1',status:'closed'},
+];
+let fndFilter='all';
+function setFnd(f){fndFilter=f;renderMain();}
+function distBar(){const c={crit:0,high:0,med:0,low:0};FINDINGS.forEach(f=>{if(c[f.sev]!=null)c[f.sev]++});const t=FINDINGS.length||1;
+  const seg=(k,col)=>c[k]?`<span style="width:${(100*c[k]/t).toFixed(1)}%;background:var(${col})" title="${SEVL[k]}: ${c[k]}"></span>`:'';
+  return `<div class="distbar" role="img" aria-label="Severity mix: ${Object.keys(c).map(k=>SEVL[k]+' '+c[k]).join(', ')}">${seg('crit','--sev-critical')}${seg('high','--sev-high')}${seg('med','--sev-medium')}${seg('low','--sev-low')}</div>`;}
+function fndRows(){return FINDINGS.filter(f=>fndFilter==='all'||f.sev===fndFilter).map(f=>
+  `<tr><td><span class="sevchip ${f.sev}">${SEVL[f.sev]}</span></td><td>${f.name}</td><td>${f.asset}</td><td class="mono">${f.cvss}</td><td><span class="pill ${f.status}">${STATL[f.status]}</span></td></tr>`).join('')
+  || `<tr><td colspan="5" class="muted" style="text-align:center;padding:18px">No ${SEVL[fndFilter]||''} findings.</td></tr>`;}
+function registerTable(dim){
+  const chips=['all','crit','high','med','low'].map(k=>`<button type="button" class="fchip ${fndFilter===k?'on':''}" onclick="setFnd('${k}')">${k==='all'?'All':SEVL[k]}</button>`).join('');
+  return `<div style="${dim?'opacity:.55;pointer-events:none':''}">
+  <div class="sectionlabel" style="margin-top:0">Severity distribution <span class="srs">FR-FND-01</span></div>${distBar()}
+  <div class="fchips">${chips}</div>
+  <div class="card" style="padding:0;overflow:hidden"><table class="t"><thead><tr><th>Severity</th><th>Finding</th><th>Asset</th><th>CVSS</th><th>Status</th></tr></thead><tbody id="regBody">${fndRows()}</tbody></table></div>
+  <p class="muted" style="margin-top:10px;font-size:var(--text-xs)"><span class="srs">FR-FND-01</span> fixed 5-step scale, never colour alone · <span class="srs">FR-FND-03</span> enter once → live register</p></div>`;}
+const STAGES=['Intake','Assign','Scope','SoW','Access','Test','Findings','Report','Retest'];
+const ENGS=[
+  {name:'Claims Portal',ref:'ENG-2026-0412',type:'project',stage:3,owner:'A. Khan',sla:['amber','2d']},
+  {name:'Payments API',ref:'ENG-2026-0419',type:'bau',stage:4,owner:'S. Lee',sla:['green','4d']},
+  {name:'Retail Web',ref:'ENG-2026-0408',type:'project',stage:6,owner:'R. Patel',sla:['red','overdue']},
+  {name:'Broker Portal',ref:'ENG-2026-0399',type:'retest',stage:8,owner:'R. Patel',sla:['green','—']},
+];
+const TYPEB={project:'<span class="chip project">PROJECT</span>',bau:'<span class="chip bau">BAU</span>',retest:'<span class="chip retest">RETEST</span>'};
+function minispine(stage){let h='';for(let i=0;i<STAGES.length;i++){const cls=i<stage?'done':i===stage?'cur':'';h+=`<span class="b ${cls}"></span>`;if(i<STAGES.length-1)h+=`<span class="c ${i<stage?'done':''}"></span>`;}
+  return `<div class="minispine" role="img" aria-label="At stage ${STAGES[stage]}">${h}</div>`;}
+function engCards(){return `<div class="enggrid">`+ENGS.map(e=>`
+  <div class="engcard" role="button" tabindex="0" aria-label="${e.name} ${e.ref}, at ${STAGES[e.stage]}" onclick="toast('Open ${e.ref} · ${e.name}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
+    <div class="top"><span class="nm">${e.name}</span>${TYPEB[e.type]||''}</div>
+    <div class="rf">${e.ref}</div>${minispine(e.stage)}
+    <div class="foot"><span>▸ ${e.owner}</span><span class="muted">· ${STAGES[e.stage]}</span><span class="sla ${e.sla[0]}" style="margin-left:auto">⏱ ${e.sla[1]}</span></div>
+  </div>`).join('')+`</div>`;}
 
 /* ============================ GATE CEREMONY ============================ */
 const gate=document.getElementById('gate'),modal=document.getElementById('gateModal');
@@ -503,6 +650,12 @@ function verifyAccess(){FLOW['tester:access']=[{l:'Define prereqs',s:'done'},{l:
   if(ROLES[role].scoped) renderSpine(document.getElementById('masterSpine'),master,true);
   renderNav(); renderMain(); toast('Access verified. Test window open.');}
 function toast(m){const t=document.getElementById('toast');document.getElementById('toastMsg').textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000);}
+const skelBlock=(n)=>`<div class="card">${Array.from({length:n}).map((_,i)=>`<div class="skel skel-line" style="width:${[92,72,84,60,78][i%5]}%"></div>`).join('')}</div>`;
+function genDraft(){const o=document.getElementById('reportOut');if(!o)return;
+  o.innerHTML=`<div class="sectionlabel" style="margin-top:0">Assembling report… <span class="muted">async · NFR-PER-03</span></div>`+skelBlock(5);
+  const done=()=>{o.innerHTML=`<div class="card"><div class="sectionlabel" style="margin-top:0">Draft assembled <span class="srs">FR-REP-01</span></div>
+    <p>Exec summary · 7 findings · register snapshot · appendix</p><div class="lockline">🔒 QA GATE: peer review before release <span class="srs">FR-REP-02</span></div></div>`;toast('Draft report generated.');};
+  RM()?done():setTimeout(done,1100);}
 
 /* ============================ ⌘K PALETTE (RBAC-scoped) ============================ */
 const pal=document.getElementById('palette'),pin=document.getElementById('pinput'),pres=document.getElementById('presults');
@@ -534,13 +687,52 @@ pin.addEventListener('keydown',e=>{const f=pres._f||[];
   else if(e.key==='Enter'){e.preventDefault();if(f[pidx]){f[pidx].run();closePalette();}}
   else if(e.key==='Escape'){closePalette();}});
 
+/* ============================ DRAWER RAIL (§4 universal engagement view) ============================ */
+const DRAWERS={
+  documents:{icon:'📄',title:'Documents',srs:'FR-DOC',html:`
+    <div class="q"><b>Statement of Work</b> · v3 <span class="pill retest">awaiting sign</span><br><span class="muted" style="font-size:var(--text-xs)">versioned · FR-SOW-02</span></div>
+    <div class="q"><b>Assessment</b> <span class="pill done">confirmed ✓</span></div>
+    <div class="q" style="border:none"><b>Report</b> · draft v2 <span class="pill retest">in QA</span><br><span class="muted" style="font-size:var(--text-xs)">re-auth on download · SEC-EVD-03</span></div>`},
+  findings:{icon:'🐞',title:'Findings',srs:'FR-FND',html:`
+    <div class="q"><span class="sevchip crit">Critical</span> Auth bypass <span class="pill open">open</span></div>
+    <div class="q"><span class="sevchip high">High</span> SQLi /claims <span class="pill retest">retest-pending</span></div>
+    <div class="q" style="border:none"><span class="sevchip med">Medium</span> Verbose errors <span class="pill remediated">remediated</span></div>
+    <p class="muted" style="font-size:var(--text-xs);margin-top:10px">Enter once → live register · FR-FND-03</p>`},
+  comms:{icon:'✉',title:'Comms log',srs:'FR-EXE-05',html:`
+    <div class="q">✓ IR advance notice <span class="muted" style="font-size:var(--text-xs)">sent 14 Jul 09:01</span></div>
+    <div class="q">✓ Scoping call invite <span class="muted" style="font-size:var(--text-xs)">sent 8 Jul</span></div>
+    <div class="q" style="border:none">○ End-of-test notice <span class="muted" style="font-size:var(--text-xs)">drafts on final day</span></div>
+    <p class="muted" style="font-size:var(--text-xs);margin-top:10px">Every send logged: content · recipient · time · FR-EXE-05</p>`},
+  audit:{icon:'🔗',title:'Audit',srs:'FR-AUD',html:`
+    <div class="q"><span class="mono">14:02</span> A.Khan revealed credential <span class="pill ok">🔗 ✓</span></div>
+    <div class="q"><span class="mono">13:51</span> J.Okafor signed SoW <span class="pill ok">🔗 ✓</span></div>
+    <div class="q" style="border:none"><span class="mono">11:20</span> M.Reyes assigned tester <span class="pill ok">🔗 ✓</span></div>
+    <p class="muted" style="font-size:var(--text-xs);margin-top:10px">Append-only · hash-chained · SEC-AUD-01</p>`},
+};
+let lastFocusD=null;
+function updateRail(){const rail=document.getElementById('drawerRail');
+  if(!ROLES[role].scoped){rail.style.display='none';return;}
+  rail.style.display='flex';
+  rail.innerHTML=Object.entries(DRAWERS).map(([k,d])=>`<button type="button" data-d="${k}" aria-label="Open ${d.title}">${d.icon} ${d.title}</button>`).join('');
+  rail.querySelectorAll('button').forEach(b=>b.onclick=()=>openDrawer(b.dataset.d));}
+function openDrawer(k){const d=DRAWERS[k];if(!d)return;lastFocusD=document.activeElement;
+  const dr=document.getElementById('drawer');
+  dr.innerHTML=`<header><span aria-hidden="true">${d.icon}</span><b id="drawerTitle">${d.title}</b><span class="srs">${d.srs}</span>
+    <button class="x" aria-label="Close drawer" onclick="closeDrawer()">✕</button></header><div class="dbody">${d.html}</div>`;
+  document.getElementById('drawerScrim').classList.add('show');dr.classList.add('show');
+  setTimeout(()=>{const x=dr.querySelector('.x');if(x)x.focus();},30);}
+function closeDrawer(){const dr=document.getElementById('drawer');if(!dr.classList.contains('show'))return;
+  dr.classList.remove('show');document.getElementById('drawerScrim').classList.remove('show');
+  if(lastFocusD&&lastFocusD.focus)lastFocusD.focus();}
+
 /* ============================ INIT ============================ */
 const rs=document.getElementById('roleSel');
 rs.innerHTML=Object.entries(ROLES).map(([k,v])=>`<option value="${k}">${v.name}</option>`).join('');
 rs.value='tester'; rs.onchange=()=>switchRole(rs.value);
 document.getElementById('themeBtn').onclick=()=>{const h=document.documentElement;h.dataset.theme=h.dataset.theme==='dark'?'light':'dark';};
 document.getElementById('kbtn').onclick=openPalette;
-document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();openPalette();}if(e.key==='Escape'){closeGate();closePalette();}});
+document.getElementById('drawerScrim').onclick=closeDrawer;
+document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();openPalette();}if(e.key==='Escape'){closeGate();closePalette();closeDrawer();}});
 renderContext(); renderNav(); renderMain();
 </script>
 </body>

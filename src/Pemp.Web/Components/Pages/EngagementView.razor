@@ -1,0 +1,215 @@
+@page "/engagement/{Id:guid}"
+@inject EngagementStore Store
+@inject DemoSession Session
+@inject NavigationManager Nav
+<PageTitle>Engagement · PEMP</PageTitle>
+
+@if (_rec is null)
+{
+    <p class="muted">Loading…</p>
+}
+else
+{
+    var next = Workflow.Next(_rec);
+    var mine = next.Kind != ActionKind.None && next.OwnerRole == Session.Role;
+
+    <div class="wrap">
+        <div class="eyebrow">Engagement</div>
+        <h1 class="title">@_rec.AppName <span class="ref">@_rec.Reference</span></h1>
+        <p class="sub">
+            <span class="chip @TypeClass(_rec.Type)">@_rec.Type.ToString().ToUpperInvariant()</span>
+            <span class="chip crit-@_rec.Criticality.ToLowerInvariant()">@_rec.Criticality criticality</span>
+            @if (_rec.ParentId is not null)
+            {
+                <span class="chip retest">RETEST CHILD</span>
+            }
+            · tester @(_rec.AssignedTesterName ?? "—")
+        </p>
+
+        <div class="card"><Spine Current="_rec.CurrentStage" /></div>
+
+        @if (_reauthFor != ActionKind.None)
+        {
+            <div class="scrim" @onclick="Cancel">
+                <div class="modal" @onclick:stopPropagation="true">
+                    <h3>@ModalTitle()</h3>
+                    <p class="muted" style="margin-bottom:12px">@(_reauthFor == ActionKind.SignSow ? "You are agreeing to:" : "You are releasing:")</p>
+                    <ul class="attest">@foreach (var l in ModalLines()){<li>@l</li>}</ul>
+                    <div class="chainline"><span class="tick">🔗</span> Creates an immutable, hash-chained record · <span class="srs">SEC-AUD-01</span></div>
+                    <div class="reauthnote">🔐 Re-authenticate via Entra MFA before it commits · <span class="srs">SEC-IAM-04</span></div>
+                    <div class="actions">
+                        <button class="btn ghost" @onclick="Cancel">Cancel</button>
+                        <button class="btn primary" @onclick="() => Run(_reauthFor, true)">Confirm via Entra MFA ▶</button>
+                    </div>
+                </div>
+            </div>
+        }
+
+        @if (_error is not null)
+        {
+            <div class="banner err">⛔ @_error</div>
+        }
+        @if (_ok is not null)
+        {
+            <div class="banner ok">✓ @_ok</div>
+        }
+
+        @if (next.Kind == ActionKind.None)
+        {
+            <div class="card"><b>Engagement closed.</b> Final report released and stored immutable (FR-REP-04).</div>
+            @if (_rec.CurrentStage == Stage.Closed && _rec.RetestRequested)
+            {
+                <div class="card muted">↻ Retest already requested — a linked child engagement was created.</div>
+            }
+            else if (_rec.CurrentStage == Stage.Closed && (Session.Role is "Stakeholder" or "Acme CA Officer"))
+            {
+                <div class="card nextaction">
+                    <div style="font-size:26px">↻</div>
+                    <div class="meta"><b>Request a retest</b><span class="muted">Owner: You (@Session.Role) · FR-RET-01</span></div>
+                    <button class="btn primary" @onclick="Retest">Request retest ▶</button>
+                </div>
+            }
+        }
+        else if (mine)
+        {
+            <div class="card nextaction">
+                <div style="font-size:26px">▸</div>
+                <div class="meta"><b>@next.Label</b><span class="muted">Owner: You (@Session.Role)@(Workflow.NeedsReauth(next.Kind) ? " · re-auth required (SEC-IAM-04)" : "")</span></div>
+                @if (next.Kind == ActionKind.CompleteAssessment)
+                {
+                    <a class="btn primary" href="@($"engagement/{Id}/assessment")">Open assessment form ▶</a>
+                }
+                else
+                {
+                    <button class="btn primary" @onclick="() => OnAct(next.Kind)">@next.Label ▶</button>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="card">⏳ Waiting on <b>@next.OwnerRole</b> — "@next.Label". <span class="muted">You're viewing as @Session.Role.</span></div>
+        }
+
+        <AccessRequirements EngagementId="Id" Reqs="_access" Editable="@(_rec.CurrentStage == Stage.Access && Session.Role == "Tester")" />
+
+        <FindingsRegister Findings="_findings" />
+
+        <EvidencePanel EngagementId="Id" Findings="_findings" Editable="@(Session.Role == "Tester" && _rec.CurrentStage != Stage.Closed)" />
+
+        @if ((int)_rec.CurrentStage >= (int)Stage.Access)
+        {
+            <ChecklistPanel EngagementId="Id" Done="_checklist"
+                            Editable="@(Session.Role == "Tester" && (int)_rec.CurrentStage >= (int)Stage.Access && _rec.CurrentStage != Stage.Closed)" />
+        }
+
+        <div class="sectionlabel">
+            Audit trail <span class="srs">SEC-AUD-01</span>
+            <button class="btn ghost" style="margin-left:8px" @onclick="Verify">Verify chain</button>
+            @if (_chainOk is not null)
+            {
+                <span class="pill @(_chainOk == true ? "ok" : "warn")">@(_chainOk == true ? "🔗 verified" : "⚠ broken")</span>
+            }
+        </div>
+        <div class="card" style="padding:0;overflow:hidden">
+            <table class="t">
+                <thead><tr><th>#</th><th>Actor</th><th>Action</th><th>Before → After</th><th>When</th></tr></thead>
+                <tbody>
+                    @foreach (var a in _audit)
+                    {
+                        <tr>
+                            <td class="mono">@a.Sequence</td>
+                            <td>@a.Actor</td>
+                            <td class="mono">@a.Action</td>
+                            <td class="mono muted">@a.Before → @a.After</td>
+                            <td class="muted">@a.Timestamp.ToString("dd MMM HH:mm")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    EngagementRecord? _rec;
+    List<AuditEntryRow> _audit = new();
+    List<FindingRecord> _findings = new();
+    List<AccessRequirementRecord> _access = new();
+    HashSet<string> _checklist = new();
+    string? _error, _ok;
+    bool? _chainOk;
+    ActionKind _reauthFor = ActionKind.None;
+
+    static readonly Guid PeerReviewer = Guid.Parse("99999999-9999-9999-9999-999999999999");
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    async Task Load()
+    {
+        _rec = await Store.GetAsync(Id);
+        if (_rec is not null)
+        {
+            _audit = await Store.AuditForAsync(Id);
+            _findings = await Store.FindingsForAsync(Id);
+            _access = await Store.AccessReqsForAsync(Id);
+            _checklist = await Store.ChecklistDoneAsync(Id);
+        }
+    }
+
+    void OnAct(ActionKind k)
+    {
+        _error = _ok = null; _chainOk = null;
+        if (Workflow.NeedsReauth(k)) _reauthFor = k;   // show the re-auth confirm step
+        else _ = Run(k, false);
+    }
+
+    void Cancel() => _reauthFor = ActionKind.None;
+
+    string ModalTitle() => _reauthFor == ActionKind.SignSow ? "Sign Statement of Work" : "Release final report";
+
+    string[] ModalLines() => _reauthFor == ActionKind.SignSow
+        ? new[] { $"Scope: {_rec!.AppName} ({_rec.Type})", "Methodology & dates per the SoW draft", "Prerequisites & test accounts" }
+        : new[] { "Final report — peer QA passed", "Vulnerability register snapshot", "Stored immutable on release" };
+
+    async Task Run(ActionKind k, bool reauth)
+    {
+        _reauthFor = ActionKind.None;
+        _error = _ok = null; _chainOk = null;
+        var actor = Session.Actor;
+
+        var result = k switch
+        {
+            ActionKind.RouteToDm        => await Store.ExecuteAsync(Id, e => e.RouteToDeliveryManager(actor)),
+            ActionKind.AssignTester     => await Store.ExecuteAsync(Id, e => e.AssignTester(DemoSeeder.TesterKhan, actor)),
+            ActionKind.CompleteAssessment => await Store.ExecuteAsync(Id, e => e.CompleteAssessment(actor)),
+            ActionKind.ReviewSow        => await Store.ExecuteAsync(Id, e => e.ReviewSowAsDeliveryManager(actor)),
+            ActionKind.SignSow          => await Store.ExecuteAsync(Id, e => e.SignSow(actor, reauth)),
+            ActionKind.VerifyAccess     => await Store.ExecuteAsync(Id, e => e.VerifyAccess(actor)),
+            ActionKind.SendIr           => await Store.ExecuteAsync(Id, e => e.SendIrNotice(actor)),
+            ActionKind.EndTest          => await Store.ExecuteAsync(Id, e => e.EndTest(actor)),
+            ActionKind.GenerateDraft    => await Store.ExecuteAsync(Id, e => e.GenerateDraft(actor)),
+            ActionKind.PeerReview       => await Store.ExecuteAsync(Id, e => e.PeerReview(PeerReviewer, true, actor)),
+            ActionKind.ReleaseFinal     => await Store.ExecuteAsync(Id, e => e.ReleaseFinal(actor, reauth)),
+            _ => Result.Fail("Retest spawns a child engagement — wired in a later pass."),
+        };
+
+        if (result.Failed) _error = result.Error;
+        else _ok = "Done — state advanced and the audit chain was appended atomically.";
+        await Load();
+    }
+
+    void Verify() => _chainOk = Store.VerifyChain();
+
+    async Task Retest()
+    {
+        _error = _ok = null; _chainOk = null;
+        var (result, childId) = await Store.RequestRetestAsync(Id, Session.Actor);
+        if (result.Failed || childId is null) { _error = result.Error; await Load(); return; }
+        Nav.NavigateTo($"engagement/{childId}");
+    }
+
+    static string TypeClass(EngagementType t) =>
+        t == EngagementType.Project ? "project" : t == EngagementType.Bau ? "bau" : "retest";
+}

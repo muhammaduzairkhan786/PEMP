@@ -1,0 +1,75 @@
+@* Live vulnerability register (FR-FND-01/03/04): severity distribution + filter chips + table *@
+@if (Findings.Count > 0)
+{
+    <div class="sectionlabel">Live register <span class="srs">FR-FND-01</span></div>
+
+    <div class="distbar" role="img" aria-label="@DistLabel()">
+        @foreach (var s in Order)
+        {
+            var n = Count(s);
+            if (n > 0)
+            {
+                <span title="@s @n" style="width:@(Pct(n))%;background:@SevVar(s)"></span>
+            }
+        }
+    </div>
+
+    <div class="fchips">
+        <button type="button" class="fchip @(_filter is null ? "on" : "")" @onclick="() => _filter = null">All (@Findings.Count)</button>
+        @foreach (var s in Order)
+        {
+            if (Count(s) > 0)
+            {
+                <button type="button" class="fchip @(_filter == s ? "on" : "")" @onclick="() => _filter = s">@s (@Count(s))</button>
+            }
+        }
+    </div>
+
+    <div class="card" style="padding:0;overflow:hidden">
+        <table class="t">
+            <thead><tr><th>Severity</th><th>Finding</th><th>Asset</th><th>CVSS</th><th>Status</th></tr></thead>
+            <tbody>
+                @foreach (var f in Filtered())
+                {
+                    <tr>
+                        <td><span class="sevchip @f.Severity.ToString().ToLowerInvariant()">@f.Severity</span></td>
+                        <td>@f.Title</td>
+                        <td>@f.Asset</td>
+                        <td class="mono">@f.Cvss</td>
+                        <td><span class="pill @f.Status.ToString().ToLowerInvariant()">@StatusLabel(f.Status)</span></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <p class="muted" style="font-size:var(--text-xs);margin-top:8px">Entered once → flows live into the register · <span class="srs">FR-FND-03</span></p>
+}
+
+@code {
+    [Parameter] public List<FindingRecord> Findings { get; set; } = new();
+    Severity? _filter;
+
+    static readonly Severity[] Order = { Severity.Critical, Severity.High, Severity.Medium, Severity.Low, Severity.Info };
+
+    int Count(Severity s) => Findings.Count(f => f.Severity == s);
+    int Pct(int n) => Findings.Count == 0 ? 0 : (int)Math.Round(100.0 * n / Findings.Count);
+    IEnumerable<FindingRecord> Filtered() => _filter is null ? Findings : Findings.Where(f => f.Severity == _filter);
+
+    static string SevVar(Severity s) => s switch
+    {
+        Severity.Critical => "var(--sev-critical)",
+        Severity.High => "var(--sev-high)",
+        Severity.Medium => "var(--sev-medium)",
+        Severity.Low => "var(--sev-low)",
+        _ => "var(--sev-info)",
+    };
+
+    static string StatusLabel(FindingStatus s) => s switch
+    {
+        FindingStatus.RetestPending => "retest-pending",
+        FindingStatus.AcceptedRisk => "accepted-risk",
+        _ => s.ToString().ToLowerInvariant(),
+    };
+
+    string DistLabel() => string.Join(", ", Order.Where(s => Count(s) > 0).Select(s => $"{s} {Count(s)}"));
+}

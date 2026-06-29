@@ -1,0 +1,17 @@
+@* Master engagement spine — done / current / future (DESIGN_PLAN §1.1) *@
+<div class="spine">
+    @foreach (var s in Workflow.Spine)
+    {
+        var cls = (int)s < (int)Current ? "done" : s == Current ? "current" : "future";
+        <div class="node @cls">
+            <div class="connector"></div>
+            <div class="bead">@((int)s < (int)Current ? "✓" : "")</div>
+            <div class="lbl">@Workflow.Label(s)</div>
+            <div class="wk">@Workflow.Week(s)</div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Stage Current { get; set; }
+}

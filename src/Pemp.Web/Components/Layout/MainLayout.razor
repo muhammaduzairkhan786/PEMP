@@ -1,0 +1,42 @@
+@inherits LayoutComponentBase
+@inject DemoSession Session
+@inject NavigationManager Nav
+
+<div class="shell">
+    <div class="brand"><div class="logo">P</div><b>PEMP</b></div>
+
+    <header class="topbar">
+        <span class="eyebrow">Pentest Engagement Management</span>
+        <span class="sp"></span>
+        <label class="muted" style="font-size:var(--text-xs)" for="roleSel">Viewing as</label>
+        <select id="roleSel" class="rolesel" @onchange="OnRole">
+            @foreach (var r in DemoSession.Roles)
+            {
+                <option value="@r" selected="@(r == Session.Role)">@r</option>
+            }
+        </select>
+    </header>
+
+    <nav class="side">
+        <NavLink href="" Match="NavLinkMatch.All">⌂ My Turn</NavLink>
+        <NavLink href="engagements">◉ Engagements</NavLink>
+        <NavLink href="analytics">▦ Analytics</NavLink>
+        <div class="foot">@Session.Role · @Session.Actor</div>
+    </nav>
+
+    <main class="content">@Body</main>
+</div>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
+</div>
+
+@code {
+    void OnRole(ChangeEventArgs e)
+    {
+        Session.Role = e.Value?.ToString() ?? Session.Role;
+        Nav.Refresh(); // re-run the current page so "your turn" reflects the new role
+    }
+}
