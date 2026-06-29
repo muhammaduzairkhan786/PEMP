@@ -180,11 +180,11 @@ else
         }
     }
 
-    void OnAct(ActionKind k)
+    async Task OnAct(ActionKind k)
     {
         _error = _ok = null; _chainOk = null;
-        if (Workflow.NeedsReauth(k)) _reauthFor = k;   // show the re-auth confirm step
-        else _ = Run(k, false);
+        if (Workflow.NeedsReauth(k)) _reauthFor = k;       // show the re-auth confirm step
+        else await Run(k, false);                          // await so the UI re-renders (async DB providers)
     }
 
     void Cancel() => _reauthFor = ActionKind.None;
