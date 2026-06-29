@@ -57,6 +57,10 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
 
     public bool VerifyChain() => new EfAuditChain(db).Verify();
 
+    /// <summary>Global audit log for the admin console (FR-AUD-03), newest first.</summary>
+    public Task<List<AuditEntryRow>> AllAuditAsync() =>
+        db.AuditEntries.AsNoTracking().OrderByDescending(a => a.Sequence).ToListAsync();
+
     // ---- Assessment answers (workbook Tab 1 / FR-SCO) ----------------------
     public Task<Dictionary<string, string>> AssessmentAnswersAsync(Guid id) =>
         db.AssessmentAnswers.AsNoTracking().Where(a => a.EngagementId == id)

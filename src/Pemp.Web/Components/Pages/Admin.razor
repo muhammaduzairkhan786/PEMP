@@ -1,0 +1,94 @@
+@page "/admin"
+@inject EngagementStore Store
+@inject DemoSession Session
+<PageTitle>Admin · PEMP</PageTitle>
+
+<div class="wrap">
+    <div class="eyebrow">System Administrator</div>
+    <h1 class="title">Admin console</h1>
+    <p class="sub">Users &amp; roles, integrations, configuration, and the global audit log.</p>
+
+    @if (Session.Role != "System Administrator")
+    {
+        <div class="banner err">⛔ Admin console is restricted to the System Administrator role.</div>
+    }
+    else
+    {
+        <div class="sectionlabel">Users &amp; roles <span class="srs">FR-ADM-01 · SEC-IAM-03</span></div>
+        <div class="card" style="padding:0;overflow:hidden">
+            <table class="t">
+                <thead><tr><th>Name</th><th>Role (= Entra group)</th><th>Type</th><th>Conditional Access</th></tr></thead>
+                <tbody>
+                    <tr><td>J. Okafor</td><td>Acme CA Officer</td><td>native</td><td><span class="pill ok">✓ compliant</span></td></tr>
+                    <tr><td>M. Reyes</td><td>Delivery Manager</td><td><span class="pill wait">B2B guest</span></td><td><span class="pill ok">✓ compliant</span></td></tr>
+                    <tr><td>A. Khan</td><td>Penetration Tester</td><td><span class="pill wait">B2B guest</span></td><td><span class="pill ok">✓ MFA enforced</span></td></tr>
+                    <tr><td>R. Patel</td><td>Penetration Tester</td><td><span class="pill wait">B2B guest</span></td><td><span class="pill warn">⚠ risky sign-in</span></td></tr>
+                    <tr><td>P. Devlin</td><td>Application Stakeholder</td><td><span class="pill wait">B2B guest</span></td><td><span class="pill ok">✓ compliant</span></td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="muted" style="font-size:var(--text-xs);margin-top:6px">Roles are Entra group membership — changed in Entra, reflected here. No local password store.</p>
+
+        <div class="sectionlabel">Integrations <span class="srs">FR-ADM-03 · CON-05</span></div>
+        <div class="card">
+            <div class="q">Entra ID (SSO) <span class="pill ok">● connected</span></div>
+            <div class="q">Mail / Teams <span class="pill ok">● connected</span></div>
+            <div class="q">ITSM ticketing <span class="pill warn">◑ degraded · webhook</span></div>
+            <div class="q" style="border:none">Azure Key Vault <span class="pill ok">● connected (managed identity)</span></div>
+        </div>
+
+        <div class="sectionlabel">Configuration <span class="srs">FR-ADM-02/04 · FR-DOC-04</span></div>
+        <div class="card">
+            <div class="q"><b>Templates</b> assessment · SoW · email</div>
+            <div class="q"><b>SLA thresholds</b> assign 2d · sign 2d · QA 1d</div>
+            <div class="q"><b>Retention</b> evidence 7y · credentials purge-on-close · crypto-shred on expiry</div>
+            <div class="q" style="border:none"><b>Feature flags</b> command palette · snooze</div>
+        </div>
+
+        <div class="sectionlabel">
+            Global audit log <span class="srs">FR-AUD-03 · SEC-AUD-01</span>
+            <button class="btn ghost" style="margin-left:8px" @onclick="Verify">Verify chain</button>
+            @if (_chainOk is not null)
+            {
+                <span class="pill @(_chainOk == true ? "ok" : "warn")">@(_chainOk == true ? "🔗 verified" : "⚠ broken")</span>
+            }
+        </div>
+        <div class="q"><input class="inp" placeholder="filter by actor or action…" @bind="_filter" @bind:event="oninput" /></div>
+        <div class="card" style="padding:0;overflow:hidden">
+            <table class="t">
+                <thead><tr><th>#</th><th>Actor</th><th>Action</th><th>Before → After</th><th>When</th></tr></thead>
+                <tbody>
+                    @foreach (var a in Filtered())
+                    {
+                        <tr>
+                            <td class="mono">@a.Sequence</td>
+                            <td>@a.Actor</td>
+                            <td class="mono">@a.Action</td>
+                            <td class="mono muted">@a.Before → @a.After</td>
+                            <td class="muted">@a.Timestamp.ToString("dd MMM HH:mm")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <p class="muted" style="font-size:var(--text-xs);margin-top:6px">@_audit.Count entries · append-only · hash-chained. <a href="#" @onclick:preventDefault @onclick="Export">Export</a> @_exportMsg</p>
+    }
+</div>
+
+@code {
+    List<AuditEntryRow> _audit = new();
+    string _filter = "";
+    bool? _chainOk;
+    string? _exportMsg;
+
+    protected override async Task OnInitializedAsync() => _audit = await Store.AllAuditAsync();
+
+    IEnumerable<AuditEntryRow> Filtered() =>
+        string.IsNullOrWhiteSpace(_filter)
+            ? _audit
+            : _audit.Where(a => a.Actor.Contains(_filter, StringComparison.OrdinalIgnoreCase)
+                             || a.Action.Contains(_filter, StringComparison.OrdinalIgnoreCase));
+
+    void Verify() => _chainOk = Store.VerifyChain();
+    void Export() => _exportMsg = $"· exported {Filtered().Count()} entries (CSV) for compliance.";
+}

@@ -21,6 +21,10 @@
         <NavLink href="" Match="NavLinkMatch.All">⌂ My Turn</NavLink>
         <NavLink href="engagements">◉ Engagements</NavLink>
         <NavLink href="analytics">▦ Analytics</NavLink>
+        @if (Session.Role == "System Administrator")
+        {
+            <NavLink href="admin">⚙ Admin</NavLink>
+        }
         <div class="foot">@Session.Role · @Session.Actor</div>
     </nav>
 
@@ -37,6 +41,7 @@
     void OnRole(ChangeEventArgs e)
     {
         Session.Role = e.Value?.ToString() ?? Session.Role;
-        Nav.Refresh(); // re-run the current page so "your turn" reflects the new role
+        // Land each role on its home: Admin → console, everyone else → My-Turn.
+        Nav.NavigateTo(Session.Role == "System Administrator" ? "/admin" : "/");
     }
 }
