@@ -28,6 +28,19 @@ public static class Workflow
         _ => s.ToString(),
     };
 
+    /// <summary>SOP target week per stage (workbook Tab 2 "Pentesting SOP Process").</summary>
+    public static string Week(Stage s) => s switch
+    {
+        Stage.Scoping => "WK-1",
+        Stage.Sow => "WK-2",
+        Stage.Access => "WK-2/3",
+        Stage.Execution => "WK-4–6",
+        Stage.Findings => "WK-6",
+        Stage.Report => "WK-8–10",
+        Stage.Closed => "WK-11–12",
+        _ => "",
+    };
+
     /// <summary>Re-auth-gated privileged actions (SEC-IAM-04): credential view, sign, release.</summary>
     public static bool NeedsReauth(ActionKind k) => k is ActionKind.SignSow or ActionKind.ReleaseFinal;
 
