@@ -1,0 +1,60 @@
+@page "/"
+@inject EngagementStore Store
+@inject DemoSession Session
+<PageTitle>My Turn · PEMP</PageTitle>
+
+<div class="wrap">
+    <div class="eyebrow">@Session.Role · @Session.Actor</div>
+    <h1 class="title">My Turn</h1>
+    <p class="sub">What needs you now — and what's moving without you.</p>
+
+    @if (_items is null)
+    {
+        <p class="muted">Loading…</p>
+    }
+    else
+    {
+        var mine = _items.Where(i => i.Owner == Session.Role).ToList();
+        var others = _items.Where(i => i.Owner != Session.Role).ToList();
+
+        <div class="sectionlabel">▸ Your turn <span class="srs">FR-NOT-01</span></div>
+        @if (mine.Count == 0)
+        {
+            <div class="card muted">You're all clear. <b>@others.Count</b> engagements moving without you.</div>
+        }
+        <div class="pile">
+            @foreach (var i in mine)
+            {
+                <div class="row">
+                    <div class="grow"><span class="verb">@i.Action</span> · @i.Rec.AppName<br><span class="ref">@i.Rec.Reference</span></div>
+                    <a class="btn primary" href="@($"engagement/{i.Rec.Id}")">Open ▶</a>
+                </div>
+            }
+        </div>
+
+        <div class="sectionlabel">Waiting on others <span class="srs">FR-NOT-03</span></div>
+        <div class="pile">
+            @foreach (var i in others)
+            {
+                <div class="row" style="opacity:.75">
+                    <div class="grow"><span class="verb">@i.Action</span> · @i.Rec.AppName<br><span class="ref">@i.Rec.Reference · owner: @i.Owner</span></div>
+                    <a class="btn ghost" href="@($"engagement/{i.Rec.Id}")">View</a>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    record Item(EngagementRecord Rec, string Action, string Owner);
+    List<Item>? _items;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var recs = await Store.ListAsync();
+        _items = recs
+            .Select(r => { var n = Workflow.Next(r); return new Item(r, n.Label, n.OwnerRole); })
+            .Where(i => i.Owner != "")
+            .ToList();
+    }
+}

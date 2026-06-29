@@ -22,3 +22,8 @@ TestResults/
 
 # Git transfer bundles (used to move history between clones; not source)
 *.bundle
+
+# Local demo SQLite database
+*.db
+*.db-shm
+*.db-wal

@@ -57,6 +57,28 @@ public sealed class Engagement
         return e;
     }
 
+    /// <summary>
+    /// Reconstruct a persisted engagement so a further transition can run (persistence only).
+    /// Restores prior state and writes no audit; later transitions append to the chain as normal.
+    /// </summary>
+    public static Engagement Rehydrate(
+        Guid id, string reference, EngagementType type, Guid? parentId, Stage stage, Guid? assignedTesterId,
+        bool assessmentComplete, bool sowReviewedByDm, bool sowSigned, bool accessVerified,
+        bool irNoticeSent, bool draftGenerated, bool peerReviewPassed, bool retestRequested,
+        IAuditChain chain, Func<DateTimeOffset> clock) =>
+        new(id, reference, type, parentId, stage, chain, clock)
+        {
+            AssignedTesterId = assignedTesterId,
+            AssessmentComplete = assessmentComplete,
+            SowReviewedByDm = sowReviewedByDm,
+            SowSigned = sowSigned,
+            AccessVerified = accessVerified,
+            IrNoticeSent = irNoticeSent,
+            DraftGenerated = draftGenerated,
+            PeerReviewPassed = peerReviewPassed,
+            RetestRequested = retestRequested,
+        };
+
     // ---- Transitions (guard table rows 2–12) -------------------------------
 
     /// <summary>Intake → Assignment: routed to the Delivery Manager queue (FR-REQ-03).</summary>

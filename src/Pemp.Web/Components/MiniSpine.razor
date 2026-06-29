@@ -1,0 +1,17 @@
+@* Compact spine for engagement cards *@
+<div class="minispine">
+    @for (var i = 0; i < Workflow.Spine.Length; i++)
+    {
+        var s = Workflow.Spine[i];
+        var cls = (int)s < (int)Current ? "done" : s == Current ? "cur" : "";
+        <span class="b @cls"></span>
+        @if (i < Workflow.Spine.Length - 1)
+        {
+            <span class="c @((int)s < (int)Current ? "done" : "")"></span>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public Stage Current { get; set; }
+}

@@ -1,0 +1,39 @@
+@page "/engagements"
+@inject EngagementStore Store
+<PageTitle>Engagements · PEMP</PageTitle>
+
+<div class="wrap">
+    <div class="eyebrow">Portfolio</div>
+    <h1 class="title">Engagements</h1>
+    <p class="sub">Every engagement, one consistent story.</p>
+
+    @if (_recs is null)
+    {
+        <p class="muted">Loading…</p>
+    }
+    else
+    {
+        <div class="enggrid">
+            @foreach (var r in _recs)
+            {
+                <a class="engcard" href="@($"engagement/{r.Id}")">
+                    <div class="top">
+                        <span class="nm">@r.AppName</span>
+                        <span class="chip @TypeClass(r.Type)">@r.Type.ToString().ToUpperInvariant()</span>
+                    </div>
+                    <div class="ref">@r.Reference</div>
+                    <MiniSpine Current="r.CurrentStage" />
+                    <div style="margin-top:10px" class="muted">▸ @(r.AssignedTesterName ?? "—") · @Workflow.Label(r.CurrentStage)</div>
+                </a>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    List<EngagementRecord>? _recs;
+    protected override async Task OnInitializedAsync() => _recs = await Store.ListAsync();
+
+    static string TypeClass(EngagementType t) =>
+        t == EngagementType.Project ? "project" : t == EngagementType.Bau ? "bau" : "retest";
+}

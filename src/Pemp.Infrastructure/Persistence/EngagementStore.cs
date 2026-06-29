@@ -1,0 +1,45 @@
+using Microsoft.EntityFrameworkCore;
+using Pemp.Domain;
+using Pemp.Domain.Audit;
+
+namespace Pemp.Infrastructure.Persistence;
+
+/// <summary>
+/// Application service the UI calls. Loads a record, rehydrates the domain aggregate
+/// bound to a DB-backed audit chain, runs the requested guarded transition, and — only
+/// on success — persists the new state and the appended audit entries together.
+/// A failed guard changes and saves nothing (the enforcement guarantee).
+/// </summary>
+public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock)
+{
+    public Task<List<EngagementRecord>> ListAsync() =>
+        db.Engagements.AsNoTracking().OrderBy(e => e.Reference).ToListAsync();
+
+    public Task<EngagementRecord?> GetAsync(Guid id) =>
+        db.Engagements.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id);
+
+    public Task<List<AuditEntryRow>> AuditForAsync(Guid id) =>
+        db.AuditEntries.AsNoTracking().Where(a => a.EngagementId == id).OrderBy(a => a.Sequence).ToListAsync();
+
+    public bool VerifyChain() => new EfAuditChain(db).Verify();
+
+    /// <summary>
+    /// Run a guarded transition on the aggregate. The action invokes a domain method
+    /// (e.g. <c>e =&gt; e.SignSow(actor, reAuth: true)</c>). State + audit persist only if it succeeds.
+    /// </summary>
+    public async Task<Result> ExecuteAsync(Guid id, Func<Engagement, Result> action)
+    {
+        var rec = await db.Engagements.FirstOrDefaultAsync(e => e.Id == id);
+        if (rec is null) return Result.Fail("Engagement not found.");
+
+        var chain = new EfAuditChain(db);
+        var aggregate = rec.ToDomain(chain, clock);
+
+        var result = action(aggregate);
+        if (result.Failed) return result; // guard rejected — nothing appended, nothing saved
+
+        rec.CopyFrom(aggregate);
+        await db.SaveChangesAsync();
+        return result;
+    }
+}
