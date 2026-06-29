@@ -18,6 +18,7 @@
    Pass 5: real engagement cards with mini-spine (kit #2) for list views.
    Pass 6: skeleton loading on async report generation (NFR-PER-03).
    Pass 7: capacity-board Mon–Fri load heatmap (FR-ASG-04).
+   Pass 8: live register — severity-distribution bar + working filter chips.
    ============================================================================ */
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
@@ -164,6 +165,14 @@ h1.title{font-size:var(--text-2xl);font-weight:750;margin:4px 0 2px;letter-spaci
 .skel-line{height:12px;margin:10px 0}
 @keyframes shimmer{0%{background-position:100% 0}100%{background-position:-100% 0}}
 @media (prefers-reduced-motion: reduce){.skel{animation:none}}
+
+/* live register: severity distribution + filter chips */
+.distbar{display:flex;height:10px;border-radius:var(--radius-pill);overflow:hidden;background:var(--surface-raised);margin:6px 0 14px}
+.distbar span{display:block}
+.fchips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:var(--space-3)}
+.fchip{font:inherit;font-size:var(--text-xs);padding:5px 12px;border-radius:var(--radius-pill);border:1px solid var(--border);color:var(--ink-muted);cursor:pointer;background:transparent;transition:all var(--dur-fast)}
+.fchip:hover{color:var(--ink);border-color:var(--border-strong)}
+.fchip.on{color:var(--ink);background:var(--brand-soft);border-color:var(--border-strong)}
 
 /* dashboard tiles */
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:var(--space-3)}
@@ -562,13 +571,30 @@ const BODY={
   <div class="q">ITSM ticketing <span class="pill warn">◑ degraded · webhook</span> <span class="srs">FR-ADM-03 · CON-05</span></div>
   <div class="q" style="border:none">Azure Key Vault <span class="pill ok">● connected (managed id)</span></div></div>`,
 };
-function registerTable(dim){return `<div class="card" style="padding:0;overflow:hidden;${dim?'opacity:.55':''}"><table class="t"><thead><tr><th>Severity</th><th>Finding</th><th>Asset</th><th>CVSS</th><th>Status</th></tr></thead><tbody>
-  <tr><td><span class="sevchip crit">Critical</span></td><td>Auth bypass via JWT confusion</td><td>API</td><td class="mono">9.1</td><td><span class="pill open">open</span></td></tr>
-  <tr><td><span class="sevchip high">High</span></td><td>SQLi in /claims search</td><td>Web</td><td class="mono">8.1</td><td><span class="pill retest">retest-pending</span></td></tr>
-  <tr><td><span class="sevchip high">High</span></td><td>Stored XSS in note field</td><td>Web</td><td class="mono">7.4</td><td><span class="pill open">open</span></td></tr>
-  <tr><td><span class="sevchip med">Medium</span></td><td>Verbose error disclosure</td><td>API</td><td class="mono">5.3</td><td><span class="pill remediated">remediated</span></td></tr>
-  <tr><td><span class="sevchip low">Low</span></td><td>Missing cookie flags</td><td>Web</td><td class="mono">3.1</td><td><span class="pill closed">closed</span></td></tr></tbody></table></div>
-  <p class="muted" style="margin-top:10px;font-size:var(--text-xs)"><span class="srs">FR-FND-01</span> fixed 5-step scale, never colour alone · <span class="srs">FR-FND-03</span> enter once → live register</p>`;}
+const SEVL={crit:'Critical',high:'High',med:'Medium',low:'Low'};
+const STATL={open:'open',retest:'retest-pending',remediated:'remediated',closed:'closed'};
+const FINDINGS=[
+  {sev:'crit',name:'Auth bypass via JWT confusion',asset:'API',cvss:'9.1',status:'open'},
+  {sev:'high',name:'SQLi in /claims search',asset:'Web',cvss:'8.1',status:'retest'},
+  {sev:'high',name:'Stored XSS in note field',asset:'Web',cvss:'7.4',status:'open'},
+  {sev:'med',name:'Verbose error disclosure',asset:'API',cvss:'5.3',status:'remediated'},
+  {sev:'low',name:'Missing cookie flags',asset:'Web',cvss:'3.1',status:'closed'},
+];
+let fndFilter='all';
+function setFnd(f){fndFilter=f;renderMain();}
+function distBar(){const c={crit:0,high:0,med:0,low:0};FINDINGS.forEach(f=>{if(c[f.sev]!=null)c[f.sev]++});const t=FINDINGS.length||1;
+  const seg=(k,col)=>c[k]?`<span style="width:${(100*c[k]/t).toFixed(1)}%;background:var(${col})" title="${SEVL[k]}: ${c[k]}"></span>`:'';
+  return `<div class="distbar" role="img" aria-label="Severity mix: ${Object.keys(c).map(k=>SEVL[k]+' '+c[k]).join(', ')}">${seg('crit','--sev-critical')}${seg('high','--sev-high')}${seg('med','--sev-medium')}${seg('low','--sev-low')}</div>`;}
+function fndRows(){return FINDINGS.filter(f=>fndFilter==='all'||f.sev===fndFilter).map(f=>
+  `<tr><td><span class="sevchip ${f.sev}">${SEVL[f.sev]}</span></td><td>${f.name}</td><td>${f.asset}</td><td class="mono">${f.cvss}</td><td><span class="pill ${f.status}">${STATL[f.status]}</span></td></tr>`).join('')
+  || `<tr><td colspan="5" class="muted" style="text-align:center;padding:18px">No ${SEVL[fndFilter]||''} findings.</td></tr>`;}
+function registerTable(dim){
+  const chips=['all','crit','high','med','low'].map(k=>`<button type="button" class="fchip ${fndFilter===k?'on':''}" onclick="setFnd('${k}')">${k==='all'?'All':SEVL[k]}</button>`).join('');
+  return `<div style="${dim?'opacity:.55;pointer-events:none':''}">
+  <div class="sectionlabel" style="margin-top:0">Severity distribution <span class="srs">FR-FND-01</span></div>${distBar()}
+  <div class="fchips">${chips}</div>
+  <div class="card" style="padding:0;overflow:hidden"><table class="t"><thead><tr><th>Severity</th><th>Finding</th><th>Asset</th><th>CVSS</th><th>Status</th></tr></thead><tbody id="regBody">${fndRows()}</tbody></table></div>
+  <p class="muted" style="margin-top:10px;font-size:var(--text-xs)"><span class="srs">FR-FND-01</span> fixed 5-step scale, never colour alone · <span class="srs">FR-FND-03</span> enter once → live register</p></div>`;}
 const STAGES=['Intake','Assign','Scope','SoW','Access','Test','Findings','Report','Retest'];
 const ENGS=[
   {name:'Claims Portal',ref:'ENG-2026-0412',type:'project',stage:3,owner:'A. Khan',sla:['amber','2d']},
