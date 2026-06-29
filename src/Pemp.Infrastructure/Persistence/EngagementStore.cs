@@ -18,6 +18,10 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
     public Task<EngagementRecord?> GetAsync(Guid id) =>
         db.Engagements.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id);
 
+    /// <summary>All findings across the portfolio (FR-ANL-04 analytics).</summary>
+    public Task<List<FindingRecord>> AllFindingsAsync() =>
+        db.Findings.AsNoTracking().ToListAsync();
+
     public Task<List<AuditEntryRow>> AuditForAsync(Guid id) =>
         db.AuditEntries.AsNoTracking().Where(a => a.EngagementId == id).OrderBy(a => a.Sequence).ToListAsync();
 
