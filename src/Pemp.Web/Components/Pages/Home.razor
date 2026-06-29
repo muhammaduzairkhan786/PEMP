@@ -57,7 +57,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var recs = await Store.ListAsync();
+        var recs = await Store.ListScopedAsync(Session.AppScope, Session.TesterScope);
         _items = recs
             .Select(r => { var n = Workflow.Next(r); return new Item(r, n.Label, n.OwnerRole); })
             .Where(i => i.Owner != "")

@@ -15,6 +15,18 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
     public Task<List<EngagementRecord>> ListAsync() =>
         db.Engagements.AsNoTracking().OrderBy(e => e.Reference).ToListAsync();
 
+    /// <summary>
+    /// Object-level scoped list (SEC-AZN/SEC-INS-01): filter to one app (Stakeholder) or
+    /// to engagements assigned to a tester. Null filters mean unrestricted (Acme/DM/Admin).
+    /// </summary>
+    public Task<List<EngagementRecord>> ListScopedAsync(string? appName, string? assignedToName)
+    {
+        var q = db.Engagements.AsNoTracking().AsQueryable();
+        if (appName is not null) q = q.Where(e => e.AppName == appName || e.AppName == appName + " (retest)");
+        if (assignedToName is not null) q = q.Where(e => e.AssignedTesterName == assignedToName);
+        return q.OrderBy(e => e.Reference).ToListAsync();
+    }
+
     public Task<EngagementRecord?> GetAsync(Guid id) =>
         db.Engagements.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id);
 

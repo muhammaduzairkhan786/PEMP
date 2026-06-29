@@ -19,4 +19,10 @@ public sealed class DemoSession
         "Stakeholder" => "P. Devlin",
         _ => "S. Cole",
     };
+
+    // ---- Object-level scope (SEC-AZN / SEC-INS-01) ----
+    // A Stakeholder sees only their own application; a Tester only their assigned engagements.
+    // Other roles (Acme, DM, Admin) see the whole portfolio.
+    public string? AppScope => Role == "Stakeholder" ? "Mobile App" : null;
+    public string? TesterScope => Role == "Tester" ? Actor : null;
 }

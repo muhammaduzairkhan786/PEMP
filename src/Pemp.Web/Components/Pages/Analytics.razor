@@ -1,5 +1,6 @@
 @page "/analytics"
 @inject EngagementStore Store
+@inject DemoSession Session
 <PageTitle>Analytics · PEMP</PageTitle>
 
 <div class="wrap">
@@ -84,8 +85,9 @@
 
     protected override async Task OnInitializedAsync()
     {
-        _engs = await Store.ListAsync();
-        _findings = await Store.AllFindingsAsync();
+        _engs = await Store.ListScopedAsync(Session.AppScope, Session.TesterScope);
+        var ids = _engs.Select(e => e.Id).ToHashSet();
+        _findings = (await Store.AllFindingsAsync()).Where(f => ids.Contains(f.EngagementId)).ToList();
     }
 
     static string SevVar(Severity s) => s switch
