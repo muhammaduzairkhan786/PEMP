@@ -91,6 +91,25 @@ public sealed class PersistenceTests : IDisposable
     }
 
     [Fact]
+    public async Task GetScoped_enforces_object_level_access()
+    {
+        var claims = IdOf("ENG-2026-0412"); // assigned A. Khan
+        var retail = IdOf("ENG-2026-0408"); // assigned R. Patel
+        var mobile = IdOf("ENG-2026-0421"); // Mobile App, at Scoping
+
+        // Tester scope (A. Khan): reaches own assignment, blocked from another tester's.
+        Assert.NotNull(await _store.GetScopedAsync(claims, null, "A. Khan"));
+        Assert.Null(await _store.GetScopedAsync(retail, null, "A. Khan"));
+
+        // Stakeholder app scope (Mobile App): reaches own app, blocked from others (anti-BOLA).
+        Assert.NotNull(await _store.GetScopedAsync(mobile, "Mobile App", null));
+        Assert.Null(await _store.GetScopedAsync(claims, "Mobile App", null));
+
+        // Unrestricted (Acme/DM/Admin): reaches anything.
+        Assert.NotNull(await _store.GetScopedAsync(retail, null, null));
+    }
+
+    [Fact]
     public async Task RequestRetest_spawns_linked_child()
     {
         // Broker Portal is closed → retest spawns a child engagement.
