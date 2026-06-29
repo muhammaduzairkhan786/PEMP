@@ -28,6 +28,23 @@ else
 
         <div class="card"><Spine Current="_rec.CurrentStage" /></div>
 
+        @if (_reauthFor != ActionKind.None)
+        {
+            <div class="scrim" @onclick="Cancel">
+                <div class="modal" @onclick:stopPropagation="true">
+                    <h3>@ModalTitle()</h3>
+                    <p class="muted" style="margin-bottom:12px">@(_reauthFor == ActionKind.SignSow ? "You are agreeing to:" : "You are releasing:")</p>
+                    <ul class="attest">@foreach (var l in ModalLines()){<li>@l</li>}</ul>
+                    <div class="chainline"><span class="tick">🔗</span> Creates an immutable, hash-chained record · <span class="srs">SEC-AUD-01</span></div>
+                    <div class="reauthnote">🔐 Re-authenticate via Entra MFA before it commits · <span class="srs">SEC-IAM-04</span></div>
+                    <div class="actions">
+                        <button class="btn ghost" @onclick="Cancel">Cancel</button>
+                        <button class="btn primary" @onclick="() => Run(_reauthFor, true)">Confirm via Entra MFA ▶</button>
+                    </div>
+                </div>
+            </div>
+        }
+
         @if (_error is not null)
         {
             <div class="banner err">⛔ @_error</div>
@@ -57,13 +74,8 @@ else
         {
             <div class="card nextaction">
                 <div style="font-size:26px">▸</div>
-                <div class="meta"><b>@next.Label</b><span class="muted">Owner: You (@Session.Role)</span></div>
-                @if (_reauthFor == next.Kind)
-                {
-                    <button class="btn" @onclick="Cancel">Cancel</button>
-                    <button class="btn primary" @onclick="() => Run(next.Kind, true)">🔐 Confirm via Entra MFA ▶</button>
-                }
-                else if (next.Kind == ActionKind.CompleteAssessment)
+                <div class="meta"><b>@next.Label</b><span class="muted">Owner: You (@Session.Role)@(Workflow.NeedsReauth(next.Kind) ? " · re-auth required (SEC-IAM-04)" : "")</span></div>
+                @if (next.Kind == ActionKind.CompleteAssessment)
                 {
                     <a class="btn primary" href="@($"engagement/{Id}/assessment")">Open assessment form ▶</a>
                 }
@@ -72,10 +84,6 @@ else
                     <button class="btn primary" @onclick="() => OnAct(next.Kind)">@next.Label ▶</button>
                 }
             </div>
-            @if (Workflow.NeedsReauth(next.Kind) && _reauthFor == next.Kind)
-            {
-                <p class="muted" style="font-size:var(--text-sm)">Privileged action — re-authentication required before it commits (SEC-IAM-04).</p>
-            }
         }
         else
         {
@@ -158,6 +166,12 @@ else
     }
 
     void Cancel() => _reauthFor = ActionKind.None;
+
+    string ModalTitle() => _reauthFor == ActionKind.SignSow ? "Sign Statement of Work" : "Release final report";
+
+    string[] ModalLines() => _reauthFor == ActionKind.SignSow
+        ? new[] { $"Scope: {_rec!.AppName} ({_rec.Type})", "Methodology & dates per the SoW draft", "Prerequisites & test accounts" }
+        : new[] { "Final report — peer QA passed", "Vulnerability register snapshot", "Stored immutable on release" };
 
     async Task Run(ActionKind k, bool reauth)
     {
