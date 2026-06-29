@@ -177,3 +177,11 @@ textarea.inp{resize:vertical}
   .modal{width:94vw}
   .inp{max-width:100%}
 }
+
+/* skeleton loaders */
+.skel{background:linear-gradient(90deg,var(--surface-raised) 25%,color-mix(in srgb,var(--ink) 9%,var(--surface-raised)) 37%,var(--surface-raised) 63%);
+  background-size:400% 100%;border-radius:var(--radius-md);animation:shimmer 1.4s ease infinite;display:block}
+.skel-row{height:56px;margin-bottom:var(--space-2)}
+.skel-line{height:14px;margin:10px 0;border-radius:var(--radius-sm)}
+@keyframes shimmer{0%{background-position:100% 0}100%{background-position:-100% 0}}
+@media (prefers-reduced-motion: reduce){.skel{animation:none}}
