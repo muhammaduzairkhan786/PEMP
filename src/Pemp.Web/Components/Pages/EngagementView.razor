@@ -65,6 +65,8 @@ else
             <div class="card">⏳ Waiting on <b>@next.OwnerRole</b> — "@next.Label". <span class="muted">You're viewing as @Session.Role.</span></div>
         }
 
+        <AccessRequirements EngagementId="Id" Reqs="_access" Editable="@(_rec.CurrentStage == Stage.Access && Session.Role == "Tester")" />
+
         <FindingsRegister Findings="_findings" />
 
         <div class="sectionlabel">
@@ -101,6 +103,7 @@ else
     EngagementRecord? _rec;
     List<AuditEntryRow> _audit = new();
     List<FindingRecord> _findings = new();
+    List<AccessRequirementRecord> _access = new();
     string? _error, _ok;
     bool? _chainOk;
     ActionKind _reauthFor = ActionKind.None;
@@ -116,6 +119,7 @@ else
         {
             _audit = await Store.AuditForAsync(Id);
             _findings = await Store.FindingsForAsync(Id);
+            _access = await Store.AccessReqsForAsync(Id);
         }
     }
 

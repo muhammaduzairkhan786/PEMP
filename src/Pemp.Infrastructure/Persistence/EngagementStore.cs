@@ -42,6 +42,18 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
         await db.SaveChangesAsync();
     }
 
+    // ---- Access requirements (workbook Tab 3 / FR-ACC-01) ------------------
+    public Task<List<AccessRequirementRecord>> AccessReqsForAsync(Guid id) =>
+        db.AccessRequirements.AsNoTracking().Where(a => a.EngagementId == id).OrderBy(a => a.Environment).ToListAsync();
+
+    public async Task SetAccessStatusAsync(Guid reqId, AccessStatus status)
+    {
+        var row = await db.AccessRequirements.FirstOrDefaultAsync(a => a.Id == reqId);
+        if (row is null) return;
+        row.Status = status;
+        await db.SaveChangesAsync();
+    }
+
     /// <summary>
     /// Run a guarded transition on the aggregate. The action invokes a domain method
     /// (e.g. <c>e =&gt; e.SignSow(actor, reAuth: true)</c>). State + audit persist only if it succeeds.

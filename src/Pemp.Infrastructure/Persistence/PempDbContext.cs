@@ -8,6 +8,7 @@ public sealed class PempDbContext(DbContextOptions<PempDbContext> options) : DbC
     public DbSet<AuditEntryRow> AuditEntries => Set<AuditEntryRow>();
     public DbSet<FindingRecord> Findings => Set<FindingRecord>();
     public DbSet<AssessmentAnswerRecord> AssessmentAnswers => Set<AssessmentAnswerRecord>();
+    public DbSet<AccessRequirementRecord> AccessRequirements => Set<AccessRequirementRecord>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -34,5 +35,10 @@ public sealed class PempDbContext(DbContextOptions<PempDbContext> options) : DbC
         var ans = b.Entity<AssessmentAnswerRecord>();
         ans.HasKey(a => a.Id);
         ans.HasIndex(a => new { a.EngagementId, a.QuestionId }).IsUnique();
+
+        var acc = b.Entity<AccessRequirementRecord>();
+        acc.HasKey(a => a.Id);
+        acc.HasIndex(a => a.EngagementId);
+        acc.Property(a => a.Status).HasConversion<string>();
     }
 }

@@ -81,6 +81,16 @@ public static class DemoSeeder
             F(broker.Id, "Weak password policy", Severity.Medium, "4.8", "Web", FindingStatus.Closed)
         );
 
+        // Access requirements (FR-ACC-01) for Payments API (at the Access stage).
+        AccessRequirementRecord A(Guid eng, string env, string url, string type, AccessStatus st)
+            => new() { Id = Guid.NewGuid(), EngagementId = eng, Environment = env, Url = url, AccessType = type, Status = st };
+        db.AccessRequirements.AddRange(
+            A(pay.Id, "Production URLs", "https://payments.axaxl.example", "Read", AccessStatus.InProgress),
+            A(pay.Id, "Pre-production", "https://preprod.payments.axaxl.example", "Read-Write", AccessStatus.AppTeamToProvision),
+            A(pay.Id, "QA (lower env)", "https://qa.payments.axaxl.example", "Read-Write", AccessStatus.AppTeamToProvision),
+            A(pay.Id, "APIs / Postman collection", "token + subscription key", "Other", AccessStatus.AppTeamToProvision)
+        );
+
         db.SaveChanges();
     }
 }

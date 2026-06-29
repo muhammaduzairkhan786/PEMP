@@ -1,0 +1,69 @@
+@* Access requirements matrix (workbook Tab 3 / FR-ACC-01). Tester defines; status per env. *@
+@inject EngagementStore Store
+
+@if (Reqs.Count > 0)
+{
+    <div class="sectionlabel">Access requirements <span class="srs">FR-ACC-01</span></div>
+    <div class="card" style="padding:0;overflow:hidden">
+        <table class="t">
+            <thead><tr><th>Environment / asset</th><th>URL / detail</th><th>Access</th><th>Status</th></tr></thead>
+            <tbody>
+                @foreach (var r in Reqs)
+                {
+                    <tr>
+                        <td>@r.Environment</td>
+                        <td class="mono muted">@r.Url</td>
+                        <td>@r.AccessType</td>
+                        <td>
+                            @if (Editable)
+                            {
+                                <select class="inp" style="max-width:210px" value="@r.Status" @onchange="e => SetStatus(r, e)">
+                                    @foreach (var s in Enum.GetValues<AccessStatus>())
+                                    {
+                                        <option value="@s">@Label(s)</option>
+                                    }
+                                </select>
+                            }
+                            else
+                            {
+                                <span class="pill @Cls(r.Status)">@Label(r.Status)</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <p class="muted" style="font-size:var(--text-xs);margin-top:8px">Tester defines required access per environment; app team provisions · <span class="srs">FR-ACC-02</span></p>
+}
+
+@code {
+    [Parameter] public Guid EngagementId { get; set; }
+    [Parameter] public List<AccessRequirementRecord> Reqs { get; set; } = new();
+    [Parameter] public bool Editable { get; set; }
+
+    async Task SetStatus(AccessRequirementRecord r, ChangeEventArgs e)
+    {
+        if (Enum.TryParse<AccessStatus>(e.Value?.ToString(), out var s))
+        {
+            r.Status = s;
+            await Store.SetAccessStatusAsync(r.Id, s);
+        }
+    }
+
+    static string Label(AccessStatus s) => s switch
+    {
+        AccessStatus.AppTeamToProvision => "App team to provision",
+        AccessStatus.InProgress => "In progress",
+        AccessStatus.Provisioned => "Provisioned",
+        _ => "Not required",
+    };
+
+    static string Cls(AccessStatus s) => s switch
+    {
+        AccessStatus.Provisioned => "ok",
+        AccessStatus.InProgress => "wait",
+        AccessStatus.AppTeamToProvision => "warn",
+        _ => "",
+    };
+}
