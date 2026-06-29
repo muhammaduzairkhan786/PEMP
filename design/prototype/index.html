@@ -16,6 +16,7 @@
    Pass 3: right slide-over drawer rail (Documents/Findings/Comms/Audit, §4).
    Pass 4: responsive tablet/phone layout (NFR-USA-04) — desktop untouched.
    Pass 5: real engagement cards with mini-spine (kit #2) for list views.
+   Pass 6: skeleton loading on async report generation (NFR-PER-03).
    ============================================================================ */
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
@@ -155,6 +156,13 @@ h1.title{font-size:var(--text-2xl);font-weight:750;margin:4px 0 2px;letter-spaci
 .minispine .c.done{background:var(--state-done)}
 .chip.bau{color:var(--ink-muted)}
 .chip.retest{color:var(--state-waiting);border-color:color-mix(in srgb,var(--state-waiting) 45%,transparent)}
+
+/* skeleton loading — only on genuinely-async surfaces (report gen, NFR-PER-03) */
+.skel{background:linear-gradient(90deg,var(--surface-raised) 25%,color-mix(in srgb,var(--ink) 9%,var(--surface-raised)) 37%,var(--surface-raised) 63%);
+  background-size:400% 100%;border-radius:var(--radius-sm);animation:shimmer 1.4s ease infinite}
+.skel-line{height:12px;margin:10px 0}
+@keyframes shimmer{0%{background-position:100% 0}100%{background-position:-100% 0}}
+@media (prefers-reduced-motion: reduce){.skel{animation:none}}
 
 /* dashboard tiles */
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:var(--space-3)}
@@ -449,8 +457,9 @@ const BODY={
 'tester:reports':()=>head('Reporting',LOCKED['tester:reports']?'Locked — opens when findings are drafted.':'Assemble, peer-review, release.')+
   (LOCKED['tester:reports']?`<div class="lockbanner">🔒 Unlocks once findings exist to draft.</div>`:'')+
   nextCard('Release final report','Owner: You → peer → Acme','FR-REP-02',LOCKED['tester:reports'],LOCKED['tester:reports']?'':'Release ▶',"openGate('release')")+
-  `<div class="card" style="${LOCKED['tester:reports']?'opacity:.55':''}"><div class="sectionlabel" style="margin-top:0">Assembled from engagement + findings <span class="srs">FR-REP-01</span></div>
-  <p>Exec summary · 7 findings · register snapshot · appendix</p><div class="lockline">🔒 QA GATE: peer review before release <span class="srs">FR-REP-02</span></div></div>`,
+  `<div style="display:flex;gap:10px;align-items:center;margin-bottom:var(--space-4)"><button class="btn" onclick="genDraft()" ${LOCKED['tester:reports']?'disabled':''}>↻ Generate draft</button><span class="muted" style="font-size:var(--text-xs)">report generation runs async — never a frozen screen · <span class="srs">NFR-PER-03</span></span></div>
+  <div id="reportOut"><div class="card" style="${LOCKED['tester:reports']?'opacity:.55':''}"><div class="sectionlabel" style="margin-top:0">Assembled from engagement + findings <span class="srs">FR-REP-01</span></div>
+  <p>Exec summary · 7 findings · register snapshot · appendix</p><div class="lockline">🔒 QA GATE: peer review before release <span class="srs">FR-REP-02</span></div></div></div>`,
 
 /* ---- ACME CA OFFICER ---- */
 'acme:home':()=>head('Home','Approvals due and reports to read — plus your portfolio at a glance.')+
@@ -603,6 +612,12 @@ function verifyAccess(){FLOW['tester:access']=[{l:'Define prereqs',s:'done'},{l:
   if(ROLES[role].scoped) renderSpine(document.getElementById('masterSpine'),master,true);
   renderNav(); renderMain(); toast('Access verified. Test window open.');}
 function toast(m){const t=document.getElementById('toast');document.getElementById('toastMsg').textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000);}
+const skelBlock=(n)=>`<div class="card">${Array.from({length:n}).map((_,i)=>`<div class="skel skel-line" style="width:${[92,72,84,60,78][i%5]}%"></div>`).join('')}</div>`;
+function genDraft(){const o=document.getElementById('reportOut');if(!o)return;
+  o.innerHTML=`<div class="sectionlabel" style="margin-top:0">Assembling report… <span class="muted">async · NFR-PER-03</span></div>`+skelBlock(5);
+  const done=()=>{o.innerHTML=`<div class="card"><div class="sectionlabel" style="margin-top:0">Draft assembled <span class="srs">FR-REP-01</span></div>
+    <p>Exec summary · 7 findings · register snapshot · appendix</p><div class="lockline">🔒 QA GATE: peer review before release <span class="srs">FR-REP-02</span></div></div>`;toast('Draft report generated.');};
+  RM()?done():setTimeout(done,1100);}
 
 /* ============================ ⌘K PALETTE (RBAC-scoped) ============================ */
 const pal=document.getElementById('palette'),pin=document.getElementById('pinput'),pres=document.getElementById('presults');
