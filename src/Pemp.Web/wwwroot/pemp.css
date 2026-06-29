@@ -95,3 +95,15 @@ h1.title{font-size:var(--text-2xl);font-weight:750;margin:4px 0 2px;letter-spaci
 table.t{width:100%;border-collapse:collapse;font-size:var(--text-sm)}
 table.t th{text-align:left;color:var(--ink-muted);font-weight:600;font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;padding:8px 10px;border-bottom:1px solid var(--border)}
 table.t td{padding:9px 10px;border-bottom:1px solid var(--border)}
+
+/* portfolio tiles */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--space-3);margin-bottom:var(--space-4)}
+.tile{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-4);transition:all var(--dur-fast)}
+.tile:hover{transform:translateY(-2px);border-color:var(--border-strong);box-shadow:var(--elev-raised)}
+.tile .k{font-size:var(--text-xs);color:var(--ink-muted)}
+.tile .v{font-size:var(--text-2xl);font-weight:750;margin-top:4px}
+
+/* criticality chip — colour on status only (NFR-USA-03) */
+.chip.crit-high{color:var(--sev-high);border-color:color-mix(in srgb,var(--sev-high) 45%,transparent);background:color-mix(in srgb,var(--sev-high) 12%,transparent)}
+.chip.crit-medium{color:var(--sev-medium);border-color:color-mix(in srgb,var(--sev-medium) 45%,transparent);background:color-mix(in srgb,var(--sev-medium) 12%,transparent)}
+.chip.crit-low{color:var(--state-done);border-color:color-mix(in srgb,var(--state-done) 40%,transparent);background:color-mix(in srgb,var(--state-done) 12%,transparent)}

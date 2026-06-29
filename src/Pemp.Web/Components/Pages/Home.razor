@@ -17,6 +17,12 @@
         var mine = _items.Where(i => i.Owner == Session.Role).ToList();
         var others = _items.Where(i => i.Owner != Session.Role).ToList();
 
+        <div class="tiles">
+            <div class="tile"><div class="k">Your turn</div><div class="v">@mine.Count</div></div>
+            <div class="tile"><div class="k">Waiting on others</div><div class="v">@others.Count</div></div>
+            <div class="tile"><div class="k">In flight</div><div class="v">@_items.Count</div></div>
+        </div>
+
         <div class="sectionlabel">▸ Your turn <span class="srs">FR-NOT-01</span></div>
         @if (mine.Count == 0)
         {

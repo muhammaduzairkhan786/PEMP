@@ -13,9 +13,13 @@ else
     var mine = next.Kind != ActionKind.None && next.OwnerRole == Session.Role;
 
     <div class="wrap">
-        <div class="eyebrow">Engagement · @_rec.Type</div>
+        <div class="eyebrow">Engagement</div>
         <h1 class="title">@_rec.AppName <span class="ref">@_rec.Reference</span></h1>
-        <p class="sub">Criticality @_rec.Criticality · tester @(_rec.AssignedTesterName ?? "—")</p>
+        <p class="sub">
+            <span class="chip @TypeClass(_rec.Type)">@_rec.Type.ToString().ToUpperInvariant()</span>
+            <span class="chip crit-@_rec.Criticality.ToLowerInvariant()">@_rec.Criticality criticality</span>
+            · tester @(_rec.AssignedTesterName ?? "—")
+        </p>
 
         <div class="card"><Spine Current="_rec.CurrentStage" /></div>
 
@@ -141,4 +145,7 @@ else
     }
 
     void Verify() => _chainOk = Store.VerifyChain();
+
+    static string TypeClass(EngagementType t) =>
+        t == EngagementType.Project ? "project" : t == EngagementType.Bau ? "bau" : "retest";
 }
