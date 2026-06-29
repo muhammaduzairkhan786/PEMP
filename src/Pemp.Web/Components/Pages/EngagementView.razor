@@ -1,6 +1,7 @@
 @page "/engagement/{Id:guid}"
 @inject EngagementStore Store
 @inject DemoSession Session
+@inject NavigationManager Nav
 <PageTitle>Engagement · PEMP</PageTitle>
 
 @if (_rec is null)
@@ -18,6 +19,10 @@ else
         <p class="sub">
             <span class="chip @TypeClass(_rec.Type)">@_rec.Type.ToString().ToUpperInvariant()</span>
             <span class="chip crit-@_rec.Criticality.ToLowerInvariant()">@_rec.Criticality criticality</span>
+            @if (_rec.ParentId is not null)
+            {
+                <span class="chip retest">RETEST CHILD</span>
+            }
             · tester @(_rec.AssignedTesterName ?? "—")
         </p>
 
@@ -35,6 +40,18 @@ else
         @if (next.Kind == ActionKind.None)
         {
             <div class="card"><b>Engagement closed.</b> Final report released and stored immutable (FR-REP-04).</div>
+            @if (_rec.CurrentStage == Stage.Closed && _rec.RetestRequested)
+            {
+                <div class="card muted">↻ Retest already requested — a linked child engagement was created.</div>
+            }
+            else if (_rec.CurrentStage == Stage.Closed && (Session.Role is "Stakeholder" or "Acme CA Officer"))
+            {
+                <div class="card nextaction">
+                    <div style="font-size:26px">↻</div>
+                    <div class="meta"><b>Request a retest</b><span class="muted">Owner: You (@Session.Role) · FR-RET-01</span></div>
+                    <button class="btn primary" @onclick="Retest">Request retest ▶</button>
+                </div>
+            }
         }
         else if (mine)
         {
@@ -168,6 +185,14 @@ else
     }
 
     void Verify() => _chainOk = Store.VerifyChain();
+
+    async Task Retest()
+    {
+        _error = _ok = null; _chainOk = null;
+        var (result, childId) = await Store.RequestRetestAsync(Id, Session.Actor);
+        if (result.Failed || childId is null) { _error = result.Error; await Load(); return; }
+        Nav.NavigateTo($"engagement/{childId}");
+    }
 
     static string TypeClass(EngagementType t) =>
         t == EngagementType.Project ? "project" : t == EngagementType.Bau ? "bau" : "retest";

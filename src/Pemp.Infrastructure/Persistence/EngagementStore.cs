@@ -69,6 +69,30 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
     }
 
     /// <summary>
+    /// Request a retest on a closed engagement (FR-RET-01/02): spawns a linked child that
+    /// re-verifies remediated findings. Persists the parent (RetestRequested) + the new
+    /// child record + the audit entries together. Returns the child id on success.
+    /// </summary>
+    public async Task<(Result Result, Guid? ChildId)> RequestRetestAsync(Guid parentId, string actor)
+    {
+        var parent = await db.Engagements.FirstOrDefaultAsync(e => e.Id == parentId);
+        if (parent is null) return (Result.Fail("Engagement not found."), null);
+
+        var chain = new EfAuditChain(db);
+        var aggregate = parent.ToDomain(chain, clock);
+        var childRef = $"{parent.Reference}-RT";
+
+        var result = aggregate.RequestRetest(childRef, actor, out var child);
+        if (result.Failed || child is null) return (result, null);
+
+        parent.CopyFrom(aggregate);
+        var childRec = EngagementRecord.FromDomain(child, $"{parent.AppName} (retest)", parent.Criticality, parent.AssignedTesterName);
+        db.Engagements.Add(childRec);
+        await db.SaveChangesAsync();
+        return (result, child.Id);
+    }
+
+    /// <summary>
     /// Run a guarded transition on the aggregate. The action invokes a domain method
     /// (e.g. <c>e =&gt; e.SignSow(actor, reAuth: true)</c>). State + audit persist only if it succeeds.
     /// </summary>
