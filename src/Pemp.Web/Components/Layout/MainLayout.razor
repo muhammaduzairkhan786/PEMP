@@ -19,6 +19,10 @@
 
     <nav class="side">
         <NavLink href="" Match="NavLinkMatch.All">⌂ My Turn</NavLink>
+        @if (Session.Role == "Acme CA Officer")
+        {
+            <NavLink href="new-request">＋ New Request</NavLink>
+        }
         <NavLink href="engagements">◉ Engagements</NavLink>
         <NavLink href="analytics">▦ Analytics</NavLink>
         @if (Session.Role == "System Administrator")

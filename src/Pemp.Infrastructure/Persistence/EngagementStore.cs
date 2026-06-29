@@ -103,6 +103,25 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
     }
 
     /// <summary>
+    /// Raise a new engagement request (FR-REQ-01/04): mints a reference, enters Intake,
+    /// and writes the first audit entry. Returns the new engagement id.
+    /// </summary>
+    public async Task<Guid> RaiseAsync(EngagementType type, string appName, string criticality, string actor)
+    {
+        var refs = await db.Engagements.AsNoTracking().Select(e => e.Reference).ToListAsync();
+        var maxNum = refs
+            .Select(r => int.TryParse(r.Split('-').Last(), out var n) ? n : 0)
+            .DefaultIfEmpty(420).Max();
+        var reference = $"ENG-2026-{maxNum + 1:D4}";
+
+        var chain = new EfAuditChain(db);
+        var engagement = Engagement.Raise(reference, type, actor, chain, clock);
+        db.Engagements.Add(EngagementRecord.FromDomain(engagement, appName, criticality, null));
+        await db.SaveChangesAsync();
+        return engagement.Id;
+    }
+
+    /// <summary>
     /// Assign a tester (FR-ASG-03) and record the display name together, so the card/header
     /// don't show a stale "—" after assignment.
     /// </summary>
