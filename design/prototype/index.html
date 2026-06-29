@@ -14,6 +14,7 @@
    tinted status chips (colour-on-status discipline kept), tile hover lift.
    Pass 2: inline sparklines in dashboard tiles.
    Pass 3: right slide-over drawer rail (Documents/Findings/Comms/Audit, §4).
+   Pass 4: responsive tablet/phone layout (NFR-USA-04) — desktop untouched.
    ============================================================================ */
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
@@ -224,6 +225,20 @@ table.t tr:hover td{background:var(--surface-raised)}
 .drawer .dbody{padding:var(--space-4) var(--space-6);overflow-y:auto}
 .drawer .x{margin-left:auto;cursor:pointer;color:var(--ink-muted);background:transparent;border:none;font-size:17px;line-height:1;padding:4px}
 .drawer .x:hover{color:var(--ink)}
+
+/* responsive: tablet/phone graceful degradation (NFR-USA-04, §15) — desktop rules untouched */
+@media (max-width:760px){
+  body{grid-template-columns:1fr;grid-template-rows:auto auto auto 1fr;grid-template-areas:"brand" "topbar" "nav" "main"}
+  .brandcell{border-right:none}
+  nav{flex-direction:row;overflow-x:auto;overflow-y:hidden;border-right:none;border-bottom:1px solid var(--border);gap:6px;padding:8px var(--space-3)}
+  .navtab{flex:none}
+  .navtab .subbar,.navfoot{display:none}
+  main{padding:var(--space-6) var(--space-4)}
+  .tiles{grid-template-columns:repeat(2,1fr)}
+  .drawer{width:100%}
+  .drawerrail{left:50%;bottom:var(--space-4)}
+  .modal,.pbox{width:94vw}
+}
 </style>
 </head>
 <body>
