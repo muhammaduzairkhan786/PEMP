@@ -141,6 +141,7 @@ h1.title{font-size:var(--text-2xl);font-weight:750;margin:4px 0 2px;letter-spaci
 .tile .k{font-size:var(--text-xs);color:var(--ink-muted)}
 .tile .v{font-size:var(--text-2xl);font-weight:750;margin-top:4px}
 .tile .t{font-size:var(--text-xs);margin-top:2px}
+.spark{display:block;width:100%;height:26px;margin:8px 0 2px;opacity:.9}
 .up{color:var(--state-blocked)}.down{color:var(--state-done)}
 
 /* alerts (security events) */
@@ -339,7 +340,15 @@ const nextCard=(t,o,srs,locked,btn,fn)=>`<div class="card nextaction"><div style
 const PRI={crit:'Critical',high:'High',med:'Medium',low:'Low'};
 const arow=(d,v,t,r,sc,sl,b,fn)=>`<div class="row actionable"><span class="dot ${d}" role="img" aria-label="${PRI[d]} priority"></span><div class="grow"><span class="verb">${v}</span> · ${t}<br><span class="ref">${r}</span></div><span class="sla ${sc}">${sl}</span><button class="btn primary" onclick="${fn}">${b}</button></div>`;
 const wrow=(d,v,t,m)=>`<div class="row waiting"><span class="dot ${d}" role="img" aria-label="${PRI[d]} priority"></span><div class="grow"><span class="verb">${v}</span> · ${t}<br><span class="ref">${m}</span></div><span class="nudge">Nudge</span></div>`;
-const tile=(k,v,t,cls)=>`<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="t ${cls||''}">${t}</div></div>`;
+// tiny inline sparkline — trend made legible; colour follows the up/down status (NFR-USA-03)
+const spark=(pts,cls)=>{const w=100,h=26,mx=Math.max(...pts),mn=Math.min(...pts),rng=(mx-mn)||1;
+  const d=pts.map((p,i)=>`${(i/(pts.length-1)*w).toFixed(1)},${(h-3-(p-mn)/rng*(h-6)).toFixed(1)}`).join(' ');
+  const col=cls==='up'?'var(--state-blocked)':cls==='down'?'var(--state-done)':'var(--brand-glow)';
+  const lx=(w).toFixed(1),ly=(h-3-(pts[pts.length-1]-mn)/rng*(h-6)).toFixed(1);
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
+    <polyline points="${d}" fill="none" stroke="${col}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="${lx}" cy="${ly}" r="1.8" fill="${col}"/></svg>`;};
+const tile=(k,v,t,cls,sp)=>`<div class="tile"><div class="k">${k}</div><div class="v">${v}</div>${sp?spark(sp,cls):''}<div class="t ${cls||''}">${t}</div></div>`;
 const stub=()=>`<div class="empty">This surface follows the same pattern — sub-spine + one primary action + role-filtered content.<br><span style="font-size:var(--text-xs)">Representative screen.</span></div>`;
 
 const BODY={
@@ -386,7 +395,7 @@ const BODY={
 
 /* ---- ACME CA OFFICER ---- */
 'acme:home':()=>head('Home','Approvals due and reports to read — plus your portfolio at a glance.')+
-  `<div class="tiles">${tile('Open engagements','14','3 need you')}${tile('Overdue (SLA)','1','SoW unsigned 3d','up')}${tile('Mean time-to-remediate','11d','▼ from 14d','down')}${tile('Critical open','2','Auth bypass · SQLi','up')}</div>
+  `<div class="tiles">${tile('Open engagements','14','3 need you','',[10,11,9,12,13,14])}${tile('Overdue (SLA)','1','SoW unsigned 3d','up',[0,1,0,2,1,1])}${tile('Mean time-to-remediate','11d','▼ from 14d','down',[14,14,13,12,11,11])}${tile('Critical open','2','Auth bypass · SQLi','up',[1,1,2,1,2,2])}</div>
   <div class="sectionlabel">▸ Your turn <span class="srs">FR-NOT-01</span></div><div class="pile">
   ${arow('high','Sign the Statement of Work','Claims Portal','ENG-2026-0412','amber','⏱ 2d','Review & Sign ▶',"go('approvals')")}
   ${arow('low','Read final report','Broker Portal','ENG-2026-0399','green','new','Open report ▶',"go('reports')")}</div>
@@ -407,7 +416,7 @@ const BODY={
 
 /* ---- DELIVERY MANAGER ---- */
 'dm:home':()=>head('Home','Unassigned requests and SoWs to review.')+
-  `<div class="tiles">${tile('Unassigned','2','oldest 1d','up')}${tile('Team load','68%','headroom Thu–Fri','down')}${tile('SoWs to review','1','Claims Portal')}${tile('Active','9','on track')}</div>
+  `<div class="tiles">${tile('Unassigned','2','oldest 1d','up',[1,0,2,1,3,2])}${tile('Team load','68%','headroom Thu–Fri','down',[82,79,74,71,69,68])}${tile('SoWs to review','1','Claims Portal','',[2,1,2,0,1,1])}${tile('Active','9','on track','',[7,8,8,9,9,9])}</div>
   <div class="sectionlabel">▸ Your turn <span class="srs">FR-NOT-01</span></div><div class="pile">
   ${arow('high','Assign a tester','Claims Portal','ENG-2026-0412','amber','⏱ 1d','Open capacity ▶',"go('capacity')")}
   ${arow('med','Review Project SoW','Retail Web','ENG-2026-0408','green','⏱ 2d','Review SoW ▶',"go('approvals')")}</div>`,
