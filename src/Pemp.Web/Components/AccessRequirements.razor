@@ -18,7 +18,7 @@
                         <td>
                             @if (Editable)
                             {
-                                <select class="inp" style="max-width:210px" value="@r.Status" @onchange="e => SetStatus(r, e)">
+                                <select class="inp" style="max-width:210px" aria-label="Access status" value="@r.Status" @onchange="e => SetStatus(r, e)">
                                     @foreach (var s in Enum.GetValues<AccessStatus>())
                                     {
                                         <option value="@s">@Label(s)</option>

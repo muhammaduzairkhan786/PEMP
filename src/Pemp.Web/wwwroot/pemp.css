@@ -245,7 +245,9 @@ textarea.inp{resize:vertical}
 .auth-codrow .auth-inp{flex:1}
 
 /* 2FA recovery codes (shown once after enrolment) */
-.recovery-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:var(--space-3) 0 var(--space-4)}
+.recovery-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:var(--space-3) 0 var(--space-4)}
+/* 11-char codes get tight on the narrowest phones — drop to one column so they never crowd (NFR-USA-04) */
+@media (max-width:360px){.recovery-grid{grid-template-columns:1fr}}
 .recovery-code{padding:8px 10px;background:var(--surface-raised);border:1px solid var(--border-strong);border-radius:var(--radius-md);text-align:center;letter-spacing:1px;font-size:var(--text-sm)}
 
 /* authenticator QR — real scannable code, framed on white for contrast */

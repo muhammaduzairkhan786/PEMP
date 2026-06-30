@@ -158,3 +158,22 @@
         opacity: 0;
     }
 }
+
+/* Honour reduced-motion: show the modal instantly (no slide/fade) and freeze the
+   rejoining spinner, consistent with the motion gating in tokens.css / pemp.css. */
+@media (prefers-reduced-motion: reduce) {
+    #components-reconnect-modal,
+    #components-reconnect-modal[open] {
+        animation: none;
+        opacity: 1;
+        transition: none;
+    }
+
+    #components-reconnect-modal::backdrop {
+        animation: none;
+    }
+
+    .components-rejoining-animation div {
+        animation: none;
+    }
+}
