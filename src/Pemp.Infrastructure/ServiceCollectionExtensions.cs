@@ -32,8 +32,10 @@ public static class ServiceCollectionExtensions
         // HMAC-signed tokens (singleton so the pending-token map is shared). PROD swaps this for
         // AzureBlobEvidenceStorage (Blob user-delegation SAS) — see that class's documented seam.
         services.AddSingleton<IEvidenceStorage, LocalEvidenceStorage>();
-        // Assessment .docx import (FR-SCO-01): stateless OpenXML parser/writer — safe to share.
+        // Assessment import (FR-SCO-01): stateless OpenXML parsers/writers — safe to share. Word .docx and
+        // Excel .xlsx readers both feed the shared AssessmentMapper, so the matching/result are identical.
         services.AddSingleton<IAssessmentDocImporter, DocxAssessmentImporter>();
+        services.AddSingleton<IAssessmentXlsxImporter, XlsxAssessmentImporter>();
         return services;
     }
 }
