@@ -17,10 +17,7 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
     /// it must arrive with a concrete object filter and a blank/unresolved filter must match
     /// NOTHING — never the full set. These strings mirror the canonical PEMP role names.
     /// </summary>
-    private static readonly HashSet<string> AllPortfolioRoles = new(StringComparer.Ordinal)
-    {
-        "Acme CA Officer", "Delivery Manager", "System Administrator",
-    };
+    private static readonly IReadOnlySet<string> AllPortfolioRoles = PempRoles.Portfolio;
 
     private EfAuditChain NewChain() => new(db, auditKey.Value);
 
@@ -62,7 +59,7 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
             // A Tester's scope = own assignments ∪ Report-stage engagements authored by another tester
             // (the peer-QA queue, FR-REP-02). A blank name still matches nothing (fail-closed) because
             // the union only opens for a concrete, non-empty tester name.
-            if (role == "Tester" && !string.IsNullOrEmpty(assignedToName))
+            if (role == PempRoles.Tester && !string.IsNullOrEmpty(assignedToName))
             {
                 var name = assignedToName;
                 q = q.Where(e => e.AssignedTesterName == name
@@ -101,7 +98,7 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
         {
             var isAssigned = rec.AssignedTesterName == assignedToName;
             // Peer-QA review access: a Report-stage engagement authored by another tester is in scope.
-            var isPeerReviewable = role == "Tester" && !string.IsNullOrEmpty(assignedToName)
+            var isPeerReviewable = role == PempRoles.Tester && !string.IsNullOrEmpty(assignedToName)
                 && rec.CurrentStage == Stage.Report
                 && rec.AssignedTesterName != null && rec.AssignedTesterName != assignedToName;
             if (!isAssigned && !isPeerReviewable) return null;

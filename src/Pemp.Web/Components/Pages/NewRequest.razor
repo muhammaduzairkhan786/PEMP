@@ -1,5 +1,5 @@
 @page "/new-request"
-@attribute [Authorize(Roles = "Acme CA Officer")]
+@attribute [Authorize(Roles = PempRoles.AcmeOfficer)]
 @inject EngagementStore Store
 @inject DemoSession Session
 @inject NavigationManager Nav
@@ -10,7 +10,7 @@
     <h1 class="title">New request</h1>
     <p class="sub">A short request, not a long form. It enters Intake; the Delivery Manager picks it up next.</p>
 
-    @if (Session.Role != "Acme CA Officer")
+    @if (Session.Role != PempRoles.AcmeOfficer)
     {
         <div class="banner err">⛔ Raising requests is the Acme CA Officer's action.</div>
     }

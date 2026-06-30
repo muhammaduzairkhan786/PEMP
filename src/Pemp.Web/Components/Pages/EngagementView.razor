@@ -91,7 +91,7 @@ else
             <div class="card"><b>Engagement closed.</b> Final report released and stored immutable (FR-REP-04).
                 @if (_rec.RetestRequested){<span class="muted"> · ↻ a retest child engagement was created.</span>}
             </div>
-            @if (_rec.CurrentStage == Stage.Closed && !_rec.RetestRequested && (Session.Role is "Acme CA Officer" or "Stakeholder"))
+            @if (_rec.CurrentStage == Stage.Closed && !_rec.RetestRequested && (Session.Role == PempRoles.AcmeOfficer || Session.Role == PempRoles.Stakeholder))
             {
                 <div style="margin-top:var(--space-2)"><button class="btn ghost" @onclick="Retest">↻ Request a retest (optional) · FR-RET-01</button></div>
             }
@@ -139,7 +139,7 @@ else
         else
         {
             <div class="card">⏳ Waiting on <b>@next.OwnerRole</b> — "@next.Label". <span class="muted">You're viewing as @Session.Role.</span>
-                @if (next.Kind == ActionKind.CompleteAssessment && Session.Role == "Stakeholder")
+                @if (next.Kind == ActionKind.CompleteAssessment && Session.Role == PempRoles.Stakeholder)
                 {
                     <div style="margin-top:10px"><a class="btn ghost" href="@($"engagement/{Id}/assessment")">Open assessment form (provide input)</a></div>
                 }
@@ -148,27 +148,27 @@ else
 
         <AccessRequirements EngagementId="Id" Reqs="_access"
                             ShowEmpty="@((int)_rec.CurrentStage >= (int)Stage.Access)"
-                            Editable="@(_rec.CurrentStage == Stage.Access && Session.Role == "Tester" && _rec.AssignedTesterName == Session.Actor)"
+                            Editable="@(_rec.CurrentStage == Stage.Access && Session.Role == PempRoles.Tester && _rec.AssignedTesterName == Session.Actor)"
                             OnAdded="Load" />
 
         <TestCredentialsPanel EngagementId="Id" Credentials="_credentials"
-                              CanView="@(Session.Role == "Tester" && _rec.AssignedTesterName == Session.Actor)"
+                              CanView="@(Session.Role == PempRoles.Tester && _rec.AssignedTesterName == Session.Actor)"
                               ShowEmpty="@(_rec.CurrentStage == Stage.Access || _rec.CurrentStage == Stage.Execution)" />
 
         <FindingsRegister Findings="_findings" EngagementId="Id"
                           ShowEmpty="@((int)_rec.CurrentStage >= (int)Stage.Execution)"
-                          CanAdd="@(Session.Role == "Tester" && _rec.AssignedTesterName == Session.Actor
+                          CanAdd="@(Session.Role == PempRoles.Tester && _rec.AssignedTesterName == Session.Actor
                                     && (_rec.CurrentStage == Stage.Execution || _rec.CurrentStage == Stage.Findings))"
-                          CanRetest="@(Session.Role == "Tester" && _rec.AssignedTesterName == Session.Actor
+                          CanRetest="@(Session.Role == PempRoles.Tester && _rec.AssignedTesterName == Session.Actor
                                        && _rec.CurrentStage == Stage.Retest)"
                           OnAdded="Load" />
 
-        <EvidencePanel EngagementId="Id" Findings="_findings" Editable="@(Session.Role == "Tester" && _rec.CurrentStage != Stage.Closed)" />
+        <EvidencePanel EngagementId="Id" Findings="_findings" Editable="@(Session.Role == PempRoles.Tester && _rec.CurrentStage != Stage.Closed)" />
 
         @if ((int)_rec.CurrentStage >= (int)Stage.Access)
         {
             <ChecklistPanel EngagementId="Id" Done="_checklist"
-                            Editable="@(Session.Role == "Tester" && (int)_rec.CurrentStage >= (int)Stage.Access && _rec.CurrentStage != Stage.Closed)" />
+                            Editable="@(Session.Role == PempRoles.Tester && (int)_rec.CurrentStage >= (int)Stage.Access && _rec.CurrentStage != Stage.Closed)" />
         }
 
         <h2 class="sectionlabel">
@@ -268,7 +268,7 @@ else
             _access = await Store.AccessReqsForAsync(Id);
             _checklist = await Store.ChecklistDoneAsync(Id);
             // Least exposure (SEC-CRD): only fetch test credentials for the assigned tester who may view them.
-            _credentials = (Session.Role == "Tester" && _rec.AssignedTesterName == Session.Actor)
+            _credentials = (Session.Role == PempRoles.Tester && _rec.AssignedTesterName == Session.Actor)
                 ? await Store.CredentialsForAsync(Id)
                 : new();
             if (_rec.CurrentStage == Stage.Assignment)

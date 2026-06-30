@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Components.Authorization;
+using Pemp.Domain;
 
 namespace Pemp.Web;
 
@@ -13,8 +14,7 @@ namespace Pemp.Web;
 /// </summary>
 public sealed class DemoSession(AuthenticationStateProvider authProvider)
 {
-    public static readonly string[] Roles =
-        { "Acme CA Officer", "Delivery Manager", "Tester", "Stakeholder", "System Administrator" };
+    public static readonly string[] Roles = PempRoles.All;
 
     private bool _initialized;
 
@@ -51,6 +51,6 @@ public sealed class DemoSession(AuthenticationStateProvider authProvider)
     // ---- Object-level scope (SEC-AZN / SEC-INS-01) ----
     // A Stakeholder sees only their own application; a Tester only their assigned engagements.
     // Other roles (Acme, DM, Admin) see the whole portfolio.
-    public string? AppScope => Role == "Stakeholder" ? "Retail Web" : null;
-    public string? TesterScope => Role == "Tester" ? Actor : null;
+    public string? AppScope => Role == PempRoles.Stakeholder ? "Retail Web" : null;
+    public string? TesterScope => Role == PempRoles.Tester ? Actor : null;
 }

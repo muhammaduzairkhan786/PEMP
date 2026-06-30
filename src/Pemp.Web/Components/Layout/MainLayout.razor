@@ -24,13 +24,13 @@
 
     <nav class="side">
         <NavLink href="dashboard" Match="NavLinkMatch.All" aria-current="@Cur("dashboard")">⌂ My Turn</NavLink>
-        @if (Session.Role == "Acme CA Officer")
+        @if (Session.Role == PempRoles.AcmeOfficer)
         {
             <NavLink href="new-request" aria-current="@Cur("new-request")">＋ New Request</NavLink>
         }
         <NavLink href="engagements" aria-current="@Cur("engagements")">◉ Engagements</NavLink>
         <NavLink href="analytics" aria-current="@Cur("analytics")">▦ Analytics</NavLink>
-        @if (Session.Role == "System Administrator")
+        @if (Session.Role == PempRoles.Administrator)
         {
             <NavLink href="admin" aria-current="@Cur("admin")">⚙ Admin</NavLink>
         }
