@@ -7,7 +7,7 @@
     <base href="/" />
     <script nonce="@CspNonce">
         // Apply saved theme before first paint (no flash); expose a toggle for the UI.
-        (function () { try { document.documentElement.setAttribute('data-theme', localStorage.getItem('pemp-theme') || 'dark'); } catch (e) { } })();
+        (function () { try { document.documentElement.setAttribute('data-theme', localStorage.getItem('pemp-theme') || 'light'); } catch (e) { } })();
         window.pempToggleTheme = function () {
             var h = document.documentElement;
             var t = h.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
@@ -37,6 +37,7 @@
         };
     </script>
     <ResourcePreloader />
+    <link rel="stylesheet" href="fonts.css" />
     <link rel="stylesheet" href="tokens.css" />
     <link rel="stylesheet" href="pemp.css" />
     <link rel="stylesheet" href="@Assets["Pemp.Web.styles.css"]" />

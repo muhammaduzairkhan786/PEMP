@@ -1,15 +1,19 @@
-/* PEMP web app — adapts the prototype's look (DESIGN_PLAN §2/§12) over tokens.css */
+/* PEMP web app — "Warm Editorial" foundation (DESIGN_PLAN §2/§12) over tokens.css */
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
-body{font-family:var(--font-sans);color:var(--ink);font-size:var(--text-base);line-height:1.5;-webkit-font-smoothing:antialiased;
+body{font-family:var(--font-sans);color:var(--ink);font-size:var(--text-base);line-height:1.55;letter-spacing:-.005em;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;
   background:
-    radial-gradient(1100px 560px at 2% -12%, color-mix(in srgb,var(--brand) 10%,transparent), transparent 60%),
-    radial-gradient(900px 520px at 102% -4%, color-mix(in srgb,var(--brand-glow) 7%,transparent), transparent 55%),
+    radial-gradient(1200px 620px at 0% -12%, color-mix(in srgb,var(--brand) 6%,transparent), transparent 60%),
+    radial-gradient(1000px 560px at 100% -2%, color-mix(in srgb,var(--brand) 4%,transparent), transparent 55%),
     var(--canvas);
   background-attachment:fixed}
 a{color:inherit;text-decoration:none}
 .mono{font-family:var(--font-mono)} .muted{color:var(--ink-muted)}
-:focus-visible{outline:2px solid var(--brand-glow);outline-offset:2px;border-radius:4px}
+/* editorial typography: display serif for headings, humanist sans for body/UI */
+h1,h2,h3{font-family:var(--font-serif);font-weight:600;letter-spacing:-.012em;line-height:1.18;color:var(--ink)}
+h4,h5,h6{font-family:var(--font-sans)}
+:focus-visible{outline:2px solid var(--brand-glow);outline-offset:2px;border-radius:6px}
 
 /* a11y utilities: visually-hidden text + skip-to-content link (revealed on keyboard focus) */
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
@@ -23,8 +27,8 @@ main.content:focus{outline:none}
 /* shell */
 .shell{display:grid;grid-template-columns:240px 1fr;grid-template-rows:auto 1fr;grid-template-areas:"brand top" "nav main";height:100vh;overflow:hidden}
 .brand{grid-area:brand;display:flex;align-items:center;gap:10px;padding:0 var(--space-4);background:var(--surface);border-right:1px solid var(--border);border-bottom:1px solid var(--border)}
-.brand .logo{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--brand),var(--brand-glow));box-shadow:var(--brand-glow-sh);display:grid;place-items:center;font-weight:800;color:var(--brand-ink)}
-.brand b{font-size:var(--text-lg);letter-spacing:.3px}
+.brand .logo{width:32px;height:32px;border-radius:10px;background:linear-gradient(150deg,var(--brand),color-mix(in srgb,var(--brand) 60%,#000));box-shadow:var(--brand-glow-sh);display:grid;place-items:center;font-weight:700;color:var(--brand-ink);font-family:var(--font-serif)}
+.brand b{font-family:var(--font-serif);font-size:var(--text-xl);font-weight:600;letter-spacing:-.01em}
 .topbar{grid-area:top;display:flex;align-items:center;gap:12px;padding:0 var(--space-8);background:var(--surface);border-bottom:1px solid var(--border)}
 .topbar .sp{margin-left:auto}
 nav.side{grid-area:nav;background:var(--surface);border-right:1px solid var(--border);padding:var(--space-4) var(--space-3);display:flex;flex-direction:column;gap:var(--space-1);overflow-y:auto}
@@ -36,19 +40,21 @@ nav.side .foot{margin-top:auto;font-size:11px;color:var(--ink-muted);padding:10p
 main.content{grid-area:main;overflow-y:auto;padding:var(--space-8) var(--space-12)}
 .wrap{max-width:1000px}
 
-.eyebrow{font-size:var(--text-xs);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-muted)}
-h1.title{font-size:var(--text-2xl);font-weight:750;margin:4px 0 2px;letter-spacing:-.01em}
-.sub{color:var(--ink-muted);margin-bottom:var(--space-6)}
-.sectionlabel{font-size:var(--text-sm);font-weight:650;color:var(--ink-muted);margin:var(--space-6) 0 var(--space-3)}
+.eyebrow{font-family:var(--font-sans);font-size:var(--text-xs);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-muted);font-weight:600}
+h1.title{font-family:var(--font-serif);font-size:var(--text-2xl);font-weight:600;margin:6px 0 4px;letter-spacing:-.018em;line-height:1.12}
+.sub{color:var(--ink-muted);margin-bottom:var(--space-6);font-size:var(--text-lg)}
+.sectionlabel{font-family:var(--font-serif);font-size:var(--text-lg);font-weight:600;letter-spacing:-.01em;color:var(--ink);margin:var(--space-8) 0 var(--space-3)}
 .srs{font-family:var(--font-mono);font-size:11px;color:var(--ink-muted);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:1px 6px}
 
-.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-6);margin-bottom:var(--space-4)}
-.btn{font-family:inherit;font-size:var(--text-sm);font-weight:650;border-radius:var(--radius-pill);padding:8px 16px;cursor:pointer;border:1px solid var(--border-strong);background:var(--surface-raised);color:var(--ink);transition:all var(--dur-fast)}
-.btn:hover{border-color:var(--ink-muted)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-6);margin-bottom:var(--space-4);box-shadow:var(--elev-raised)}
+.btn{font-family:var(--font-sans);font-size:var(--text-sm);font-weight:600;border-radius:var(--radius-pill);padding:9px 18px;cursor:pointer;border:1px solid var(--border-strong);background:var(--surface);color:var(--ink);transition:transform var(--dur-fast) var(--ease-standard),box-shadow var(--dur-fast),border-color var(--dur-fast),background var(--dur-fast)}
+.btn:hover{border-color:var(--ink-muted);box-shadow:var(--elev-raised)}
+.btn:active{transform:translateY(.5px)}
 .btn.primary{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
-.btn.primary:hover{box-shadow:var(--brand-glow-sh)}
-.btn:disabled{opacity:.4;cursor:not-allowed}
-.btn.ghost{background:transparent;border-color:var(--border)}
+.btn.primary:hover{background:color-mix(in srgb,var(--brand) 88%,#000);border-color:transparent;box-shadow:var(--brand-glow-sh)}
+.btn:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
+.btn.ghost{background:transparent;border-color:var(--border);box-shadow:none}
+.btn.ghost:hover{background:color-mix(in srgb,var(--ink) 5%,transparent);border-color:var(--border-strong)}
 
 /* next-action card — the one bright thing (glow) */
 .nextaction{display:flex;align-items:center;gap:var(--space-4);position:relative;overflow:hidden;
@@ -125,8 +131,8 @@ table.t td{padding:9px 10px;border-bottom:1px solid var(--border)}
 .q{padding:10px 0;border-bottom:1px solid var(--border)}
 .q:last-child{border-bottom:none}
 .qlabel{display:block;font-size:var(--text-sm);margin-bottom:6px}
-.inp{width:100%;max-width:560px;background:var(--surface-raised);color:var(--ink);border:1px solid var(--border-strong);border-radius:var(--radius-md);padding:8px 11px;font-family:inherit;font-size:var(--text-sm)}
-.inp:focus{border-color:var(--brand)}
+.inp{width:100%;max-width:560px;background:var(--surface-raised);color:var(--ink);border:1px solid var(--border-strong);border-radius:var(--radius-md);padding:9px 12px;font-family:var(--font-sans);font-size:var(--text-sm);transition:border-color var(--dur-fast),box-shadow var(--dur-fast),background var(--dur-fast)}
+.inp:focus{border-color:var(--brand);background:var(--surface);box-shadow:0 0 0 3px color-mix(in srgb,var(--brand) 18%,transparent)}
 /* keyboard focus gets a visible ring (>=3:1 in both themes via --brand-glow); pointer focus keeps
    just the brand border. Replaces the old outline:none which stripped the indicator entirely. */
 .inp:focus-visible{outline:2px solid var(--brand-glow);outline-offset:1px;border-color:var(--brand)}
@@ -135,9 +141,9 @@ textarea.inp{resize:vertical}
 .opt{display:inline-flex;align-items:center;gap:6px;font-size:var(--text-sm);color:var(--ink-muted)}
 
 /* gate ceremony modal (signature moment) */
-.scrim{position:fixed;inset:0;background:rgba(4,7,14,.66);backdrop-filter:blur(3px);display:grid;place-items:center;z-index:50;animation:fadein var(--dur-base)}
+.scrim{position:fixed;inset:0;background:color-mix(in srgb,var(--canvas) 12%,rgba(28,18,10,.62));backdrop-filter:blur(4px);display:grid;place-items:center;z-index:50;animation:fadein var(--dur-base)}
 .modal{width:480px;max-width:92vw;background:var(--surface-modal);border:1px solid var(--border-strong);border-radius:var(--radius-lg);box-shadow:var(--elev-modal);padding:var(--space-8);animation:rise var(--dur-base) var(--ease-emphasis)}
-.modal h3{font-size:var(--text-xl);margin-bottom:var(--space-4)}
+.modal h3{font-family:var(--font-serif);font-size:var(--text-xl);font-weight:600;letter-spacing:-.012em;margin-bottom:var(--space-4)}
 .attest{list-style:none;margin:0 0 var(--space-4);padding:var(--space-4);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md)}
 .attest li{padding:4px 0;display:flex;gap:8px}
 .attest li::before{content:"•";color:var(--brand)}
@@ -168,7 +174,7 @@ textarea.inp{resize:vertical}
 .tile{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-4);transition:all var(--dur-fast)}
 .tile:hover{transform:translateY(-2px);border-color:var(--border-strong);box-shadow:var(--elev-raised)}
 .tile .k{font-size:var(--text-xs);color:var(--ink-muted)}
-.tile .v{font-size:var(--text-2xl);font-weight:750;margin-top:4px}
+.tile .v{font-family:var(--font-serif);font-size:var(--text-2xl);font-weight:600;letter-spacing:-.01em;margin-top:4px}
 
 /* live register: severity distribution + filter chips + severity chips */
 .distbar{display:flex;height:10px;border-radius:var(--radius-pill);overflow:hidden;background:var(--surface-raised);margin:6px 0 14px}
@@ -229,8 +235,8 @@ textarea.inp{resize:vertical}
 .auth-card{width:420px;max-width:94vw;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--elev-modal);padding:var(--space-8)}
 .auth-brand{display:flex;align-items:center;gap:10px;margin-bottom:var(--space-6)}
 .auth-brand .logo{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--brand),var(--brand-glow));box-shadow:var(--brand-glow-sh);display:grid;place-items:center;font-weight:800;color:var(--brand-ink)}
-.auth-brand-name{font-size:var(--text-lg);font-weight:750;letter-spacing:.3px}
-.auth-head h1{font-size:var(--text-2xl);font-weight:750;margin:0 0 4px;letter-spacing:-.01em}
+.auth-brand-name{font-family:var(--font-serif);font-size:var(--text-xl);font-weight:600;letter-spacing:-.01em}
+.auth-head h1{font-family:var(--font-serif);font-size:var(--text-2xl);font-weight:600;margin:0 0 4px;letter-spacing:-.018em;line-height:1.14}
 .auth-head p{margin:0 0 var(--space-6)}
 .auth-label{display:block;font-size:var(--text-sm);font-weight:600;margin:var(--space-4) 0 6px}
 .auth-inp{max-width:none}
@@ -275,12 +281,12 @@ textarea.inp{resize:vertical}
    ============================================================================ */
 .landing{max-width:1080px;margin:0 auto;padding:var(--space-6) var(--space-6) var(--space-12);min-height:100vh;display:flex;flex-direction:column}
 .landing-nav{display:flex;align-items:center;justify-content:space-between;padding:var(--space-2) 0 var(--space-12)}
-.landing-brand{display:flex;align-items:center;gap:10px;font-size:var(--text-lg);font-weight:750}
-.landing-brand .logo{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--brand),var(--brand-glow));box-shadow:var(--brand-glow-sh);display:grid;place-items:center;font-weight:800;color:var(--brand-ink)}
+.landing-brand{display:flex;align-items:center;gap:10px;font-family:var(--font-serif);font-size:var(--text-xl);font-weight:600;letter-spacing:-.01em}
+.landing-brand .logo{width:32px;height:32px;border-radius:10px;background:linear-gradient(150deg,var(--brand),color-mix(in srgb,var(--brand) 60%,#000));box-shadow:var(--brand-glow-sh);display:grid;place-items:center;font-weight:700;color:var(--brand-ink);font-family:var(--font-serif)}
 .landing-hero{max-width:760px}
-.landing-eyebrow{font-size:var(--text-xs);letter-spacing:.12em;text-transform:uppercase;color:var(--brand-glow)}
-.landing-hero h1{font-size:clamp(2rem,5vw,3.4rem);line-height:1.05;font-weight:800;letter-spacing:-.02em;margin:var(--space-4) 0 var(--space-4)}
-.landing-lede{font-size:var(--text-lg);color:var(--ink-muted);max-width:640px;margin-bottom:var(--space-6)}
+.landing-eyebrow{font-family:var(--font-sans);font-size:var(--text-xs);letter-spacing:.14em;text-transform:uppercase;color:var(--brand-glow);font-weight:600}
+.landing-hero h1{font-family:var(--font-serif);font-size:clamp(2.25rem,5.5vw,3.5rem);line-height:1.06;font-weight:600;letter-spacing:-.022em;margin:var(--space-4) 0 var(--space-4)}
+.landing-lede{font-size:var(--text-lg);line-height:1.6;color:var(--ink-muted);max-width:640px;margin-bottom:var(--space-6)}
 .landing-cta{display:flex;align-items:center;gap:var(--space-4);flex-wrap:wrap}
 .btn.lg{padding:11px 24px;font-size:var(--text-base)}
 /* landing signature spine — the product's enforcement story, as ambient motif */
