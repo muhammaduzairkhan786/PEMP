@@ -1,5 +1,6 @@
 @* Conditional assessment questionnaire (workbook Tab 1 / FR-SCO-01). Auto-saves answers. *@
 @inject EngagementStore Store
+@inject DemoSession Session
 
 <div class="sectionlabel" style="margin-top:0">
     Completeness <span class="srs">FR-SCO-03</span>
@@ -94,7 +95,7 @@
     {
         if (ReadOnly) return;
         Answers[id] = e.Value?.ToString() ?? "";
-        await Store.SaveAssessmentAnswerAsync(EngagementId, id, Answers[id]);
+        await Store.SaveAssessmentAnswerAsync(EngagementId, id, Answers[id], actor: Session.Actor, role: Session.Role);
         Recount();
     }
 
@@ -105,7 +106,7 @@
         if (e.Value is true) { if (!set.Contains(opt)) set.Add(opt); }
         else set.Remove(opt);
         Answers[id] = string.Join('|', set);
-        await Store.SaveAssessmentAnswerAsync(EngagementId, id, Answers[id]);
+        await Store.SaveAssessmentAnswerAsync(EngagementId, id, Answers[id], actor: Session.Actor, role: Session.Role);
         Recount();
     }
 }

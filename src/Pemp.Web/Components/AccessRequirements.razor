@@ -1,5 +1,6 @@
 @* Access requirements matrix (workbook Tab 3 / FR-ACC-01). Tester defines; status per env. *@
 @inject EngagementStore Store
+@inject DemoSession Session
 
 @if (Reqs.Count > 0)
 {
@@ -74,7 +75,8 @@ else if (ShowEmpty)
     async Task AddRow()
     {
         if (string.IsNullOrWhiteSpace(_env)) { _msg = "Enter an environment / asset."; return; }
-        await Store.AddAccessRequirementAsync(EngagementId, _env.Trim(), _url.Trim(), _type);
+        await Store.AddAccessRequirementAsync(EngagementId, _env.Trim(), _url.Trim(), _type,
+            actor: Session.Actor, role: Session.Role);
         _env = _url = ""; _type = "Read";
         _msg = "Added — app team to provision (FR-ACC-02).";
         if (OnAdded.HasDelegate) await OnAdded.InvokeAsync();
@@ -85,7 +87,7 @@ else if (ShowEmpty)
         if (Enum.TryParse<AccessStatus>(e.Value?.ToString(), out var s))
         {
             r.Status = s;
-            await Store.SetAccessStatusAsync(r.Id, s);
+            await Store.SetAccessStatusAsync(r.Id, s, actor: Session.Actor, role: Session.Role);
         }
     }
 

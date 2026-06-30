@@ -1,5 +1,6 @@
 @* Tester action checklists (workbook Tab 4): pre-requisites / during / end-of-test *@
 @inject EngagementStore Store
+@inject DemoSession Session
 
 <div class="sectionlabel">
     Tester checklist <span class="srs">SOP Tab 4</span>
@@ -38,6 +39,6 @@
         if (!Editable) return;
         var on = e.Value is true;
         if (on) _done.Add(code); else _done.Remove(code);
-        await Store.SetChecklistAsync(EngagementId, code, on);
+        await Store.SetChecklistAsync(EngagementId, code, on, actor: Session.Actor, role: Session.Role);
     }
 }
