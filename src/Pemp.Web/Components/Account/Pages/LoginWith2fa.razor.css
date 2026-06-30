@@ -1,0 +1,20 @@
+/* ============================================================================
+   LoginWith2fa — the verification ceremony. Component-scoped; token-only.
+   The 6-digit field reads as a deliberate code entry: centered, spacious,
+   generously tracked. AA both themes.
+   ============================================================================ */
+
+#code.inp.mono {
+    text-align: center;
+    letter-spacing: .4em;
+    font-size: var(--text-2xl);
+    padding-block: 13px;
+    /* nudge the placeholder/value to sit optically centered despite the tracking */
+    text-indent: .4em;
+}
+
+#code.inp.mono::placeholder {
+    letter-spacing: .3em;
+    color: var(--ink-muted);
+    opacity: .7;
+}

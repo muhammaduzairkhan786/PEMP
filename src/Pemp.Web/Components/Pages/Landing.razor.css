@@ -1,0 +1,235 @@
+/* ============================================================================
+   Landing — "warm editorial" artistry pass (component-scoped over pemp.css).
+   Token-only. Honors prefers-reduced-motion. AA in both themes.
+   ============================================================================ */
+
+.landing {
+    position: relative;
+    isolation: isolate;
+    /* a touch more air, magazine-cover margins */
+    padding-top: var(--space-8);
+    gap: 0;
+}
+
+/* a single, restrained warm flourish: a soft paper glow that sits behind the
+   hero and fades out — never gaudy, just depth on the cream. */
+.landing::before {
+    content: "";
+    position: absolute;
+    inset: -8% -20% auto -20%;
+    height: 70%;
+    z-index: -1;
+    pointer-events: none;
+    background:
+        radial-gradient(60% 80% at 18% 22%, color-mix(in srgb, var(--brand) 9%, transparent), transparent 70%),
+        radial-gradient(45% 60% at 92% 4%, color-mix(in srgb, var(--brand) 5%, transparent), transparent 72%);
+    filter: blur(2px);
+}
+
+/* ---- nav: quieter, with a hairline seat under it ---- */
+.landing-nav {
+    padding-bottom: var(--space-8);
+}
+
+.landing-brand .logo {
+    transition: transform var(--dur-base) var(--ease-emphasis);
+}
+
+.landing-brand:hover .logo {
+    transform: rotate(-4deg) scale(1.04);
+}
+
+/* ---- hero: cinematic-but-calm ---- */
+.landing-hero {
+    position: relative;
+    max-width: 18ch; /* fallback; overridden below for the headline measure */
+    max-width: none;
+    padding-top: var(--space-6);
+}
+
+.landing-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* an elegant leading hairline mark on the eyebrow */
+.landing-eyebrow::before {
+    content: "";
+    width: 28px;
+    height: 1px;
+    background: linear-gradient(90deg, var(--brand-glow), transparent);
+}
+
+.landing-hero h1 {
+    /* refined display scale + tighter optical leading + a comfortable measure */
+    font-size: clamp(2.5rem, 6vw, 3.75rem);
+    line-height: 1.04;
+    letter-spacing: -.028em;
+    max-width: 15ch;
+    text-wrap: balance;
+    margin: var(--space-6) 0 var(--space-6);
+}
+
+.landing-lede {
+    max-width: 56ch;
+    text-wrap: pretty;
+}
+
+.landing-cta {
+    margin-top: var(--space-8);
+}
+
+.landing-cta .btn.lg {
+    letter-spacing: -.005em;
+}
+
+/* the primary CTA earns a confident warm payoff glow on hover */
+.landing-cta .btn.primary.lg:hover {
+    box-shadow: var(--brand-glow-sh);
+    transform: translateY(-1px);
+}
+
+/* ---- the lifecycle spine, as a graceful motif ---- */
+.landing-spine-figure {
+    margin: var(--space-16) 0 0;
+    padding: var(--space-6) var(--space-6) var(--space-4);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background:
+        linear-gradient(180deg, color-mix(in srgb, var(--surface) 70%, transparent), transparent);
+}
+
+.landing-spine-cap {
+    margin: 0 0 var(--space-6);
+    font-family: var(--font-sans);
+    font-size: var(--text-xs);
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+    font-weight: 600;
+}
+
+.landing-spine {
+    margin-top: 0;
+    padding: 0 0 var(--space-2);
+}
+
+/* the gate bead — the one quiet bright point of the spine */
+.landing-spine .ls-node.gate .ls-bead {
+    width: 20px;
+    height: 20px;
+    position: relative;
+}
+
+.landing-spine .ls-node.gate .ls-lbl {
+    font-weight: 650;
+}
+
+.landing-spine .ls-node.gate .ls-bead::after {
+    content: "";
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    border: 1px solid color-mix(in srgb, var(--brand) 32%, transparent);
+}
+
+.landing-spine .ls-lbl {
+    letter-spacing: .01em;
+}
+
+/* ---- value cards: tasteful editorial cards ---- */
+.landing-section-label {
+    margin: var(--space-16) 0 var(--space-4);
+    font-family: var(--font-sans);
+    font-size: var(--text-xs);
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--brand-glow);
+    font-weight: 600;
+}
+
+.landing-grid {
+    margin: 0 0 auto;
+    gap: var(--space-4);
+}
+
+.landing-card {
+    position: relative;
+    padding: var(--space-8) var(--space-6);
+    overflow: hidden;
+}
+
+/* a hairline accent that warms on hover — quiet, top-left corner motif */
+.landing-card::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: var(--space-6);
+    bottom: var(--space-6);
+    width: 2px;
+    border-radius: 2px;
+    background: var(--border-strong);
+    transition: background var(--dur-base) var(--ease-standard);
+}
+
+.landing-card:hover::before {
+    background: linear-gradient(var(--brand), var(--brand-glow));
+}
+
+.landing-ic {
+    font-size: 1.5rem;
+    line-height: 1;
+    margin-bottom: var(--space-4);
+    color: var(--brand-glow);
+    opacity: .92;
+}
+
+.landing-card h3 {
+    /* serif title, larger and more editorial than the global default */
+    font-family: var(--font-serif);
+    font-size: var(--text-lg);
+    font-weight: 600;
+    letter-spacing: -.014em;
+    line-height: 1.22;
+    margin: 0 0 var(--space-2);
+}
+
+.landing-card p {
+    line-height: 1.55;
+    text-wrap: pretty;
+}
+
+/* ---- footer: quiet ---- */
+.landing-foot {
+    margin-top: var(--space-16);
+    text-align: center;
+    letter-spacing: .01em;
+}
+
+/* ---- gentle, restrained entrance (motion only when welcomed) ---- */
+@media (prefers-reduced-motion: no-preference) {
+    .landing-eyebrow,
+    .landing-hero h1,
+    .landing-lede,
+    .landing-cta,
+    .landing-spine-figure {
+        animation: landing-rise var(--dur-ceremony) var(--ease-standard) both;
+    }
+
+    .landing-hero h1 { animation-delay: 60ms; }
+    .landing-lede { animation-delay: 120ms; }
+    .landing-cta { animation-delay: 180ms; }
+    .landing-spine-figure { animation-delay: 240ms; }
+}
+
+@keyframes landing-rise {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: none; }
+}
+
+@media (max-width: 640px) {
+    .landing-hero h1 { font-size: clamp(2rem, 9vw, 2.75rem); }
+    .landing-spine-figure { padding: var(--space-4); }
+    .landing-card { padding: var(--space-6); }
+}
