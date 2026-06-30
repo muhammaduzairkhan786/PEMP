@@ -92,7 +92,7 @@ distribution**, and per-application worst severity.
 
 ## What's real vs demo-mode
 - **Real:** the engagement state machine + guards (15 unit tests), EF persistence + the store
-  (8 persistence tests), the hash-chained audit, server-side RBAC + object-level scoping +
+  (23 infrastructure tests), the hash-chained audit, server-side RBAC + object-level scoping +
   the 2FA-enrolment gate, local Identity sign-in with authenticator 2FA, the conditional
   assessment logic, the full UI.
 - **Demo-mode:** SQLite (vs Azure SQL), local Identity (vs Entra SSO), evidence metadata +

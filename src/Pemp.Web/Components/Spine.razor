@@ -2,7 +2,9 @@
 @{
     var curIdx = Array.IndexOf(Workflow.Spine, Current);
 }
-<div class="spine">
+@* Ordered-list semantics so AT announces this as a stepped progression; aria-current="step" marks
+   the active stage and the bead/connector glyphs are decorative (aria-hidden). Visual design unchanged. *@
+<ol class="spine">
     @for (var i = 0; i < Workflow.Spine.Length; i++)
     {
         var s = Workflow.Spine[i];
@@ -11,14 +13,14 @@
         var glyph = i < curIdx ? "✓" : (!terminal && i == curIdx + 1) ? "🔒" : "";
         var locked = !terminal && i == curIdx + 1;
         var nodeText = locked ? $"Locked — finish {Workflow.Label(Current)} first" : Workflow.Label(s);
-        <div class="node @cls" title="@nodeText" aria-label="@nodeText">
-            <div class="connector"></div>
-            <div class="bead">@glyph</div>
+        <li class="node @cls" title="@nodeText" aria-label="@nodeText" aria-current="@(i == curIdx ? "step" : null)">
+            <div class="connector" aria-hidden="true"></div>
+            <div class="bead" aria-hidden="true">@glyph</div>
             <div class="lbl">@Workflow.Label(s)</div>
             <div class="wk">@Workflow.Week(s)</div>
-        </div>
+        </li>
     }
-</div>
+</ol>
 
 @code {
     [Parameter] public Stage Current { get; set; }

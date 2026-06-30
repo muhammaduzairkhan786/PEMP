@@ -28,6 +28,11 @@ param entraTenantId string = subscription().tenantId
 @description('Entra app (client) id of the registered PEMP web app — see setup guide.')
 param entraClientId string
 
+@description('Audit hash-chain HMAC key (SEC-AUD-01). Stored as the Key Vault secret Audit--HmacKey and read by the app via managed identity — NEVER committed. Supply a strong random value at deploy time and keep it STABLE (rotating it invalidates existing audit-chain verification).')
+@secure()
+@minLength(32)
+param auditHmacKey string
+
 var suffix = uniqueString(resourceGroup().id)
 var tags = { app: 'PEMP', env: namePrefix, dataResidency: 'UK' }
 // KV + Storage names: lowercase alphanumeric only, max 24 chars.
@@ -62,6 +67,18 @@ resource vault 'Microsoft.KeyVault/vaults@2023-07-01' = {
     softDeleteRetentionInDays: 90
     enablePurgeProtection: true
     publicNetworkAccess: 'Disabled'
+  }
+}
+
+// Audit HMAC key secret (SEC-AUD-01). The "--" in the name maps to the Audit:HmacKey config key
+// when read by the app's Azure Key Vault configuration provider (via managed identity). The app
+// FAILS CLOSED outside Development if this is missing or equals the public default key.
+resource auditHmacSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+  parent: vault
+  name: 'Audit--HmacKey'
+  properties: {
+    value: auditHmacKey
+    contentType: 'text/plain'
   }
 }
 
@@ -135,6 +152,7 @@ resource web 'Microsoft.Web/sites@2023-12-01' = {
       linuxFxVersion: 'DOTNETCORE|10.0'
       ftpsState: 'Disabled'
       minTlsVersion: '1.2'
+      healthCheckPath: '/health' // liveness probe (NFR-AVL); /healthz/ready covers DB readiness
       appSettings: [
         { name: 'UseSqlite', value: 'false' }
         { name: 'ConnectionStrings__Pemp', value: 'Server=tcp:${sql.properties.fullyQualifiedDomainName},1433;Database=pemp;Authentication=Active Directory Default;Encrypt=True;' }

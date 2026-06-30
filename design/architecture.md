@@ -25,23 +25,40 @@
 
 ---
 
-## 2. Front end — decision: SPA
+## 2. Front end — decision: Blazor Web App (interactive Server)
 
-Resolves the one open stack item (`ASM-01`, DESIGN_PLAN §16). The optimistic-UI +
-⌘K + drawer-heavy model argues for a **SPA**. Two viable options, decide in build:
+Resolves the one open stack item (`ASM-01`, DESIGN_PLAN §16). **Status: ratified and
+shipped.** The earlier draft kept a SPA / React-vs-Blazor-WASM choice open; the Phase-3
+vertical slice was built as a **Blazor Web App running interactive Server components**,
+and that is the decision of record.
 
-| Option | Pros | Cons |
-|--------|------|------|
-| **React + TypeScript** (recommended) | largest ecosystem, design-token/theming maturity, easy ⌘K/optimistic patterns | separate stack from C# backend |
-| **Blazor WASM** | one language (C#) end-to-end, shared DTOs | heavier payload, fewer UI libs for the "art-piece" motion |
+**Rationale.** PEMP is an internal, enforcement-first system of record, not a
+public-scale app, so the SPA trade-offs that mattered most landed on the C# side:
 
-Either way:
-- **Design system** implements `design/tokens.css` (dark-first, §12) as the theme
-  source of truth; the component kit (DESIGN_PLAN §11) maps 1:1 to components.
-- **Auth:** MSAL (OIDC/PKCE) against Entra ID; tokens never leave the browser's
-  secure storage; **re-auth step-up** for privileged actions (`SEC-IAM-04`).
-- **Optimistic UI** with server reconciliation; heavy work (reports, notifications)
-  is async with in-progress states (`NFR-PER-01/03`).
+- **One language end-to-end** — the UI shares the `Pemp.Domain` types (state, guards,
+  enums) with no DTO duplication and no client/server contract drift.
+- **No separate API yet** — interactive Server runs component logic on the server over
+  a SignalR circuit, so the demo needs no standalone `Pemp.Api`; pages call the
+  store/domain directly. (A `Pemp.Api` can still be extracted later — §6, §3.)
+- **Low-latency interactivity + secure-by-default** — server-side render keeps secrets
+  (test credentials, evidence) and authorization on the server; the browser never holds
+  domain state or long-lived tokens. Object-level authz runs where the data is read.
+- **Theming unchanged** — `design/tokens.css` (dark-first, §12) remains the theme source
+  of truth; light/dark toggle ships in the layout.
+
+**Trade-offs / caveats.**
+- **Circuit + scale-out:** interactive Server holds per-user SignalR circuits with
+  server-side UI state, so horizontal scale needs sticky sessions or a backplane (Azure
+  SignalR Service / Redis), and a dropped connection must reconnect/rehydrate gracefully.
+- **Latency sensitivity:** every interaction is a round-trip, so it suits the internal,
+  good-connectivity audience; the optimistic-UI ambition (DESIGN_PLAN) is softened to
+  fast server reconciliation rather than client-only optimism.
+- The richest "art-piece" motion libraries are JS-first; we lean on CSS tokens/transitions.
+
+- **Auth:** Entra ID (OIDC) via Microsoft Identity Web, activated by config; local
+  ASP.NET Core Identity (email/password + authenticator TOTP) stands in for dev.
+  **Re-auth step-up** gates privileged actions (`SEC-IAM-04`).
+- Heavy work (reports, notifications) stays async with in-progress states (`NFR-PER-01/03`).
 
 ---
 

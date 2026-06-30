@@ -1,5 +1,8 @@
 @inherits LayoutComponentBase
 @inject DemoSession Session
+@inject NavigationManager Nav
+
+<a class="skip-link" href="#main">Skip to content</a>
 
 <div class="shell">
     <a class="brand" href="dashboard" aria-label="PEMP home"><div class="logo">P</div><b>PEMP</b></a>
@@ -20,21 +23,21 @@
     </header>
 
     <nav class="side">
-        <NavLink href="dashboard" Match="NavLinkMatch.All">⌂ My Turn</NavLink>
+        <NavLink href="dashboard" Match="NavLinkMatch.All" aria-current="@Cur("dashboard")">⌂ My Turn</NavLink>
         @if (Session.Role == "Acme CA Officer")
         {
-            <NavLink href="new-request">＋ New Request</NavLink>
+            <NavLink href="new-request" aria-current="@Cur("new-request")">＋ New Request</NavLink>
         }
-        <NavLink href="engagements">◉ Engagements</NavLink>
-        <NavLink href="analytics">▦ Analytics</NavLink>
+        <NavLink href="engagements" aria-current="@Cur("engagements")">◉ Engagements</NavLink>
+        <NavLink href="analytics" aria-current="@Cur("analytics")">▦ Analytics</NavLink>
         @if (Session.Role == "System Administrator")
         {
-            <NavLink href="admin">⚙ Admin</NavLink>
+            <NavLink href="admin" aria-current="@Cur("admin")">⚙ Admin</NavLink>
         }
         <div class="foot">@Session.Role · @Session.Actor</div>
     </nav>
 
-    <main class="content">@Body</main>
+    <main class="content" id="main" tabindex="-1">@Body</main>
 </div>
 
 <div id="blazor-error-ui" data-nosnippet>
@@ -48,4 +51,12 @@
     // the whoami + role-gated nav never flash a default identity (the SSR ordering fix). The
     // 2FA-enrollment gate is now enforced SERVER-SIDE in Program.cs (a real 302), not here.
     protected override Task OnInitializedAsync() => Session.EnsureInitializedAsync();
+
+    // aria-current="page" on the NavLink whose route matches the current path; null elsewhere so the
+    // attribute is omitted. The layout re-renders on navigation (@Body changes), so this recomputes.
+    string? Cur(string href)
+    {
+        var path = Nav.ToBaseRelativePath(Nav.Uri).Split('?', '#')[0].TrimEnd('/');
+        return string.Equals(path, href, StringComparison.OrdinalIgnoreCase) ? "page" : null;
+    }
 }

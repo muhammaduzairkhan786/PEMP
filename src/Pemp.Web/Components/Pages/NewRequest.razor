@@ -24,7 +24,9 @@
                 </select>
             </div>
             <div class="q"><label class="qlabel" for="req-app"><b>Application</b></label>
-                <input id="req-app" class="inp" @bind="_app" @bind:event="oninput" placeholder="e.g. Claims Portal" />
+                <input id="req-app" class="inp" @bind="_app" @bind:event="oninput" @ref="_appRef" @onkeydown="OnAppKey"
+                       placeholder="e.g. Claims Portal" aria-invalid="@(_err is not null ? "true" : null)"
+                       aria-describedby="@(_err is not null ? "req-err" : null)" />
             </div>
             <div class="q" style="border:none"><label class="qlabel" for="req-crit"><b>Criticality</b></label>
                 <select id="req-crit" class="inp" @bind="_crit"><option>High</option><option>Medium</option><option>Low</option></select>
@@ -39,7 +41,7 @@
 
         @if (_err is not null)
         {
-            <div class="banner err">⛔ @_err</div>
+            <div class="banner err" id="req-err" role="alert">⛔ @_err</div>
         }
     }
 </div>
@@ -49,13 +51,30 @@
     string _app = "";
     string _crit = "Medium";
     string? _err;
+    bool _focusError;
+    ElementReference _appRef;
 
     protected override Task OnInitializedAsync() => Session.EnsureInitializedAsync();
 
+    // Enter in the single Application field raises the request (keyboard parity with the button).
+    async Task OnAppKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await Raise();
+    }
+
     async Task Raise()
     {
-        if (string.IsNullOrWhiteSpace(_app)) { _err = "Enter an application name."; return; }
+        if (string.IsNullOrWhiteSpace(_app)) { _err = "Enter an application name."; _focusError = true; return; }
         var id = await Store.RaiseAsync(_type, _app.Trim(), _crit, Session.Actor);
         Nav.NavigateTo($"engagement/{id}");
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusError)
+        {
+            _focusError = false;
+            try { await _appRef.FocusAsync(); } catch { /* not rendered */ }
+        }
     }
 }

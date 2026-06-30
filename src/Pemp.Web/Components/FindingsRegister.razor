@@ -4,7 +4,7 @@
 
 @if (Findings.Count > 0)
 {
-    <div class="sectionlabel">Live register <span class="srs">FR-FND-01</span></div>
+    <h2 class="sectionlabel">Live register <Srs>FR-FND-01</Srs></h2>
 
     <div class="distbar" role="img" aria-label="@DistLabel()">
         @foreach (var s in Order)
@@ -60,20 +60,21 @@
             </tbody>
         </table>
     </div>
-    <p class="muted" style="font-size:var(--text-xs);margin-top:8px">Entered once → flows live into the register · <span class="srs">FR-FND-03</span></p>
+    <p class="muted" style="font-size:var(--text-xs);margin-top:8px">Entered once → flows live into the register<Srs Sep>FR-FND-03</Srs></p>
 }
 else if (ShowEmpty)
 {
-    <div class="sectionlabel">Live register <span class="srs">FR-FND-01</span></div>
+    <h2 class="sectionlabel">Live register <Srs>FR-FND-01</Srs></h2>
     <div class="card muted">No findings recorded yet.</div>
 }
 
 @if (CanAdd)
 {
     <div class="card">
-        <div class="sectionlabel" style="margin-top:0">Record a finding <span class="srs">FR-FND-01/03</span></div>
+        <h3 class="sectionlabel" style="margin-top:0">Record a finding <Srs>FR-FND-01/03</Srs></h3>
         <div class="q"><label class="qlabel" for="fnd-title">Title</label>
-            <input id="fnd-title" class="inp" placeholder="title (e.g. SQLi in /search)" @bind="_title" /></div>
+            <input id="fnd-title" class="inp" placeholder="title (e.g. SQLi in /search)" @bind="_title" @ref="_titleRef"
+                   @onkeydown="OnTitleKey" aria-invalid="@(_invalid ? "true" : null)" aria-describedby="@(_invalid ? "fnd-msg" : null)" /></div>
         <div class="q"><label class="qlabel" for="fnd-severity">Severity</label>
             <select id="fnd-severity" class="inp" style="max-width:210px" @bind="_severity">
                 @foreach (var s in Order){<option value="@s">@s</option>}
@@ -93,7 +94,7 @@ else if (ShowEmpty)
                 @foreach (var st in Enum.GetValues<FindingStatus>()){<option value="@st">@StatusLabel(st)</option>}
             </select>
             <button class="btn primary" style="margin-top:8px" @onclick="Add">Add finding ▶</button>
-            @if (_msg is not null){<span class="muted" style="margin-left:10px" role="status" aria-live="polite">@_msg</span>}
+            @if (_msg is not null){<span id="fnd-msg" class="muted" style="margin-left:10px" role="status" aria-live="polite">@_msg</span>}
         </div>
     </div>
 }
@@ -114,15 +115,32 @@ else if (ShowEmpty)
     FindingStatus _status = FindingStatus.Open;
     string? _msg;
 
+    // Validation state for the required Title field: drives aria-invalid/aria-describedby and a
+    // focus-the-error pass on submit (accessibility — fleet rank 27).
+    bool _invalid;
+    bool _focusError;
+    ElementReference _titleRef;
+
     static readonly Severity[] Order = { Severity.Critical, Severity.High, Severity.Medium, Severity.Low, Severity.Info };
 
     int Count(Severity s) => Findings.Count(f => f.Severity == s);
     int Pct(int n) => Findings.Count == 0 ? 0 : (int)Math.Round(100.0 * n / Findings.Count);
     IEnumerable<FindingRecord> Filtered() => _filter is null ? Findings : Findings.Where(f => f.Severity == _filter);
 
+    // Enter in the Title field submits the finding (keyboard parity with the Add button).
+    async Task OnTitleKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await Add();
+    }
+
     async Task Add()
     {
-        if (string.IsNullOrWhiteSpace(_title)) { _msg = "Enter a title."; return; }
+        if (string.IsNullOrWhiteSpace(_title))
+        {
+            _invalid = true; _msg = "Enter a title."; _focusError = true; // move focus to the offending field
+            return;
+        }
+        _invalid = false;
         await Store.AddFindingAsync(EngagementId, _title.Trim(), _severity, _cvss.Trim(),
             _cvssVector.Trim(), _asset.Trim(), _remediation.Trim(), _status,
             actor: Session.Actor, role: Session.Role);
@@ -130,6 +148,15 @@ else if (ShowEmpty)
         _severity = Severity.Medium; _status = FindingStatus.Open;
         _msg = "Recorded — live in the register (FR-FND-03).";
         if (OnAdded.HasDelegate) await OnAdded.InvokeAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusError)
+        {
+            _focusError = false;
+            try { await _titleRef.FocusAsync(); } catch { /* not rendered */ }
+        }
     }
 
     // Retest verdict (FR-RET-03): pass = fix verified → Closed; fail = still present → re-Open.

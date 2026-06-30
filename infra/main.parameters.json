@@ -6,6 +6,8 @@
     "location": { "value": "uksouth" },
     "sqlAdminLogin": { "value": "PEMP SQL Admins" },
     "sqlAdminObjectId": { "value": "<entra-object-id-of-admin-user-or-group>" },
-    "entraClientId": { "value": "<entra-app-client-id-from-step-1>" }
+    "entraClientId": { "value": "<entra-app-client-id-from-step-1>" },
+    "//auditHmacKey": "SECRET — do NOT commit a real value here. Supply at deploy time, e.g. az deployment group create --parameters auditHmacKey=$(openssl rand -base64 48), or reference an existing Key Vault secret. Keep it STABLE across deploys (rotating invalidates audit-chain verification).",
+    "auditHmacKey": { "value": "<set-securely-at-deploy-time-min-32-chars>" }
   }
 }

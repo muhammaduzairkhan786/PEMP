@@ -11,7 +11,8 @@ public static class ServiceCollectionExtensions
     /// otherwise Azure SQL via the SqlServer provider (production, SEC-DAT/§9).
     /// </summary>
     public static IServiceCollection AddPempInfrastructure(
-        this IServiceCollection services, string connectionString, bool useSqlite, string? auditHmacKey = null)
+        this IServiceCollection services, string connectionString, bool useSqlite,
+        string? auditHmacKey = null, bool allowDefaultAuditKey = true)
     {
         services.AddDbContext<PempDbContext>(options =>
         {
@@ -20,8 +21,9 @@ public static class ServiceCollectionExtensions
         });
         services.AddSingleton<Func<DateTimeOffset>>(_ => () => DateTimeOffset.UtcNow);
         // Audit hash-chain HMAC key (SEC-AUD-01). PROD supplies this from Azure Key Vault; dev/local
-        // reads Audit:HmacKey from config, falling back to the dev key when unset.
-        services.AddSingleton(AuditHmacKey.FromConfig(auditHmacKey));
+        // reads Audit:HmacKey from config. FromConfig FAILS CLOSED on real (non-SQLite, non-Dev)
+        // deployments when the key is missing or resolves to the public default — see AuditHmacKey.
+        services.AddSingleton(AuditHmacKey.FromConfig(auditHmacKey, allowDefaultAuditKey));
         services.AddScoped<EngagementStore>();
         return services;
     }

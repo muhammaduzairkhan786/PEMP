@@ -52,20 +52,20 @@ else
                     <h3 id="gate-title">@ModalTitle()</h3>
                     <p class="muted" style="margin-bottom:12px">@ModalIntro()</p>
                     <ul class="attest">@foreach (var l in ModalLines()){<li>@l</li>}</ul>
-                    <div class="chainline"><span class="tick">🔗</span> Creates an immutable, hash-chained record · <span class="srs">SEC-AUD-01</span></div>
+                    <div class="chainline"><span class="tick">🔗</span> Creates an immutable, hash-chained record<Srs Sep>SEC-AUD-01</Srs></div>
                     @if (EntraConfigured)
                     {
-                        <div class="reauthnote">🔐 Re-authenticate via Entra MFA before it commits · <span class="srs">SEC-IAM-04</span></div>
+                        <div class="reauthnote">🔐 Re-authenticate via Entra MFA before it commits<Srs Sep>SEC-IAM-04</Srs></div>
                     }
                     else
                     {
-                        <div class="reauthnote">🔐 Enter your current authenticator (TOTP) code to confirm this privileged action · <span class="srs">SEC-IAM-04</span></div>
+                        <div class="reauthnote">🔐 Enter your current authenticator (TOTP) code to confirm this privileged action<Srs Sep>SEC-IAM-04</Srs></div>
                         <input class="inp mono" style="max-width:200px;margin-top:8px" @bind="_totp" @bind:event="oninput"
-                               inputmode="numeric" autocomplete="one-time-code" placeholder="123 456" aria-label="Authenticator code" />
+                               @onkeydown="OnTotpKey" inputmode="numeric" autocomplete="one-time-code" placeholder="123 456" aria-label="Authenticator code" />
                     }
                     @if (_modalError is not null)
                     {
-                        <div class="banner err" style="margin-top:8px">⛔ @_modalError</div>
+                        <div class="banner err" style="margin-top:8px" role="alert">⛔ @_modalError</div>
                     }
                     <div class="actions">
                         <button class="btn ghost" @onclick="Cancel">Cancel</button>
@@ -77,11 +77,13 @@ else
 
         @if (_error is not null)
         {
-            <div class="banner err">⛔ @_error</div>
+            @* Guard-FAILURE: a blocked enforced transition must be announced to assistive tech — the
+               product's defining trait is otherwise unperceivable to a screen-reader user (fleet rank 5). *@
+            <div class="banner err" role="alert">⛔ @_error</div>
         }
         @if (_ok is not null)
         {
-            <div class="banner ok">✓ @_ok</div>
+            <div class="banner ok" role="status" aria-live="polite">✓ @_ok</div>
         }
 
         @if (next.Kind == ActionKind.None)
@@ -102,7 +104,7 @@ else
                 @if (next.Kind == ActionKind.AssignTester)
                 {
                     <div class="picker">
-                        <label class="qlabel">Assign from the capacity board <span class="srs">FR-ASG-02/03</span></label>
+                        <label class="qlabel">Assign from the capacity board <Srs>FR-ASG-02/03</Srs></label>
                         <select class="inp" style="max-width:300px" @bind="_assignTesterId">
                             @foreach (var t in DemoSeeder.Testers)
                             {
@@ -169,14 +171,14 @@ else
                             Editable="@(Session.Role == "Tester" && (int)_rec.CurrentStage >= (int)Stage.Access && _rec.CurrentStage != Stage.Closed)" />
         }
 
-        <div class="sectionlabel">
-            Audit trail <span class="srs">SEC-AUD-01</span>
+        <h2 class="sectionlabel">
+            Audit trail <Srs>SEC-AUD-01</Srs>
             <button class="btn ghost" style="margin-left:8px" @onclick="Verify">Verify chain</button>
             @if (_chainOk is not null)
             {
-                <span class="pill @(_chainOk == true ? "ok" : "warn")">@(_chainOk == true ? "🔗 verified" : "⚠ broken")</span>
+                <span class="pill @(_chainOk == true ? "ok" : "warn")" role="status" aria-live="polite">@(_chainOk == true ? "🔗 verified" : "⚠ broken")</span>
             }
-        </div>
+        </h2>
         <div class="card tablecard">
             <table class="t">
                 <thead><tr><th>#</th><th>Actor</th><th>Action</th><th>Before → After</th><th>When</th></tr></thead>
@@ -351,6 +353,13 @@ else
     async Task OnModalKey(KeyboardEventArgs e)
     {
         if (e.Key == "Escape") await Cancel();
+    }
+
+    // Enter on the TOTP field confirms the privileged action (keyboard parity with the primary
+    // button); Esc-to-close is handled by OnModalKey on the scrim. Entra path has no TOTP field.
+    async Task OnTotpKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await ConfirmReauth();
     }
 
     async Task Cancel()

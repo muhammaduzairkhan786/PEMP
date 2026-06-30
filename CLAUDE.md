@@ -4,16 +4,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state
 
-**Phase 2 (Design) complete; Phase 3 (Implementation) — a runnable demo vertical slice is built.** See `IMPLEMENTATION_PLAN.md` for the per-phase status. A demo branch (`feature/blazor-demo`) holds the app; `main` is the pre-app baseline (requirements + design + domain core) until that PR merges.
+**Phase 2 (Design) complete; Phase 3 (Implementation) — a runnable demo vertical slice is built and merged to `main`.** See `IMPLEMENTATION_PLAN.md` for the per-phase status. The Blazor app lives on `main`.
 
 | Phase | Stage | Status |
 |-------|-------|--------|
 | 1 | Requirements | ✅ `PEMP_SRS_v1.0_Master.docx` (released baseline) |
 | 2 | Design | ✅ `DESIGN_PLAN.md` v0.3, `design/*`, prototype, compliance |
-| 3 | Implementation | 🟢 domain + EF persistence + Blazor UI + Entra wiring + Bicep IaC (demo vertical slice). Findings register / evidence / retest-child UI still to build |
-| 4–6 | Testing / Security / Deploy | ⬜ domain unit tests only so far |
+| 3 | Implementation | 🟢 domain + EF persistence + Blazor Server UI + Entra wiring + Bicep IaC (demo vertical slice). Findings register/record, evidence, retest pass/fail child, masked credentials, peer-review QA gate and light/dark theme are all built |
+| 4–6 | Testing / Security / Deploy | 🟡 38 tests green (15 domain + 23 infra); integration/authz matrix, security review and Azure deploy still to do |
 
-> ✅ **Built on .NET 10** (Homebrew `dotnet` is 10.x; target bumped from net8 → **net10.0**, still LTS). `dotnet test` = **15/15 domain guard tests green**, 0 code warnings. The demo runs end-to-end on SQLite with a role switcher; Entra + Azure SQL activate via config (see below).
+> ✅ **Built on .NET 10** (Homebrew `dotnet` is 10.x; target bumped from net8 → **net10.0**, still LTS). `dotnet test` = **38 tests green** (15 domain guard/audit + 23 infrastructure persistence), 0 code warnings. The demo runs end-to-end on SQLite; sign-in is **local ASP.NET Core Identity (email/password + authenticator-app TOTP 2FA)** for dev, and **Entra SSO + Azure SQL activate via config** (see below).
 >
 > **Defining trait stays enforcement:** all UI actions route through the domain guards in `src/Pemp.Domain/Engagement.cs` — a failed guard changes and persists nothing. The hash-chained audit append is atomic with each transition (`EngagementStore.ExecuteAsync`).
 
@@ -22,20 +22,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 PEMP_SRS_v1.0_Master.docx   Requirements baseline (Phase 1)
 DESIGN_PLAN.md              Experience & UI design plan (v0.3)
 IMPLEMENTATION_PLAN.md      SDLC phase tracker + exit criteria
+README.md                   Human entry point: what PEMP is, build/test/run, dev sign-in, doc links
 design/                     Phase-2 artifacts
-  architecture.md             layered backend, SPA decision, data model
+  architecture.md             layered backend, Blazor-Server front-end decision, data model
   state-machine.md / .svg     the enforced engagement state machine (the core)
-  tokens.css                  design tokens (dark-first) — SPA theme source
+  tokens.css                  design tokens (dark-first) — UI theme source of truth
   prototype/index.html        self-contained clickable prototype (open in a browser)
   compliance/                 traceability.md · dpia.md · threat-model.md
 infra/                      Bicep IaC (UK Azure) + sample parameters
+docs/DEMO.md                The 5-minute walkthrough + local sign-in (5 dev logins + TOTP)
 docs/azure-entra-setup.md   The user-only Azure/Entra setup steps (app reg, consent, deploy)
 PEMP.sln                    Solution
 Directory.Build.props       Shared build settings (net10.0, latest C#, nullable, warnings-as-errors)
 src/Pemp.Domain/            Domain core: Engagement state machine + guards, hash-chained Audit, Result
 src/Pemp.Infrastructure/    EF Core (SQLite local / Azure SQL), EfAuditChain, EngagementStore, DemoSeeder
 src/Pemp.Web/               Blazor Web App (interactive server): My-Turn, engagements, spine, gated actions
-tests/Pemp.Domain.Tests/    xUnit — encodes the guard table + audit invariants
+tests/Pemp.Domain.Tests/    xUnit — encodes the guard table + audit invariants (15)
+tests/Pemp.Infrastructure.Tests/  xUnit — EF persistence, object-level scope, audit-chain (23)
 ```
 Application/API layers were collapsed for the demo: `Pemp.Web` calls `EngagementStore` (in Infrastructure) directly. A dedicated `Pemp.Application` use-case layer is the clean next refactor per `design/architecture.md §6`.
 
@@ -49,11 +52,11 @@ Application/API layers were collapsed for the demo: `Pemp.Web` calls `Engagement
 
 ```bash
 dotnet build PEMP.sln                 # strict: code warnings are errors (NuGet audit advisories stay warnings)
-dotnet test                           # Pemp.Domain.Tests — guard table + audit-chain invariants (15)
-dotnet run --project src/Pemp.Web     # the demo app → open the printed URL (SQLite, seeded, role switcher)
+dotnet test                           # 38 tests — domain guard table + audit (15), infra persistence/scope (23)
+dotnet run --project src/Pemp.Web     # the demo app → open the printed URL (SQLite, seeded)
 open design/prototype/index.html      # the static clickable prototype
 ```
-Local demo needs no cloud. For Entra SSO + Azure SQL, set `UseSqlite:false`, a SqlServer `ConnectionStrings:Pemp`, and `AzureAd:*` (per the setup guide); the app auto-falls back to the role switcher when `AzureAd:ClientId` is blank.
+Local demo needs no cloud: sign in with one of the seeded dev logins (local ASP.NET Core Identity, email/password + authenticator-app TOTP — see `docs/DEMO.md`). For Entra SSO + Azure SQL, set `UseSqlite:false`, a SqlServer `ConnectionStrings:Pemp`, and `AzureAd:*` (per the setup guide); the app auto-falls back to **local Identity** when `AzureAd:ClientId` is blank.
 
 To read the SRS as text (it is a Word `.docx`, i.e. a zip of XML):
 ```bash
@@ -73,7 +76,7 @@ The **Pentest Engagement Management Platform (PEMP)** is a secure web app that r
 
 - **Hosting:** Microsoft Azure, **UK region only** — no data egress outside the approved boundary.
 - **App / API:** ASP.NET Core (C#).
-- **Front end:** **SPA** — decided in Phase 2 (`design/architecture.md`, `DESIGN_PLAN §16`), driven by the optimistic-UI / ⌘K / drawer-heavy model. The React-vs-Blazor-WASM choice *within* the SPA posture is the one item still to ratify.
+- **Front end:** **Blazor Web App (interactive Server)** — ratified in Phase 3 and shipped (`design/architecture.md §2`). Keeps one language (C#) end-to-end and shares the domain types with no separate API; the design tokens (`design/tokens.css`) drive the theme. (Supersedes the earlier "SPA, React-vs-Blazor-WASM TBD" framing.)
 - **Data:** Azure SQL Database with Entity Framework Core.
 - **Identity:** Microsoft Entra ID (Acme's tenant) via Microsoft Identity / MSAL, OIDC SSO, **no local password store**. Acme staff are native identities; CloudKonsult delivery staff (Delivery Manager, testers) and external stakeholders are **Entra B2B guests** with scoped least-privilege access. Enforced MFA via Conditional Access.
 - **Secrets/keys:** Azure Key Vault with managed identities — no secrets in code or config.
