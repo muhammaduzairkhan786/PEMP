@@ -1,5 +1,7 @@
 @page "/engagements"
+@attribute [Authorize]
 @inject EngagementStore Store
+@inject DemoSession Session
 <PageTitle>Engagements · PEMP</PageTitle>
 
 <div class="wrap">
@@ -9,7 +11,7 @@
 
     @if (_recs is null)
     {
-        <p class="muted">Loading…</p>
+        <div aria-busy="true"><Skeleton Rows="4" /></div>
     }
     else
     {
@@ -32,7 +34,8 @@
 
 @code {
     List<EngagementRecord>? _recs;
-    protected override async Task OnInitializedAsync() => _recs = await Store.ListAsync();
+    protected override async Task OnInitializedAsync() =>
+        _recs = await Store.ListScopedAsync(Session.AppScope, Session.TesterScope);
 
     static string TypeClass(EngagementType t) =>
         t == EngagementType.Project ? "project" : t == EngagementType.Bau ? "bau" : "retest";

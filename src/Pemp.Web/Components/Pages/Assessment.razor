@@ -1,12 +1,21 @@
 @page "/engagement/{Id:guid}/assessment"
+@attribute [Authorize]
 @inject EngagementStore Store
 @inject DemoSession Session
 @inject NavigationManager Nav
 <PageTitle>Assessment · PEMP</PageTitle>
 
-@if (_rec is null)
+@if (!_loaded)
 {
-    <p class="muted">Loading…</p>
+    <div class="wrap" aria-busy="true"><Skeleton Rows="4" /></div>
+}
+else if (_rec is null)
+{
+    <div class="wrap">
+        <h1 class="title">Not available</h1>
+        <p class="sub">This engagement doesn't exist, or it isn't in your scope.</p>
+        <a class="btn primary" href="">⌂ Back to My Turn</a>
+    </div>
 }
 else
 {
@@ -21,7 +30,8 @@ else
             <div class="banner @(_done.Value ? "ok" : "err")">@(_done.Value ? "✓ Assessment marked complete — Scoping advances to SoW." : "⛔ " + _err)</div>
         }
 
-        <AssessmentForm EngagementId="Id" Answers="_answers" ReadOnly="@(_rec.CurrentStage != Stage.Scoping)" />
+        <AssessmentForm EngagementId="Id" Answers="_answers"
+                        ReadOnly="@(_rec.CurrentStage != Stage.Scoping || !(Session.Role is "Stakeholder" or "Tester"))" />
 
         @if (canComplete)
         {
@@ -45,10 +55,17 @@ else
     bool? _done;
     string? _err;
 
-    protected override async Task OnInitializedAsync()
+    Guid _loadedId;
+    bool _loaded;
+
+    protected override async Task OnParametersSetAsync()
     {
-        _rec = await Store.GetAsync(Id);
-        _answers = await Store.AssessmentAnswersAsync(Id);
+        if (Id == _loadedId) return;
+        _loadedId = Id;
+        _loaded = false;
+        _rec = await Store.GetScopedAsync(Id, Session.AppScope, Session.TesterScope); // anti-BOLA
+        if (_rec is not null) _answers = await Store.AssessmentAnswersAsync(Id);
+        _loaded = true;
     }
 
     async Task Complete()
@@ -56,6 +73,6 @@ else
         var result = await Store.ExecuteAsync(Id, e => e.CompleteAssessment(Session.Actor));
         _done = result.Ok;
         _err = result.Error;
-        _rec = await Store.GetAsync(Id);
+        _rec = await Store.GetScopedAsync(Id, Session.AppScope, Session.TesterScope);
     }
 }

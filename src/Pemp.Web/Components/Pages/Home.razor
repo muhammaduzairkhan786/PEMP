@@ -1,4 +1,5 @@
-@page "/"
+@page "/dashboard"
+@attribute [Authorize]
 @inject EngagementStore Store
 @inject DemoSession Session
 <PageTitle>My Turn · PEMP</PageTitle>
@@ -10,7 +11,7 @@
 
     @if (_items is null)
     {
-        <p class="muted">Loading…</p>
+        <div aria-busy="true"><Skeleton Rows="5" /></div>
     }
     else
     {
@@ -39,6 +40,10 @@
         </div>
 
         <div class="sectionlabel">Waiting on others <span class="srs">FR-NOT-03</span></div>
+        @if (others.Count == 0)
+        {
+            <div class="card muted">Nothing in flight elsewhere right now.</div>
+        }
         <div class="pile">
             @foreach (var i in others)
             {
@@ -57,7 +62,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var recs = await Store.ListAsync();
+        var recs = await Store.ListScopedAsync(Session.AppScope, Session.TesterScope);
         _items = recs
             .Select(r => { var n = Workflow.Next(r); return new Item(r, n.Label, n.OwnerRole); })
             .Where(i => i.Owner != "")

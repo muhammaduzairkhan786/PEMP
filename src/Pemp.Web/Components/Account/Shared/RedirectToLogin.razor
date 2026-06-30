@@ -1,0 +1,12 @@
+@inject NavigationManager NavigationManager
+
+@code {
+    protected override void OnInitialized()
+    {
+        var returnUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+        NavigationManager.NavigateTo(
+            NavigationManager.GetUriWithQueryParameters("Account/Login",
+                new Dictionary<string, object?> { ["ReturnUrl"] = returnUrl }),
+            forceLoad: true);
+    }
+}

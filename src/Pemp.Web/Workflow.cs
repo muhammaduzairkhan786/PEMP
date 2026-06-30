@@ -6,7 +6,8 @@ namespace Pemp.Web;
 public enum ActionKind
 {
     None, RouteToDm, AssignTester, CompleteAssessment, ReviewSow, SignSow,
-    VerifyAccess, SendIr, EndTest, GenerateDraft, PeerReview, ReleaseFinal, RequestRetest
+    VerifyAccess, SendIr, EndTest, GenerateDraft, PeerReview, PeerReviewReject,
+    ReleaseFinal, RequestRetest, CompleteRetest
 }
 
 /// <summary>
@@ -19,7 +20,7 @@ public static class Workflow
     /// <summary>The linear master spine shown in the UI (Retest is a child engagement).</summary>
     public static readonly Stage[] Spine =
         { Stage.Intake, Stage.Assignment, Stage.Scoping, Stage.Sow, Stage.Access,
-          Stage.Execution, Stage.Findings, Stage.Report, Stage.Closed };
+          Stage.Execution, Stage.Findings, Stage.Report, Stage.Closed, Stage.Retest };
 
     public static string Label(Stage s) => s switch
     {
@@ -41,14 +42,15 @@ public static class Workflow
         _ => "",
     };
 
-    /// <summary>Re-auth-gated privileged actions (SEC-IAM-04): credential view, sign, release.</summary>
-    public static bool NeedsReauth(ActionKind k) => k is ActionKind.SignSow or ActionKind.ReleaseFinal;
+    /// <summary>Privileged gate actions that open the attestation + re-auth ceremony (SEC-IAM-04).</summary>
+    public static bool NeedsReauth(ActionKind k) =>
+        k is ActionKind.SignSow or ActionKind.ReleaseFinal or ActionKind.VerifyAccess;
 
     public static (ActionKind Kind, string Label, string OwnerRole) Next(EngagementRecord r) => r.CurrentStage switch
     {
         Stage.Intake => (ActionKind.RouteToDm, "Route to Delivery Manager", "Delivery Manager"),
         Stage.Assignment => (ActionKind.AssignTester, "Assign a tester", "Delivery Manager"),
-        Stage.Scoping => (ActionKind.CompleteAssessment, "Complete assessment", "Tester"),
+        Stage.Scoping => (ActionKind.CompleteAssessment, "Complete the assessment", "Stakeholder"),
         Stage.Sow when r.Type == EngagementType.Project && !r.SowReviewedByDm
             => (ActionKind.ReviewSow, "Review Project SoW", "Delivery Manager"),
         Stage.Sow => (ActionKind.SignSow, "Review & Sign SoW", "Acme CA Officer"),
@@ -56,9 +58,12 @@ public static class Workflow
         Stage.Execution when !r.IrNoticeSent => (ActionKind.SendIr, "Send IR notice & start test", "Tester"),
         Stage.Execution => (ActionKind.EndTest, "End test & send notice", "Tester"),
         Stage.Findings => (ActionKind.GenerateDraft, "Generate draft report", "Tester"),
+        Stage.Report when !r.DraftGenerated => (ActionKind.GenerateDraft, "Re-draft report (address QA comments)", "Tester"),
         Stage.Report when !r.PeerReviewPassed => (ActionKind.PeerReview, "Peer QA review", "Tester"),
-        Stage.Report => (ActionKind.ReleaseFinal, "Release final report", "Acme CA Officer"),
-        // Closed: retest (child engagement) is a later pass — show the closed state for now.
+        Stage.Report => (ActionKind.ReleaseFinal, "Release final report", "Tester"),
+        // Closed is terminal/"done" — a retest is an OPTIONAL action offered on the page,
+        // not a mandatory My-Turn item. Retest child has its own owned action.
+        Stage.Retest => (ActionKind.CompleteRetest, "Re-verify findings & complete retest", "Tester"),
         _ => (ActionKind.None, "—", ""),
     };
 }

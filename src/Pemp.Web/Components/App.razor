@@ -15,9 +15,20 @@
 </head>
 
 <body>
-    <Routes @rendermode="InteractiveServer" />
+    <Routes @rendermode="RenderModeForPage" />
     <ReconnectModal />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
 </body>
 
 </html>
+
+@code {
+    // Account pages run as static SSR so their form posts hit SignInManager/UserManager
+    // server-side; the rest of the app is InteractiveServer.
+    [CascadingParameter] private HttpContext? HttpContext { get; set; }
+
+    private IComponentRenderMode? RenderModeForPage =>
+        HttpContext?.Request.Path.StartsWithSegments("/Account") == true
+            ? null
+            : InteractiveServer;
+}

@@ -30,10 +30,10 @@ public static class DemoSeeder
         // Payments API — BAU, signed, awaiting access verification.
         var pay = Engagement.Raise("ENG-2026-0419", EngagementType.Bau, "system", chain, clock);
         pay.RouteToDeliveryManager(dm);
-        pay.AssignTester(TesterLee, dm);
-        pay.CompleteAssessment("S. Lee");
+        pay.AssignTester(TesterKhan, dm);                 // A. Khan (default Tester persona) → real work at Access
+        pay.CompleteAssessment("A. Khan");
         pay.SignSow(acme, reAuthenticated: true);
-        db.Engagements.Add(EngagementRecord.FromDomain(pay, "Payments API", "Medium", "S. Lee"));
+        db.Engagements.Add(EngagementRecord.FromDomain(pay, "Payments API", "Medium", "A. Khan"));
 
         // Retail Web — Project, in the testing/findings window.
         var retail = Engagement.Raise("ENG-2026-0408", EngagementType.Project, "system", chain, clock);
@@ -68,6 +68,15 @@ public static class DemoSeeder
         mobile.AssignTester(TesterLee, dm);
         db.Engagements.Add(EngagementRecord.FromDomain(mobile, "Mobile App", "Medium", "S. Lee"));
 
+        // Partner Portal — freshly raised, at Intake (DM to route).
+        var intake = Engagement.Raise("ENG-2026-0422", EngagementType.Bau, "system", chain, clock);
+        db.Engagements.Add(EngagementRecord.FromDomain(intake, "Partner Portal", "Medium", null));
+
+        // Quote Engine — routed, awaiting tester assignment (DM's turn).
+        var assign = Engagement.Raise("ENG-2026-0423", EngagementType.Project, "system", chain, clock);
+        assign.RouteToDeliveryManager(dm);
+        db.Engagements.Add(EngagementRecord.FromDomain(assign, "Quote Engine", "High", null));
+
         // Live register (FR-FND): findings for the engagements that have reached testing.
         FindingRecord F(Guid eng, string title, Severity sev, string cvss, string asset, FindingStatus status)
             => new() { Id = Guid.NewGuid(), EngagementId = eng, Title = title, Severity = sev, Cvss = cvss, Asset = asset, Status = status };
@@ -78,7 +87,7 @@ public static class DemoSeeder
             fSqli, fXss,
             F(retail.Id, "Verbose error disclosure", Severity.Medium, "5.3", "API", FindingStatus.Remediated),
             F(retail.Id, "Missing cookie security flags", Severity.Low, "3.1", "Web", FindingStatus.Open),
-            F(broker.Id, "Insecure direct object reference", Severity.High, "7.7", "Web", FindingStatus.Closed),
+            F(broker.Id, "Insecure direct object reference", Severity.High, "7.7", "Web", FindingStatus.RetestPending),
             F(broker.Id, "Weak password policy", Severity.Medium, "4.8", "Web", FindingStatus.Closed)
         );
 

@@ -1,19 +1,21 @@
 @page "/analytics"
+@attribute [Authorize]
 @inject EngagementStore Store
+@inject DemoSession Session
 <PageTitle>Analytics · PEMP</PageTitle>
 
 <div class="wrap">
     <div class="eyebrow">Portfolio</div>
     <h1 class="title">Analytics</h1>
-    <p class="sub">Across all engagements — exposure at a glance.</p>
+    <p class="sub">@(Session.AppScope is not null || Session.TesterScope is not null ? "Across your engagements." : "Across all engagements — exposure at a glance.")</p>
 
     @if (_engs is null)
     {
-        <p class="muted">Loading…</p>
+        <div aria-busy="true"><Skeleton Rows="4" /></div>
     }
     else
     {
-        var active = _engs.Count(e => e.CurrentStage != Stage.Closed && e.CurrentStage != Stage.Retest);
+        var active = _engs.Count(e => e.CurrentStage != Stage.Closed);
         var closed = _engs.Count(e => e.CurrentStage == Stage.Closed);
         var open = _findings.Where(f => f.Status is FindingStatus.Open or FindingStatus.RetestPending).ToList();
         var critOpen = open.Count(f => f.Severity == Severity.Critical);
@@ -84,8 +86,9 @@
 
     protected override async Task OnInitializedAsync()
     {
-        _engs = await Store.ListAsync();
-        _findings = await Store.AllFindingsAsync();
+        _engs = await Store.ListScopedAsync(Session.AppScope, Session.TesterScope);
+        var ids = _engs.Select(e => e.Id).ToHashSet();
+        _findings = (await Store.AllFindingsAsync()).Where(f => ids.Contains(f.EngagementId)).ToList();
     }
 
     static string SevVar(Severity s) => s switch

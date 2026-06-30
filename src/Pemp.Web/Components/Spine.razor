@@ -1,11 +1,18 @@
-@* Master engagement spine — done / current / future (DESIGN_PLAN §1.1) *@
+@* Master engagement spine — done / current / locked-next / future (DESIGN_PLAN §1.1) *@
+@{
+    var curIdx = Array.IndexOf(Workflow.Spine, Current);
+}
 <div class="spine">
-    @foreach (var s in Workflow.Spine)
+    @for (var i = 0; i < Workflow.Spine.Length; i++)
     {
-        var cls = (int)s < (int)Current ? "done" : s == Current ? "current" : "future";
-        <div class="node @cls">
+        var s = Workflow.Spine[i];
+        var terminal = Current is Stage.Closed or Stage.Retest;   // no "next locked" cue at terminal stages
+        var cls = i < curIdx ? "done" : i == curIdx ? "current" : (!terminal && i == curIdx + 1) ? "locked" : "future";
+        var glyph = i < curIdx ? "✓" : (!terminal && i == curIdx + 1) ? "🔒" : "";
+        var locked = !terminal && i == curIdx + 1;
+        <div class="node @cls" title="@(locked ? $"Locked — finish {Workflow.Label(Current)} first" : Workflow.Label(s))">
             <div class="connector"></div>
-            <div class="bead">@((int)s < (int)Current ? "✓" : "")</div>
+            <div class="bead">@glyph</div>
             <div class="lbl">@Workflow.Label(s)</div>
             <div class="wk">@Workflow.Week(s)</div>
         </div>

@@ -1,0 +1,59 @@
+@page "/new-request"
+@attribute [Authorize(Roles = "Acme CA Officer")]
+@inject EngagementStore Store
+@inject DemoSession Session
+@inject NavigationManager Nav
+<PageTitle>New request · PEMP</PageTitle>
+
+<div class="wrap">
+    <div class="eyebrow">Acme CA Officer</div>
+    <h1 class="title">New request</h1>
+    <p class="sub">A short request, not a long form. It enters Intake; the Delivery Manager picks it up next.</p>
+
+    @if (Session.Role != "Acme CA Officer")
+    {
+        <div class="banner err">⛔ Raising requests is the Acme CA Officer's action.</div>
+    }
+    else
+    {
+        <div class="card">
+            <div class="q"><b>Type</b><br>
+                <select class="inp" @bind="_type">
+                    <option value="@EngagementType.Bau">BAU (routine / recurring)</option>
+                    <option value="@EngagementType.Project">Project (release-tied, DM review)</option>
+                </select>
+            </div>
+            <div class="q"><b>Application</b><br>
+                <input class="inp" @bind="_app" @bind:event="oninput" placeholder="e.g. Claims Portal" />
+            </div>
+            <div class="q" style="border:none"><b>Criticality</b><br>
+                <select class="inp" @bind="_crit"><option>High</option><option>Medium</option><option>Low</option></select>
+            </div>
+        </div>
+
+        <div class="card nextaction">
+            <div style="font-size:26px">＋</div>
+            <div class="meta"><b>Raise request</b><span class="muted">FR-REQ-01/04 · reference minted, enters Intake</span></div>
+            <button class="btn primary" @onclick="Raise" disabled="@string.IsNullOrWhiteSpace(_app)">Raise request ▶</button>
+        </div>
+
+        @if (_err is not null)
+        {
+            <div class="banner err">⛔ @_err</div>
+        }
+    }
+</div>
+
+@code {
+    EngagementType _type = EngagementType.Bau;
+    string _app = "";
+    string _crit = "Medium";
+    string? _err;
+
+    async Task Raise()
+    {
+        if (string.IsNullOrWhiteSpace(_app)) { _err = "Enter an application name."; return; }
+        var id = await Store.RaiseAsync(_type, _app.Trim(), _crit, Session.Actor);
+        Nav.NavigateTo($"engagement/{id}");
+    }
+}

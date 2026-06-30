@@ -1,8 +1,9 @@
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace Pemp.Infrastructure.Persistence;
 
-public sealed class PempDbContext(DbContextOptions<PempDbContext> options) : DbContext(options)
+public sealed class PempDbContext(DbContextOptions<PempDbContext> options) : IdentityDbContext<ApplicationUser>(options)
 {
     public DbSet<EngagementRecord> Engagements => Set<EngagementRecord>();
     public DbSet<AuditEntryRow> AuditEntries => Set<AuditEntryRow>();
@@ -14,6 +15,8 @@ public sealed class PempDbContext(DbContextOptions<PempDbContext> options) : DbC
 
     protected override void OnModelCreating(ModelBuilder b)
     {
+        base.OnModelCreating(b); // Identity tables (AspNetUsers, etc.)
+
         var eng = b.Entity<EngagementRecord>();
         eng.HasKey(e => e.Id);
         eng.HasIndex(e => e.Reference).IsUnique();

@@ -1,0 +1,158 @@
+@page "/Account/EnableAuthenticator"
+@layout AuthLayout
+@attribute [Authorize]
+
+@using System.Globalization
+@using System.Text
+@using System.Text.Encodings.Web
+@using QRCoder
+@inject UserManager<ApplicationUser> UserManager
+@inject IdentityUserAccessor UserAccessor
+@inject IdentityRedirectManager RedirectManager
+@inject ILogger<EnableAuthenticator> Logger
+
+<PageTitle>Set up authenticator · PEMP</PageTitle>
+
+<div class="auth-head">
+    <h1>Set up two-factor</h1>
+    <p class="muted">PEMP holds sensitive data — every account is protected with an authenticator app.</p>
+</div>
+
+<StatusMessage Message="@message" />
+
+<ol class="auth-steps">
+    <li>
+        Install an authenticator app — Microsoft Authenticator, Google Authenticator, or 1Password.
+    </li>
+    <li>
+        Scan this QR code with your authenticator app:
+        <figure class="qr-figure">
+            <div class="qr-frame" role="img" aria-label="Authenticator setup QR code">@qrSvg</div>
+            <figcaption class="muted">Point your authenticator app's camera here</figcaption>
+        </figure>
+        <div class="qr-divider"><span>or enter the key by hand</span></div>
+        <div class="auth-key">
+            <span class="muted">Setup key</span>
+            <code class="mono">@sharedKey</code>
+        </div>
+        <a class="auth-otp" href="@authenticatorUri">
+            <span class="auth-otp-icon">⧉</span>
+            <span>
+                <b>Open in authenticator app</b>
+                <span class="muted">On mobile, tap to add it directly — no scanning needed</span>
+            </span>
+        </a>
+        <details class="auth-uri">
+            <summary class="muted">Show otpauth:// link</summary>
+            <code class="mono">@authenticatorUri</code>
+        </details>
+    </li>
+    <li>
+        Enter the 6-digit code the app shows to finish:
+        <EditForm Model="Input" FormName="send-code" OnValidSubmit="OnValidSubmitAsync" method="post">
+            <DataAnnotationsValidator />
+            <div class="auth-codrow">
+                <InputText id="code" @bind-Value="Input.Code" class="inp auth-inp mono"
+                           autocomplete="off" inputmode="numeric" placeholder="123 456" />
+                <button type="submit" class="btn primary">Verify &amp; enable</button>
+            </div>
+            <ValidationMessage For="() => Input.Code" class="auth-val" />
+        </EditForm>
+    </li>
+</ol>
+
+@code {
+    private const string AuthenticatorUriFormat =
+        "otpauth://totp/{0}:{1}?secret={2}&issuer={0}&digits=6";
+
+    private ApplicationUser user = default!;
+    private string? message;
+    private string sharedKey = "";
+    private string authenticatorUri = "";
+    private MarkupString qrSvg;
+
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+
+#pragma warning disable CS8618 // bound from the form / initialised in OnInitializedAsync
+    [SupplyParameterFromForm] private InputModel Input { get; set; }
+#pragma warning restore CS8618
+
+    [SupplyParameterFromQuery] private string? ReturnUrl { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Input ??= new();
+        user = await UserAccessor.GetRequiredUserAsync(HttpContext);
+        await LoadSharedKeyAndQrCodeUriAsync();
+    }
+
+    private async Task OnValidSubmitAsync()
+    {
+        var verificationCode = Input.Code.Replace(" ", string.Empty).Replace("-", string.Empty);
+
+        var isTokenValid = await UserManager.VerifyTwoFactorTokenAsync(
+            user, UserManager.Options.Tokens.AuthenticatorTokenProvider, verificationCode);
+
+        if (!isTokenValid)
+        {
+            message = "Error: Verification code is invalid.";
+            await LoadSharedKeyAndQrCodeUriAsync();
+            return;
+        }
+
+        await UserManager.SetTwoFactorEnabledAsync(user, true);
+        Logger.LogInformation("User enabled authenticator 2FA.");
+        RedirectManager.RedirectToWithStatus(
+            ReturnUrl ?? "dashboard", "Two-factor authentication is now active.", HttpContext);
+    }
+
+    private async Task LoadSharedKeyAndQrCodeUriAsync()
+    {
+        var unformattedKey = await UserManager.GetAuthenticatorKeyAsync(user);
+        if (string.IsNullOrEmpty(unformattedKey))
+        {
+            await UserManager.ResetAuthenticatorKeyAsync(user);
+            unformattedKey = await UserManager.GetAuthenticatorKeyAsync(user);
+        }
+
+        sharedKey = FormatKey(unformattedKey!);
+        var email = await UserManager.GetEmailAsync(user);
+        authenticatorUri = string.Format(
+            CultureInfo.InvariantCulture,
+            AuthenticatorUriFormat,
+            UrlEncoder.Default.Encode("PEMP"),
+            UrlEncoder.Default.Encode(email!),
+            unformattedKey);
+
+        // Render a real, scannable QR from the otpauth:// URI as inline SVG (no JS, works in static SSR).
+        // High dark/light contrast (modules on white) so it scans cleanly regardless of theme.
+        using var generator = new QRCodeGenerator();
+        var data = generator.CreateQrCode(authenticatorUri, QRCodeGenerator.ECCLevel.Q);
+        var svg = new SvgQRCode(data).GetGraphic(4, "#0b0f1a", "#ffffff");
+        qrSvg = new MarkupString(svg);
+    }
+
+    private static string FormatKey(string unformattedKey)
+    {
+        var result = new StringBuilder();
+        int currentPosition = 0;
+        while (currentPosition + 4 < unformattedKey.Length)
+        {
+            result.Append(unformattedKey.AsSpan(currentPosition, 4)).Append(' ');
+            currentPosition += 4;
+        }
+        if (currentPosition < unformattedKey.Length)
+        {
+            result.Append(unformattedKey.AsSpan(currentPosition));
+        }
+        return result.ToString().ToUpperInvariant();
+    }
+
+    private sealed class InputModel
+    {
+        [Required]
+        [StringLength(7, MinimumLength = 6)]
+        [Display(Name = "Verification code")]
+        public string Code { get; set; } = "";
+    }
+}

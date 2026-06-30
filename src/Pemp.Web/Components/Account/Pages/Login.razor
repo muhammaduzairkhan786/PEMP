@@ -1,0 +1,111 @@
+@page "/Account/Login"
+@layout AuthLayout
+@attribute [AllowAnonymous]
+
+@inject SignInManager<ApplicationUser> SignInManager
+@inject UserManager<ApplicationUser> UserManager
+@inject ILogger<Login> Logger
+@inject NavigationManager NavigationManager
+@inject IdentityRedirectManager RedirectManager
+
+<PageTitle>Sign in · PEMP</PageTitle>
+
+<div class="auth-head">
+    <h1>Sign in</h1>
+    <p class="muted">Use your PEMP account, then confirm with your authenticator app.</p>
+</div>
+
+<StatusMessage Message="@errorMessage" />
+
+<EditForm Model="Input" method="post" OnValidSubmit="LoginUser" FormName="login">
+    <DataAnnotationsValidator />
+
+    <label class="auth-label" for="email">Email</label>
+    <InputText id="email" @bind-Value="Input.Email" class="inp auth-inp" autocomplete="username"
+               aria-required="true" placeholder="you@pemp.dev" />
+    <ValidationMessage For="() => Input.Email" class="auth-val" />
+
+    <label class="auth-label" for="password">Password</label>
+    <InputText id="password" type="password" @bind-Value="Input.Password" class="inp auth-inp"
+               autocomplete="current-password" aria-required="true" placeholder="Password" />
+    <ValidationMessage For="() => Input.Password" class="auth-val" />
+
+    <label class="auth-check">
+        <InputCheckbox @bind-Value="Input.RememberMe" />
+        <span>Remember me on this device</span>
+    </label>
+
+    <button type="submit" class="btn primary auth-submit">Sign in</button>
+</EditForm>
+
+<div class="auth-hint">
+    <span class="muted">Dev accounts</span>
+    <code>acme@pemp.dev · dm@pemp.dev · tester@pemp.dev · stakeholder@pemp.dev · admin@pemp.dev</code>
+    <span class="muted">Password <code>Pemp!2026</code> — you'll enrol an authenticator on first sign-in.</span>
+</div>
+
+@code {
+    private string? errorMessage;
+
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+
+#pragma warning disable CS8618 // bound from the form / initialised in OnInitializedAsync
+    [SupplyParameterFromForm] private InputModel Input { get; set; }
+#pragma warning restore CS8618
+
+    [SupplyParameterFromQuery] private string? ReturnUrl { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Input ??= new();
+        if (HttpMethods.IsGet(HttpContext.Request.Method))
+        {
+            // Clear any stale external cookie to ensure a clean login process.
+            await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
+        }
+    }
+
+    private async Task LoginUser()
+    {
+        var result = await SignInManager.PasswordSignInAsync(
+            Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false);
+
+        if (result.Succeeded)
+        {
+            Logger.LogInformation("User logged in.");
+            var user = await UserManager.FindByEmailAsync(Input.Email);
+            // First sign-in: no authenticator yet → force enrolment before reaching the app.
+            if (user is not null && !await UserManager.GetTwoFactorEnabledAsync(user))
+            {
+                RedirectManager.RedirectTo("Account/EnableAuthenticator",
+                    new() { ["returnUrl"] = ReturnUrl });
+            }
+            RedirectManager.RedirectTo(ReturnUrl ?? "dashboard");
+        }
+        else if (result.RequiresTwoFactor)
+        {
+            RedirectManager.RedirectTo("Account/LoginWith2fa",
+                new() { ["returnUrl"] = ReturnUrl, ["rememberMe"] = Input.RememberMe });
+        }
+        else if (result.IsLockedOut)
+        {
+            errorMessage = "Error: This account is locked out.";
+        }
+        else
+        {
+            errorMessage = "Error: Invalid email or password.";
+        }
+    }
+
+    private sealed class InputModel
+    {
+        [Required, EmailAddress]
+        public string Email { get; set; } = "";
+
+        [Required, DataType(DataType.Password)]
+        public string Password { get; set; } = "";
+
+        [Display(Name = "Remember me?")]
+        public bool RememberMe { get; set; }
+    }
+}

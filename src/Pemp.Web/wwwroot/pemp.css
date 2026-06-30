@@ -56,6 +56,8 @@ h1.title{font-size:var(--text-2xl);font-weight:750;margin:4px 0 2px;letter-spaci
 .node.done .bead{background:var(--state-done);border-color:var(--state-done);color:var(--canvas)}
 .node.current .bead{background:var(--brand);border-color:var(--brand-glow);box-shadow:var(--brand-glow-sh)}
 .node.future .bead{opacity:.5}
+.node.locked .bead{background:var(--surface-raised);border-color:var(--state-locked);color:var(--state-locked);opacity:1}
+.node.locked .lbl{color:var(--state-locked)}
 .node .lbl{font-size:10.5px;color:var(--ink-muted);text-align:center;max-width:84px}
 .node.current .lbl,.node.done .lbl{color:var(--ink)}
 .node .wk{font-size:9px;color:var(--ink-muted);opacity:.75;margin-top:1px}
@@ -156,10 +158,111 @@ textarea.inp{resize:vertical}
 .sevchip::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
 .sevchip.critical{color:var(--sev-critical)}.sevchip.high{color:var(--sev-high)}.sevchip.medium{color:var(--sev-medium)}.sevchip.low{color:var(--sev-low)}.sevchip.info{color:var(--sev-info)}
 .sevchip.critical,.sevchip.high,.sevchip.medium,.sevchip.low{background:color-mix(in srgb,currentColor 13%,transparent)}
-.pill.open{color:var(--state-blocked)}.pill.remediated{color:var(--brand-glow)}.pill.retestpending{color:var(--state-waiting)}.pill.closed{color:var(--state-done)}.pill.acceptedrisk{color:var(--ink-muted)}
-.pill.open,.pill.remediated,.pill.retestpending,.pill.closed{background:color-mix(in srgb,currentColor 13%,transparent);border-color:color-mix(in srgb,currentColor 32%,transparent)}
+.pill.open{color:var(--state-blocked)}.pill.remediated{color:var(--state-done)}.pill.retestpending{color:var(--state-waiting)}.pill.closed{color:var(--state-done)}.pill.acceptedrisk{color:var(--ink-muted)}
+.pill.open,.pill.remediated,.pill.retestpending,.pill.closed,.pill.acceptedrisk{background:color-mix(in srgb,currentColor 13%,transparent);border-color:color-mix(in srgb,currentColor 32%,transparent)}
 
 /* criticality chip — colour on status only (NFR-USA-03) */
 .chip.crit-high{color:var(--sev-high);border-color:color-mix(in srgb,var(--sev-high) 45%,transparent);background:color-mix(in srgb,var(--sev-high) 12%,transparent)}
 .chip.crit-medium{color:var(--sev-medium);border-color:color-mix(in srgb,var(--sev-medium) 45%,transparent);background:color-mix(in srgb,var(--sev-medium) 12%,transparent)}
 .chip.crit-low{color:var(--state-done);border-color:color-mix(in srgb,var(--state-done) 40%,transparent);background:color-mix(in srgb,var(--state-done) 12%,transparent)}
+
+/* responsive: tablet/phone graceful degradation (NFR-USA-04, §15) */
+@media (max-width:760px){
+  .shell{grid-template-columns:1fr;grid-template-rows:auto auto auto 1fr;grid-template-areas:"brand" "top" "nav" "main"}
+  .brand{border-right:none}
+  nav.side{flex-direction:row;overflow-x:auto;overflow-y:hidden;border-right:none;border-bottom:1px solid var(--border);gap:6px}
+  nav.side .foot{display:none}
+  main.content{padding:var(--space-6) var(--space-4)}
+  .tiles{grid-template-columns:repeat(2,1fr)}
+  .modal{width:94vw}
+  .inp{max-width:100%}
+}
+
+/* skeleton loaders */
+.skel{background:linear-gradient(90deg,var(--surface-raised) 25%,color-mix(in srgb,var(--ink) 9%,var(--surface-raised)) 37%,var(--surface-raised) 63%);
+  background-size:400% 100%;border-radius:var(--radius-md);animation:shimmer 1.4s ease infinite;display:block}
+.skel-row{height:56px;margin-bottom:var(--space-2)}
+.skel-line{height:14px;margin:10px 0;border-radius:var(--radius-sm)}
+@keyframes shimmer{0%{background-position:100% 0}100%{background-position:-100% 0}}
+@media (prefers-reduced-motion: reduce){.skel{animation:none}}
+
+/* ============================================================================
+   Auth — sign-in, 2FA, authenticator enrolment (static SSR pages, AuthLayout)
+   ============================================================================ */
+.auth-shell{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--space-4);padding:var(--space-8) var(--space-4)}
+.auth-card{width:420px;max-width:94vw;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--elev-modal);padding:var(--space-8)}
+.auth-brand{display:flex;align-items:center;gap:10px;margin-bottom:var(--space-6)}
+.auth-brand .logo{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--brand),var(--brand-glow));box-shadow:var(--brand-glow-sh);display:grid;place-items:center;font-weight:800;color:var(--brand-ink)}
+.auth-brand-name{font-size:var(--text-lg);font-weight:750;letter-spacing:.3px}
+.auth-head h1{font-size:var(--text-2xl);font-weight:750;margin:0 0 4px;letter-spacing:-.01em}
+.auth-head p{margin:0 0 var(--space-6)}
+.auth-label{display:block;font-size:var(--text-sm);font-weight:600;margin:var(--space-4) 0 6px}
+.auth-inp{max-width:none}
+.auth-val{display:block;color:var(--state-blocked);font-size:var(--text-xs);margin-top:5px}
+.auth-check{display:flex;align-items:center;gap:8px;font-size:var(--text-sm);color:var(--ink-muted);margin:var(--space-4) 0}
+.auth-submit{width:100%;margin-top:var(--space-4);padding:11px}
+.auth-hint{display:flex;flex-direction:column;gap:4px;margin-top:var(--space-6);padding-top:var(--space-4);border-top:1px solid var(--border);font-size:var(--text-xs)}
+.auth-hint code{font-family:var(--font-mono);color:var(--ink);word-break:break-all}
+.auth-foot{font-size:var(--text-xs)}
+
+/* authenticator enrolment */
+.auth-steps{margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:var(--space-4);font-size:var(--text-sm)}
+.auth-steps li{padding-left:4px}
+.auth-key{display:flex;flex-direction:column;gap:4px;margin:var(--space-3) 0;padding:var(--space-3);background:var(--surface-raised);border:1px solid var(--border-strong);border-radius:var(--radius-md)}
+.auth-key code{font-size:var(--text-lg);letter-spacing:2px}
+.auth-otp{display:flex;align-items:center;gap:12px;padding:11px var(--space-4);border:1px solid color-mix(in srgb,var(--brand) 36%,var(--border-strong));border-radius:var(--radius-md);background:linear-gradient(180deg,color-mix(in srgb,var(--brand) 7%,var(--surface)),var(--surface));margin:var(--space-3) 0}
+.auth-otp-icon{font-size:1.2rem}
+.auth-otp b{display:block}
+.auth-otp .muted{font-size:var(--text-xs)}
+.auth-uri{margin-top:var(--space-2)}
+.auth-uri summary{cursor:pointer;font-size:var(--text-xs)}
+.auth-uri code{display:block;margin-top:6px;font-size:11px;word-break:break-all;color:var(--ink-muted)}
+.auth-codrow{display:flex;gap:var(--space-3);margin-top:var(--space-3)}
+.auth-codrow .auth-inp{flex:1}
+
+/* authenticator QR — real scannable code, framed on white for contrast */
+.qr-figure{margin:var(--space-3) 0 0;display:flex;flex-direction:column;align-items:center;gap:var(--space-2)}
+.qr-frame{background:#fff;border:1px solid var(--border-strong);border-radius:var(--radius-md);padding:var(--space-3);box-shadow:var(--elev-raised);line-height:0}
+.qr-frame svg{display:block;width:184px;height:184px}
+.qr-figure figcaption{font-size:var(--text-xs)}
+.qr-divider{display:flex;align-items:center;gap:var(--space-3);margin:var(--space-4) 0 var(--space-2);color:var(--ink-muted);font-size:var(--text-xs)}
+.qr-divider::before,.qr-divider::after{content:"";flex:1;height:1px;background:var(--border)}
+
+/* ============================================================================
+   Landing / cover (anonymous, EmptyLayout)
+   ============================================================================ */
+.landing{max-width:1080px;margin:0 auto;padding:var(--space-6) var(--space-6) var(--space-12);min-height:100vh;display:flex;flex-direction:column}
+.landing-nav{display:flex;align-items:center;justify-content:space-between;padding:var(--space-2) 0 var(--space-12)}
+.landing-brand{display:flex;align-items:center;gap:10px;font-size:var(--text-lg);font-weight:750}
+.landing-brand .logo{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--brand),var(--brand-glow));box-shadow:var(--brand-glow-sh);display:grid;place-items:center;font-weight:800;color:var(--brand-ink)}
+.landing-hero{max-width:760px}
+.landing-eyebrow{font-size:var(--text-xs);letter-spacing:.12em;text-transform:uppercase;color:var(--brand-glow)}
+.landing-hero h1{font-size:clamp(2rem,5vw,3.4rem);line-height:1.05;font-weight:800;letter-spacing:-.02em;margin:var(--space-4) 0 var(--space-4)}
+.landing-lede{font-size:var(--text-lg);color:var(--ink-muted);max-width:640px;margin-bottom:var(--space-6)}
+.landing-cta{display:flex;align-items:center;gap:var(--space-4);flex-wrap:wrap}
+.btn.lg{padding:11px 24px;font-size:var(--text-base)}
+/* landing signature spine — the product's enforcement story, as ambient motif */
+.landing-spine{display:flex;align-items:center;gap:0;margin-top:var(--space-12);padding:var(--space-2) 0;overflow-x:auto}
+.landing-spine .ls-node{display:flex;flex-direction:column;align-items:center;gap:8px;flex:none}
+.landing-spine .ls-bead{width:16px;height:16px;border-radius:50%;border:2px solid var(--border-strong);background:var(--canvas);display:grid;place-items:center;font-size:9px}
+.landing-spine .ls-node.done .ls-bead{background:var(--state-done);border-color:var(--state-done)}
+.landing-spine .ls-node.gate .ls-bead{background:var(--brand);border-color:var(--brand-glow);box-shadow:var(--brand-glow-sh)}
+.landing-spine .ls-lbl{font-size:var(--text-xs);color:var(--ink-muted);white-space:nowrap}
+.landing-spine .ls-node.gate .ls-lbl{color:var(--ink)}
+.landing-spine .ls-conn{height:2px;flex:1;min-width:24px;background:var(--border-strong);margin-bottom:24px}
+.landing-spine .ls-conn.done{background:var(--state-done)}
+
+.landing-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:var(--space-4);margin:var(--space-12) 0 auto}
+.landing-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-6);transition:all var(--dur-fast)}
+.landing-card:hover{transform:translateY(-2px);border-color:var(--border-strong);box-shadow:var(--elev-raised)}
+.landing-ic{font-size:1.4rem;margin-bottom:var(--space-3)}
+.landing-card h3{font-size:var(--text-base);font-weight:700;margin:0 0 6px}
+.landing-card p{margin:0;font-size:var(--text-sm)}
+.landing-foot{margin-top:var(--space-12);padding-top:var(--space-6);border-top:1px solid var(--border);font-size:var(--text-xs)}
+
+/* topbar identity + sign-out (app shell) */
+.whoami{display:flex;flex-direction:column;align-items:flex-end;line-height:1.2}
+.whoami-name{font-size:var(--text-sm);font-weight:650}
+.whoami-role{font-size:var(--text-xs);color:var(--ink-muted)}
+.logout-form{margin:0}
+.logout-btn{padding:6px 14px}
