@@ -2,6 +2,8 @@
 @attribute [Authorize]
 @inject EngagementStore Store
 @inject DemoSession Session
+@inject IAssessmentDocImporter Importer
+@inject ILogger<Assessment> Logger
 @inject NavigationManager Nav
 <PageTitle>Assessment · PEMP</PageTitle>
 
@@ -19,7 +21,10 @@ else if (_rec is null)
 }
 else
 {
-    var canComplete = _rec.CurrentStage == Stage.Scoping && (Session.Role == PempRoles.Tester || Session.Role == PempRoles.Stakeholder);
+    var canEdit = _rec.CurrentStage == Stage.Scoping
+        && (Session.Role == PempRoles.Tester || Session.Role == PempRoles.Stakeholder || Session.Role == PempRoles.AcmeOfficer);
+    var canComplete = _rec.CurrentStage == Stage.Scoping
+        && (Session.Role == PempRoles.Tester || Session.Role == PempRoles.Stakeholder);
     <div class="wrap">
         <div class="eyebrow"><a href="@($"engagement/{Id}")">← @_rec.AppName</a></div>
         <h1 class="title">Assessment &amp; prerequisites</h1>
@@ -30,8 +35,34 @@ else
             <div class="banner @(_done.Value ? "ok" : "err")">@(_done.Value ? "✓ Assessment marked complete — Scoping advances to SoW." : "⛔ " + _err)</div>
         }
 
-        <AssessmentForm EngagementId="Id" Answers="_answers"
-                        ReadOnly="@(_rec.CurrentStage != Stage.Scoping || !(Session.Role == PempRoles.Stakeholder || Session.Role == PempRoles.Tester))" />
+        @if (canEdit)
+        {
+            <div class="asm-import card">
+                <div class="asm-import-head">
+                    <div>
+                        <b>Start from a filled Word form</b>
+                        <span class="muted">Business teams provide a half-filled .docx — upload it to auto-fill answers, then review &amp; edit.<Srs Sep>FR-SCO-01</Srs></span>
+                    </div>
+                    <a class="btn ghost" href="assessment/template.docx" target="_blank" rel="noopener">⭳ Download template</a>
+                </div>
+                <label class="asm-drop">
+                    <InputFile OnChange="OnUpload" accept=".docx" />
+                    <span class="asm-drop-cta">⇧ Upload a filled assessment (.docx)</span>
+                    <span class="muted">Word .docx only · max 5 MB · parsed in-memory, not stored</span>
+                </label>
+                @if (_importMsg is not null)
+                {
+                    <div class="banner ok" role="status">⇲ @_importMsg</div>
+                }
+                @if (_importErr is not null)
+                {
+                    <div class="banner err" role="alert">⛔ @_importErr</div>
+                }
+            </div>
+        }
+
+        <AssessmentForm EngagementId="Id" Answers="_answers" ImportedIds="_importedIds"
+                        ReadOnly="@(!canEdit)" OnChanged="StateHasChanged" />
 
         @if (canComplete)
         {
@@ -52,6 +83,9 @@ else
     [Parameter] public Guid Id { get; set; }
     EngagementRecord? _rec;
     Dictionary<string, string> _answers = new();
+    HashSet<string>? _importedIds;
+    string? _importMsg;
+    string? _importErr;
     bool? _done;
     string? _err;
 
@@ -67,6 +101,43 @@ else
         _rec = await Store.GetScopedAsync(Id, Session.AppScope, Session.TesterScope, Session.Role); // anti-BOLA
         if (_rec is not null) _answers = await Store.AssessmentAnswersAsync(Id);
         _loaded = true;
+    }
+
+    // Upload → validate (server-side) → parse (untrusted DATA) → persist each match via the scoped +
+    // audited store path. The bytes are parsed in-memory and discarded; we keep only the answers + an
+    // import audit entry. Any corrupt / non-docx upload is handled gracefully (no 500).
+    async Task OnUpload(InputFileChangeEventArgs e)
+    {
+        _importMsg = null; _importErr = null; _importedIds = null;
+        var file = e.File;
+        var err = AssessmentUpload.Validate(file.Name, file.ContentType, file.Size);
+        if (err is not null) { _importErr = err; return; }
+        try
+        {
+            using var ms = new MemoryStream();
+            await file.OpenReadStream(AssessmentUpload.MaxBytes).CopyToAsync(ms);
+            ms.Position = 0;
+            var result = Importer.Parse(ms);
+            if (result.Matched.Count == 0)
+            {
+                _importErr = $"No assessment fields could be read from that file. Use Download template for the structured form.";
+                return;
+            }
+            await Store.ImportAssessmentAsync(Id, result.Matched, file.Name, Session.Caller);
+            _answers = await Store.AssessmentAnswersAsync(Id);
+            _importedIds = result.Matched.Select(m => m.QuestionId).ToHashSet();
+            _importMsg = $"Imported {result.Matched.Count} of {result.TotalQuestions} fields from \"{file.Name}\" — review the highlighted ones.";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            _importErr = "You're not authorized to edit this assessment.";
+        }
+        catch (Exception ex)
+        {
+            // Never surface internals; never log file bytes. WHO/WHAT only.
+            Logger.LogWarning(ex, "Assessment import failed for engagement {EngagementId}", Id);
+            _importErr = "That file couldn't be read as a Word .docx. Re-export it from the template and try again.";
+        }
     }
 
     async Task Complete()
