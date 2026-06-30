@@ -14,6 +14,15 @@ public sealed class PempDbContext(DbContextOptions<PempDbContext> options) : Ide
     public DbSet<EvidenceRecord> Evidence => Set<EvidenceRecord>();
     public DbSet<TestCredentialRecord> TestCredentials => Set<TestCredentialRecord>();
 
+    // Append-only enforcement for the audit log at the data layer (SEC-AUD-01). Registered here
+    // (rather than only in DI) so EVERY context — app, seeder, and tests — gets it, regardless of
+    // how its options were built.
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        base.OnConfiguring(optionsBuilder);
+        optionsBuilder.AddInterceptors(new AuditAppendOnlyInterceptor());
+    }
+
     protected override void OnModelCreating(ModelBuilder b)
     {
         base.OnModelCreating(b); // Identity tables (AspNetUsers, etc.)

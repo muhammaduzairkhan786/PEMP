@@ -1,9 +1,12 @@
 @page "/engagement/{Id:guid}"
 @attribute [Authorize]
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.Extensions.DependencyInjection
 @inject EngagementStore Store
 @inject DemoSession Session
 @inject NavigationManager Nav
 @inject IConfiguration Configuration
+@inject IServiceProvider Services
 <PageTitle>Engagement · PEMP</PageTitle>
 
 @if (!_loaded)
@@ -48,10 +51,23 @@ else
                     <p class="muted" style="margin-bottom:12px">@ModalIntro()</p>
                     <ul class="attest">@foreach (var l in ModalLines()){<li>@l</li>}</ul>
                     <div class="chainline"><span class="tick">🔗</span> Creates an immutable, hash-chained record · <span class="srs">SEC-AUD-01</span></div>
-                    <div class="reauthnote">🔐 @(EntraConfigured ? "Re-authenticate via Entra MFA before it commits" : "Confirm this privileged action before it commits") · <span class="srs">SEC-IAM-04</span></div>
+                    @if (EntraConfigured)
+                    {
+                        <div class="reauthnote">🔐 Re-authenticate via Entra MFA before it commits · <span class="srs">SEC-IAM-04</span></div>
+                    }
+                    else
+                    {
+                        <div class="reauthnote">🔐 Enter your current authenticator (TOTP) code to confirm this privileged action · <span class="srs">SEC-IAM-04</span></div>
+                        <input class="inp mono" style="max-width:200px;margin-top:8px" @bind="_totp" @bind:event="oninput"
+                               inputmode="numeric" autocomplete="one-time-code" placeholder="123 456" aria-label="Authenticator code" />
+                    }
+                    @if (_modalError is not null)
+                    {
+                        <div class="banner err" style="margin-top:8px">⛔ @_modalError</div>
+                    }
                     <div class="actions">
                         <button class="btn ghost" @onclick="Cancel">Cancel</button>
-                        <button class="btn primary" @onclick="() => Run(_reauthFor, true)">@(EntraConfigured ? "Confirm via Entra MFA ▶" : "Confirm ▶")</button>
+                        <button class="btn primary" @onclick="ConfirmReauth">@(EntraConfigured ? "Confirm via Entra MFA ▶" : "Verify & confirm ▶")</button>
                     </div>
                 </div>
             </div>
@@ -100,8 +116,15 @@ else
                 }
                 else if (next.Kind == ActionKind.PeerReview)
                 {
-                    <button class="btn" @onclick="() => OnAct(ActionKind.PeerReviewReject)">Return to draft</button>
-                    <button class="btn primary" @onclick="() => OnAct(ActionKind.PeerReview)">Pass QA ▶</button>
+                    @if (IsAuthor)
+                    {
+                        <p class="muted">QA peer review needs an <b>independent reviewer</b> — the report's author can't pass their own QA (FR-REP-02). Another tester must sign in to review.</p>
+                    }
+                    else
+                    {
+                        <button class="btn" @onclick="() => OnAct(ActionKind.PeerReviewReject)">Return to draft</button>
+                        <button class="btn primary" @onclick="() => OnAct(ActionKind.PeerReview)">Pass QA ▶</button>
+                    }
                 }
                 else
                 {
@@ -174,10 +197,17 @@ else
 @code {
     [Parameter] public Guid Id { get; set; }
 
-    // Honest gate copy: only the Entra (production) path performs a real MFA re-prompt. On the
-    // local Identity path there is no Entra, so the ceremony confirms intent without claiming an
-    // MFA step that doesn't happen. (A fresh-TOTP re-prompt is out of scope here.)
+    // Re-auth gate (SEC-IAM-04). On the LOCAL Identity path the ceremony is REAL: the user must
+    // enter a fresh authenticator (TOTP) code, verified server-side before the privileged action
+    // runs (see ConfirmReauth/VerifyTotpAsync). On the Entra path real step-up is an acr concern
+    // handled by Conditional Access in prod, so that path keeps the existing confirm flag.
     bool EntraConfigured => !string.IsNullOrWhiteSpace(Configuration["AzureAd:ClientId"]);
+
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    // Fresh-TOTP entry for the local re-auth gate, and any inline error from a bad/blank code.
+    string _totp = "";
+    string? _modalError;
 
     EngagementRecord? _rec;
     List<AuditEntryRow> _audit = new();
@@ -198,9 +228,11 @@ else
 
     static string TesterName(Guid id) => Array.Find(DemoSeeder.Testers, t => t.Id == id)?.Name ?? "A. Khan";
 
-    // QA peer reviewer must differ from the assigned tester (no self-review, FR-REP-02).
-    Guid Reviewer() => _rec!.AssignedTesterId == DemoSeeder.TesterPatel ? DemoSeeder.TesterKhan : DemoSeeder.TesterPatel;
-    string ReviewerName() => Reviewer() == DemoSeeder.TesterKhan ? "A. Khan" : "R. Patel";
+    // QA peer review records the REAL acting user as the reviewer (no substitution). Map their
+    // display name to a tester id so the domain's no-self-review guard (FR-REP-02) compares the
+    // actual reviewer against the author; if the author is the only tester present, it blocks.
+    Guid ActingTesterId() => Array.Find(DemoSeeder.Testers, t => t.Name == Session.Actor)?.Id ?? Guid.Empty;
+    bool IsAuthor => _rec is not null && _rec.AssignedTesterName == Session.Actor;
 
     Guid _loadedId;
     bool _loaded;
@@ -218,14 +250,21 @@ else
 
     async Task Load()
     {
-        _rec = await Store.GetScopedAsync(Id, Session.AppScope, Session.TesterScope); // anti-BOLA
+        // anti-BOLA + fail-closed scope: a scoped role with no concrete scope reaches nothing (SEC-AZN/SEC-INS-01).
+        _rec = await Store.GetScopedAsync(Id, Session.AppScope, Session.TesterScope, Session.Role);
         if (_rec is not null)
         {
-            _audit = await Store.AuditForAsync(Id);
+            // Tamper-evidence is checked on READ and surfaced automatically (SEC-AUD-01), not only on a button.
+            var (rows, intact) = await Store.AuditForVerifiedAsync(Id);
+            _audit = rows;
+            _chainOk = intact;
             _findings = await Store.FindingsForAsync(Id);
             _access = await Store.AccessReqsForAsync(Id);
             _checklist = await Store.ChecklistDoneAsync(Id);
-            _credentials = await Store.CredentialsForAsync(Id);
+            // Least exposure (SEC-CRD): only fetch test credentials for the assigned tester who may view them.
+            _credentials = (Session.Role == "Tester" && _rec.AssignedTesterName == Session.Actor)
+                ? await Store.CredentialsForAsync(Id)
+                : new();
             if (_rec.CurrentStage == Stage.Assignment)
                 _capacity = await Store.ActiveAssignmentCountsAsync(); // capacity board for the picker
         }
@@ -240,8 +279,46 @@ else
     async Task OnAct(ActionKind k)
     {
         _error = _ok = null; _chainOk = null;
-        if (Workflow.NeedsReauth(k)) { _reauthFor = k; _focusModal = true; } // show the re-auth confirm step
+        if (Workflow.NeedsReauth(k))
+        {
+            _reauthFor = k; _focusModal = true; _totp = ""; _modalError = null; // open the re-auth ceremony
+        }
         else await Run(k, false);                          // await so the UI re-renders (async DB providers)
+    }
+
+    // Confirm the privileged action from the re-auth modal. Local path: a fresh authenticator TOTP
+    // code is verified server-side BEFORE the action runs; a wrong/blank code blocks it and changes
+    // nothing. Entra path: keeps the existing confirm flag (real step-up is enforced in prod).
+    async Task ConfirmReauth()
+    {
+        var action = _reauthFor;
+        if (EntraConfigured) { await Run(action, true); return; }
+
+        _modalError = null;
+        if (await VerifyTotpAsync(_totp))
+        {
+            _totp = "";
+            await Run(action, true);
+        }
+        else
+        {
+            _modalError = "That authenticator code wasn't valid. Re-enter the current 6-digit code from your app.";
+        }
+    }
+
+    // Verify a fresh TOTP against the signed-in user's authenticator key (local Identity path only).
+    // The code is never logged. Returns false on any missing dependency so the action stays blocked.
+    async Task<bool> VerifyTotpAsync(string code)
+    {
+        if (string.IsNullOrWhiteSpace(code) || AuthState is null) return false;
+        var userManager = Services.GetService<UserManager<ApplicationUser>>();
+        if (userManager is null) return false;
+        var principal = (await AuthState).User;
+        var user = await userManager.GetUserAsync(principal);
+        if (user is null) return false;
+        var normalized = code.Replace(" ", string.Empty).Replace("-", string.Empty);
+        return await userManager.VerifyTwoFactorTokenAsync(
+            user, userManager.Options.Tokens.AuthenticatorTokenProvider, normalized);
     }
 
     // Move focus into the gate-ceremony dialog when it opens (accessibility).
@@ -259,7 +336,7 @@ else
         if (e.Key == "Escape") Cancel();
     }
 
-    void Cancel() => _reauthFor = ActionKind.None;
+    void Cancel() { _reauthFor = ActionKind.None; _totp = ""; _modalError = null; }
 
     string ModalTitle() => _reauthFor switch
     {
@@ -299,10 +376,10 @@ else
             ActionKind.SendIr           => await Store.ExecuteAsync(Id, e => e.SendIrNotice(actor)),
             ActionKind.EndTest          => await Store.ExecuteAsync(Id, e => e.EndTest(actor)),
             ActionKind.GenerateDraft    => await Store.ExecuteAsync(Id, e => e.GenerateDraft(actor)),
-            ActionKind.PeerReview       => await Store.ExecuteAsync(Id, e => e.PeerReview(Reviewer(), true, ReviewerName())),
-            ActionKind.PeerReviewReject => await Store.ExecuteAsync(Id, e => e.PeerReview(Reviewer(), false, ReviewerName())),
+            ActionKind.PeerReview       => await Store.ExecuteAsync(Id, e => e.PeerReview(ActingTesterId(), true, actor)),
+            ActionKind.PeerReviewReject => await Store.ExecuteAsync(Id, e => e.PeerReview(ActingTesterId(), false, actor)),
             ActionKind.ReleaseFinal     => await Store.ExecuteAsync(Id, e => e.ReleaseFinal(actor, reauth)),
-            ActionKind.CompleteRetest   => await Store.ExecuteAsync(Id, e => e.CompleteRetest(actor)),
+            ActionKind.CompleteRetest   => await Store.CompleteRetestAsync(Id, actor),
             _ => Result.Fail("Unsupported action."),
         };
 

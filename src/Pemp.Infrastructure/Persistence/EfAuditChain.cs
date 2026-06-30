@@ -9,7 +9,7 @@ namespace Pemp.Infrastructure.Persistence;
 /// appends in order, adding rows to the context. They persist when the caller saves —
 /// keeping the append atomic with the engagement state change it records.
 /// </summary>
-public sealed class EfAuditChain(PempDbContext db) : IAuditChain
+public sealed class EfAuditChain(PempDbContext db, byte[] key) : IAuditChain
 {
     private bool _init;
     private long _seq;
@@ -26,7 +26,7 @@ public sealed class EfAuditChain(PempDbContext db) : IAuditChain
     public AuditEntry Append(Guid engagementId, string actor, string action, string before, string after, string source, DateTimeOffset at)
     {
         EnsureInit();
-        var entry = HashChain.Next(_seq + 1, _prev, engagementId, actor, action, before, after, source, at);
+        var entry = HashChain.Next(_seq + 1, _prev, engagementId, actor, action, before, after, source, at, key);
         _seq = entry.Sequence;
         _prev = entry.Hash;
         db.AuditEntries.Add(AuditEntryRow.From(entry));
@@ -40,7 +40,7 @@ public sealed class EfAuditChain(PempDbContext db) : IAuditChain
         {
             var e = r.ToEntry();
             if (e.PrevHash != prev) return false;
-            if (e.Hash != HashChain.ComputeHash(e.Canonical())) return false;
+            if (e.Hash != HashChain.ComputeHash(e.Canonical(), key)) return false;
             prev = e.Hash;
         }
         return true;
