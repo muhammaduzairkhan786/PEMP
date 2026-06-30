@@ -696,6 +696,163 @@ public sealed class PersistenceTests : IDisposable
         Assert.Empty(await _store.OpenFindingCountsAsync(Array.Empty<Guid>()));
     }
 
+    // ---- Communications log (rank 34 / FR-NOT-01/03) ----------------------
+
+    private CommsStore NewComms() => new(_db, Clock, new AuditHmacKey(Key), _store);
+
+    [Fact]
+    public async Task Comms_post_is_scoped_and_audited_without_logging_the_body()  // FR-NOT-01 / SEC-AUD
+    {
+        var comms = NewComms();
+        var id = IdOf("ENG-2026-0408"); // Retail Web, assigned A. Khan
+        var auditBefore = _db.AuditEntries.Count();
+        const string body = "Confidential post-test note with sensitive detail.";
+
+        var before = (await comms.MessagesForAsync(id, Khan)).Count;
+        var result = await comms.PostMessageAsync(id, CommsKind.Note, body, Khan);
+
+        Assert.False(result.Failed);
+        var after = await comms.MessagesForAsync(id, Khan);
+        Assert.Equal(before + 1, after.Count);
+        Assert.Equal("A. Khan", after[0].AuthorName);   // newest first
+        Assert.Equal(body, after[0].Body);
+
+        // Audited (kind only — never the body) and the chain still verifies.
+        Assert.Equal(auditBefore + 1, _db.AuditEntries.Count());
+        var last = _db.AuditEntries.OrderByDescending(a => a.Sequence).First();
+        Assert.Equal("Comms.Posted", last.Action);
+        Assert.Equal("Note", last.After);
+        Assert.DoesNotContain(_db.AuditEntries, a => a.After.Contains(body) || a.Before.Contains(body));
+        Assert.True(new EfAuditChain(_db, Key).Verify());
+    }
+
+    [Fact]
+    public async Task Comms_out_of_scope_post_and_read_are_blocked()  // FR-NOT / anti-BOLA
+    {
+        var comms = NewComms();
+        var id = IdOf("ENG-2026-0408"); // assigned A. Khan
+        var lee = CallerContext.ForTester(DemoSeeder.TesterLee, "S. Lee"); // not assigned
+        var auditBefore = _db.AuditEntries.Count();
+
+        var result = await comms.PostMessageAsync(id, CommsKind.Note, "intrusion", lee);
+        Assert.True(result.Failed);
+        Assert.Contains("scope", result.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(auditBefore, _db.AuditEntries.Count());        // nothing appended on denial
+
+        Assert.Empty(await comms.MessagesForAsync(id, lee));        // out-of-scope read sees nothing
+    }
+
+    [Fact]
+    public async Task Comms_recent_count_is_scoped_to_the_callers_engagements()  // FR-NOT-03 (badge count)
+    {
+        var comms = NewComms();
+        var since = Clock().AddDays(-7);
+
+        // Seeded: Retail Web (assigned A. Khan) has 2 messages; Broker Portal (assigned A. Khan) has 1.
+        Assert.Equal(3, await comms.RecentCountAsync(Khan, since));
+
+        // The Retail Web stakeholder sees only their own app's 2 messages.
+        var stakeholder = CallerContext.ForStakeholder("P. Devlin", DemoSeeder.AppIdFor("Retail Web"));
+        Assert.Equal(2, await comms.RecentCountAsync(stakeholder, since));
+
+        // A scoped role with no scope fails closed → 0.
+        Assert.Equal(0, await comms.RecentCountAsync(new CallerContext("Tester", "Nobody", null, null), since));
+    }
+
+    // ---- Evidence download: scope + audit (rank 33 / SEC-EVD-02/03) --------
+
+    [Fact]
+    public async Task Evidence_download_is_authorized_and_audited()  // SEC-EVD-02/03 (per-download audit)
+    {
+        var id = IdOf("ENG-2026-0408"); // Retail Web, assigned A. Khan, has seeded evidence
+        var ev = (await _store.EvidenceForAsync(id)).First();
+        var auditBefore = _db.AuditEntries.Count();
+
+        var result = await _store.RecordEvidenceDownloadAsync(id, ev.Id, ev.FileName, Khan);
+
+        Assert.False(result.Failed);
+        Assert.Equal(auditBefore + 1, _db.AuditEntries.Count());
+        var last = _db.AuditEntries.OrderByDescending(a => a.Sequence).First();
+        Assert.Equal("Evidence.Downloaded", last.Action);
+        Assert.Equal("A. Khan", last.Actor);
+        Assert.Equal(ev.FileName, last.After);   // file LABEL only
+        Assert.True(new EfAuditChain(_db, Key).Verify());
+    }
+
+    [Fact]
+    public async Task Evidence_download_is_open_to_any_in_scope_role()  // SEC-EVD (read access ≠ tester-only write)
+    {
+        var id = IdOf("ENG-2026-0408"); // Retail Web — P. Devlin is the app stakeholder
+        var ev = (await _store.EvidenceForAsync(id)).First();
+        var stakeholder = CallerContext.ForStakeholder("P. Devlin", DemoSeeder.AppIdFor("Retail Web"));
+
+        var result = await _store.RecordEvidenceDownloadAsync(id, ev.Id, ev.FileName, stakeholder);
+        Assert.False(result.Failed);   // an in-scope stakeholder may download their app's evidence
+    }
+
+    [Fact]
+    public async Task Evidence_download_is_blocked_out_of_scope_and_audits_nothing()  // SEC-EVD / anti-BOLA
+    {
+        var id = IdOf("ENG-2026-0408"); // assigned A. Khan
+        var ev = (await _store.EvidenceForAsync(id)).First();
+        var lee = CallerContext.ForTester(DemoSeeder.TesterLee, "S. Lee"); // not assigned
+        var auditBefore = _db.AuditEntries.Count();
+
+        var result = await _store.RecordEvidenceDownloadAsync(id, ev.Id, ev.FileName, lee);
+
+        Assert.True(result.Failed);
+        Assert.Contains("scope", result.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(auditBefore, _db.AuditEntries.Count());   // nothing appended on denial
+        Assert.True(new EfAuditChain(_db, Key).Verify());
+    }
+
+    // ---- Numeric CVSS score (rank 26 / FR-FND-01) --------------------------
+
+    [Fact]
+    public async Task AddFinding_round_trips_the_numeric_cvss_score()  // rank 26 (real decimal, not just the string)
+    {
+        var id = IdOf("ENG-2026-0408"); // Retail Web, mid-test, assigned A. Khan
+        var fid = await _store.AddFindingAsync(
+            id, "Open redirect on /login", Severity.Medium, "7.5",
+            "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:N/I:L/A:N", "Web",
+            "Validate redirect targets.", Khan, cvssScore: 7.5m);
+
+        var added = (await _store.FindingsForAsync(id)).Single(f => f.Id == fid);
+        Assert.Equal(7.5m, added.CvssScore);   // persisted numerically, round-trips
+        Assert.Equal("7.5", added.Cvss);       // the display string is unchanged
+    }
+
+    [Fact]
+    public async Task WorstOpenCvss_ranks_numerically_not_alphabetically()  // rank 26 ("10.0" must outrank "9.1")
+    {
+        var id = IdOf("ENG-2026-0408");
+        await _store.AddFindingAsync(id, "Score nine-one", Severity.Critical, "9.1",
+            "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N", "API", "x", Khan, cvssScore: 9.1m);
+        await _store.AddFindingAsync(id, "Score ten", Severity.Critical, "10.0",
+            "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H", "API", "x", Khan, cvssScore: 10.0m);
+
+        var worst = await _store.WorstOpenCvssAsync(new[] { id });
+
+        // A lexicographic MAX would pick "9.1" (since "9" > "1"); the numeric max is 10.0.
+        Assert.Equal(10.0m, worst[id]);
+        Assert.Empty(await _store.WorstOpenCvssAsync(Array.Empty<Guid>()));
+    }
+
+    [Fact]
+    public async Task RequestRetest_carries_the_numeric_cvss_score_into_the_child()  // rank 26 / FR-RET-02
+    {
+        var parentId = IdOf("ENG-2026-0399"); // Broker Portal, closed
+        var src = (await _store.FindingsForAsync(parentId))
+            .First(f => f.Status != FindingStatus.Closed && f.Status != FindingStatus.AcceptedRisk);
+        Assert.NotNull(src.CvssScore);
+
+        var (result, childId) = await _store.RequestRetestAsync(parentId, Acme);
+        Assert.False(result.Failed);
+
+        var child = (await _store.FindingsForAsync(childId!.Value)).Single(f => f.Title == src.Title);
+        Assert.Equal(src.CvssScore, child.CvssScore);
+    }
+
     // ---- Guarded finding-status lifecycle (rank 36 / FR-FND-04) ------------
 
     [Fact]

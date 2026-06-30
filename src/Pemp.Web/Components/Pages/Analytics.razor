@@ -56,24 +56,29 @@
             </div>
         }
 
-        <h2 class="sectionlabel">By application</h2>
+        <h2 class="sectionlabel">By application <span class="muted" style="font-weight:400;font-size:var(--text-xs)">— most exposed first</span></h2>
         <div class="card tablecard">
             <table class="t">
-                <thead><tr><th>Application</th><th>Stage</th><th>Open findings</th><th>Worst severity</th></tr></thead>
+                <thead><tr><th>Application</th><th>Stage</th><th>Open findings</th><th>Worst CVSS</th><th>Worst severity</th></tr></thead>
                 <tbody>
                     @if (_engs.Count == 0)
                     {
-                        <tr><td colspan="4" class="muted">No engagements yet.</td></tr>
+                        <tr><td colspan="5" class="muted">No engagements yet.</td></tr>
                     }
-                    @foreach (var e in _engs)
+                    @* Order by the NUMERIC worst CVSS (then worst severity) so the most-exposed apps surface
+                       first — the decimal column makes "10.0" outrank "9.1" (a string sort would not). *@
+                    @foreach (var e in _engs
+                        .OrderByDescending(x => WorstCvss(x.Id) ?? -1m)
+                        .ThenBy(x => WorstSev(x.Id) ?? Severity.Info))
                     {
-                        var of = _counts.Where(c => c.EngagementId == e.Id).ToList();
-                        var openCount = of.Sum(c => c.Count);
-                        var worst = of.Count == 0 ? (Severity?)null : of.Min(c => c.Severity); // enum-min = worst
+                        var openCount = _counts.Where(c => c.EngagementId == e.Id).Sum(c => c.Count);
+                        var worst = WorstSev(e.Id);
+                        var worstScore = WorstCvss(e.Id);
                         <tr>
                             <td>@e.AppName</td>
                             <td class="muted">@Workflow.Label(e.CurrentStage)</td>
                             <td class="mono">@openCount</td>
+                            <td class="mono">@(worstScore is decimal sc ? sc.ToString("0.0") : "—")</td>
                             <td>@if (worst is not null){<span class="sevchip @worst.ToString()!.ToLowerInvariant()">@worst</span>}else{<span class="muted">—</span>}</td>
                         </tr>
                     }
@@ -86,6 +91,14 @@
 @code {
     List<EngagementRecord>? _engs;
     List<OpenFindingCount> _counts = new();
+    Dictionary<Guid, decimal> _worstCvss = new();
+
+    decimal? WorstCvss(Guid id) => _worstCvss.TryGetValue(id, out var v) ? v : null;
+    Severity? WorstSev(Guid id)
+    {
+        var of = _counts.Where(c => c.EngagementId == id).ToList();
+        return of.Count == 0 ? null : of.Min(c => c.Severity); // enum-min = worst severity band
+    }
 
     static readonly Severity[] SevOrder = { Severity.Critical, Severity.High, Severity.Medium, Severity.Low, Severity.Info };
 
@@ -95,7 +108,10 @@
         _engs = await Store.ListScopedAsync(Session.AppScope, Session.TesterScope, Session.Role);
         // Aggregate the open findings IN SQL for exactly the scoped engagements — no portfolio-wide
         // client materialization (FR-ANL-04). The dashboard derives every number from this small set.
-        _counts = await Store.OpenFindingCountsAsync(_engs.Select(e => e.Id).ToList());
+        var ids = _engs.Select(e => e.Id).ToList();
+        _counts = await Store.OpenFindingCountsAsync(ids);
+        // Worst (numeric) open CVSS per engagement — drives the most-exposed-first ordering (FR-ANL-04).
+        _worstCvss = await Store.WorstOpenCvssAsync(ids);
     }
 
     int SevCount(Severity s) => _counts.Where(c => c.Severity == s).Sum(c => c.Count);

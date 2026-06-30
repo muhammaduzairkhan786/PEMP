@@ -108,7 +108,11 @@ public static class DemoSeeder
 
         // Live register (FR-FND): findings for the engagements that have reached testing.
         FindingRecord F(Guid eng, string title, Severity sev, string cvss, string vector, string asset, string remediation, FindingStatus status)
-            => new() { Id = Guid.NewGuid(), EngagementId = eng, Title = title, Severity = sev, Cvss = cvss, CvssVector = vector, Asset = asset, Remediation = remediation, Status = status };
+            => new() { Id = Guid.NewGuid(), EngagementId = eng, Title = title, Severity = sev, Cvss = cvss,
+                       // Backfill the numeric score from the display string so analytics rank these seeded
+                       // findings numerically (the live add-path passes the resolved decimal directly).
+                       CvssScore = decimal.TryParse(cvss, System.Globalization.CultureInfo.InvariantCulture, out var sc) ? sc : null,
+                       CvssVector = vector, Asset = asset, Remediation = remediation, Status = status };
         // Retail Web is mid-test and has NOT been retested, so its findings are Open (not RetestPending,
         // which is only valid once a retest child is carrying them for re-verification).
         var fSqli = F(retail.Id, "SQLi in /claims search", Severity.High, "8.1", "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N", "Web", "Use parameterised queries; validate and allow-list input.", FindingStatus.Open);
@@ -154,6 +158,21 @@ public static class DemoSeeder
         // Tester checklist (Tab 4): Retail Web is mid-test — pre-reqs done, some during-test done.
         foreach (var code in new[] { "PRE-01", "PRE-02", "PRE-03", "PRE-04", "PRE-05", "PRE-06", "DUR-01", "DUR-02", "DUR-03" })
             db.ChecklistTicks.Add(new ChecklistTickRecord { Id = Guid.NewGuid(), EngagementId = retail.Id, Code = code, Done = true });
+
+        // Engagement communications (FR-NOT-01/03): a couple of demo messages so the comms timeline and
+        // the notification badge have content. Seeded directly (like findings/evidence) — the live post
+        // path is the audited one.
+        var seedAt = clock();
+        CommsMessageRecord M(Guid eng, string author, string role, CommsKind kind, string body, TimeSpan ago)
+            => new() { Id = Guid.NewGuid(), EngagementId = eng, AuthorName = author, AuthorRole = role,
+                       Kind = kind, Body = body, CreatedAt = seedAt - ago };
+        db.CommsMessages.AddRange(
+            M(retail.Id, "A. Khan", "Tester", CommsKind.FindingsSummary,
+              "Same-day findings summary: 1 Critical (auth bypass), 2 High (SQLi, stored XSS). Full register in the Findings tab; draft report to follow after end-of-test.", TimeSpan.FromHours(3)),
+            M(retail.Id, "J. Okafor", "Acme CA Officer", CommsKind.Note,
+              "Thanks — please prioritise the auth-bypass write-up for the post-test call.", TimeSpan.FromHours(2)),
+            M(broker.Id, "R. Patel", "Tester", CommsKind.StatusUpdate,
+              "Peer QA passed; final report released and stored immutable. Retest can be requested once fixes land.", TimeSpan.FromDays(1)));
 
         db.SaveChanges();
     }

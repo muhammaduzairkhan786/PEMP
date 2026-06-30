@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Pemp.Infrastructure.Evidence;
 using Pemp.Infrastructure.Persistence;
 
 namespace Pemp.Infrastructure;
@@ -25,6 +26,11 @@ public static class ServiceCollectionExtensions
         // deployments when the key is missing or resolves to the public default — see AuditHmacKey.
         services.AddSingleton(AuditHmacKey.FromConfig(auditHmacKey, allowDefaultAuditKey));
         services.AddScoped<EngagementStore>();
+        services.AddScoped<CommsStore>();
+        // Evidence access (SEC-EVD-02/03): local dev streams a placeholder via short-lived, single-use,
+        // HMAC-signed tokens (singleton so the pending-token map is shared). PROD swaps this for
+        // AzureBlobEvidenceStorage (Blob user-delegation SAS) — see that class's documented seam.
+        services.AddSingleton<IEvidenceStorage, LocalEvidenceStorage>();
         return services;
     }
 }

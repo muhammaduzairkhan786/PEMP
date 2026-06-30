@@ -237,6 +237,28 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
             .ToListAsync();
     }
 
+    /// <summary>
+    /// The worst (highest) OPEN-finding CVSS base score per engagement (FR-ANL-04), for the supplied
+    /// — already scope-filtered — engagement ids. The score is a real numeric column (decimal(3,1) on
+    /// Azure SQL; REAL on SQLite), so the "worst" is a true NUMERIC maximum: a string MAX would rank
+    /// "10.0" below "9.1" lexicographically. The compact per-engagement score rows are pulled and the
+    /// max taken in memory (provider-agnostic — SQLite has no native decimal aggregate). An empty id
+    /// set short-circuits (a scoped role with no engagements sees nothing).
+    /// </summary>
+    public async Task<Dictionary<Guid, decimal>> WorstOpenCvssAsync(IReadOnlyCollection<Guid> engagementIds)
+    {
+        if (engagementIds.Count == 0) return new();
+        var ids = engagementIds.ToList();
+        var rows = await db.Findings.AsNoTracking()
+            .Where(f => ids.Contains(f.EngagementId)
+                        && (f.Status == FindingStatus.Open || f.Status == FindingStatus.RetestPending)
+                        && f.CvssScore != null)
+            .Select(f => new { f.EngagementId, Score = f.CvssScore!.Value })
+            .ToListAsync();
+        return rows.GroupBy(r => r.EngagementId)
+            .ToDictionary(g => g.Key, g => g.Max(r => r.Score));
+    }
+
     public Task<List<AuditEntryRow>> AuditForAsync(Guid id) =>
         db.AuditEntries.AsNoTracking().Where(a => a.EngagementId == id).OrderBy(a => a.Sequence).ToListAsync();
 
@@ -252,7 +274,7 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
     public async Task<Guid> AddFindingAsync(
         Guid engagementId, string title, Severity severity, string cvss, string cvssVector,
         string asset, string remediation, CallerContext caller,
-        FindingStatus status = FindingStatus.Open, Guid? originalFindingId = null)
+        FindingStatus status = FindingStatus.Open, Guid? originalFindingId = null, decimal? cvssScore = null)
     {
         await AuthorizeTrackedAsync(engagementId, caller, EngagementAction.AddFinding);
         var finding = new FindingRecord
@@ -262,6 +284,7 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
             Title = title,
             Severity = severity,
             Cvss = cvss,
+            CvssScore = cvssScore,
             CvssVector = cvssVector,
             Asset = asset,
             Remediation = remediation,
@@ -289,6 +312,36 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
         });
         StageAudit(engagementId, caller.Actor, caller.Role, "Evidence.Added", "-", fileName);
         await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Authorize + AUDIT an evidence download (SEC-EVD-02/03), atomically appending a hash-chained
+    /// <c>Evidence.Downloaded</c> entry. Object-level scope is enforced with the SAME predicate as a
+    /// scoped read (anti-BOLA, fail-closed) — viewing an engagement in scope implies the right to
+    /// download its evidence, so this is open to any in-scope role (not just the assigned tester),
+    /// unlike a data WRITE. The re-auth step-up is enforced by the caller (the ReauthDialog ceremony)
+    /// BEFORE this is invoked, and the short-lived signed URL is minted only after this succeeds. The
+    /// file LABEL is recorded — never the bytes, a path, or any secret. Nothing is audited on failure.
+    /// </summary>
+    public async Task<Result> RecordEvidenceDownloadAsync(Guid engagementId, Guid evidenceId, string fileLabel, CallerContext caller)
+    {
+        var rec = await db.Engagements.FirstOrDefaultAsync(e => e.Id == engagementId);
+        if (rec is null) return Result.Fail("Engagement not found.");
+        if (!InScope(rec, caller.AppScope, caller.TesterScope, caller.Role))
+        {
+            _log.LogWarning(
+                "SEC-EVD: evidence download REJECTED on engagement {EngagementId} for actor={Actor} role={Role}: outside scope. CorrelationId={CorrelationId}",
+                engagementId, caller.Actor, caller.Role, Corr);
+            return Result.Fail("Not authorized for this engagement — outside your scope (SEC-AZN-02).");
+        }
+        var ev = await db.Evidence.AsNoTracking().FirstOrDefaultAsync(e => e.Id == evidenceId && e.EngagementId == engagementId);
+        if (ev is null) return Result.Fail("Evidence not found.");
+        StageAudit(engagementId, caller.Actor, caller.Role, "Evidence.Downloaded", "-", fileLabel);
+        await db.SaveChangesAsync();
+        _log.LogInformation(
+            "Evidence.Downloaded on {EngagementId} by actor={Actor} role={Role}. CorrelationId={CorrelationId}",
+            engagementId, caller.Actor, caller.Role, Corr);
+        return Result.Success();
     }
 
     public bool VerifyChain() => NewChain().Verify();
@@ -592,8 +645,8 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
             db.Findings.Add(new FindingRecord
             {
                 Id = Guid.NewGuid(), EngagementId = child.Id, Title = f.Title,
-                Severity = f.Severity, Cvss = f.Cvss, CvssVector = f.CvssVector, Asset = f.Asset,
-                Remediation = f.Remediation, Status = FindingStatus.RetestPending,
+                Severity = f.Severity, Cvss = f.Cvss, CvssScore = f.CvssScore, CvssVector = f.CvssVector,
+                Asset = f.Asset, Remediation = f.Remediation, Status = FindingStatus.RetestPending,
                 OriginalFindingId = f.Id,
             });
 

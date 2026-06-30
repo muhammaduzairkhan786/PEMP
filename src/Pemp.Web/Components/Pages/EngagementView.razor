@@ -1,6 +1,7 @@
 @page "/engagement/{Id:guid}"
 @attribute [Authorize]
 @inject EngagementStore Store
+@inject CommsStore Comms
 @inject DemoSession Session
 @inject NavigationManager Nav
 <PageTitle>Engagement · PEMP</PageTitle>
@@ -187,6 +188,12 @@ else
                     }
                 </PanelBoundary>
             }
+            else if (_activeTab == "comms")
+            {
+                <PanelBoundary Label="Communications">
+                    <CommsLog EngagementId="Id" Messages="_comms" CanPost="true" OnPosted="OnCommsChanged" />
+                </PanelBoundary>
+            }
             else if (_activeTab == "audit")
             {
                 <PanelBoundary Label="Audit trail">
@@ -246,6 +253,7 @@ else
     List<FindingRecord> _findings = new();
     List<AccessRequirementRecord> _access = new();
     List<TestCredentialRecord> _credentials = new();
+    List<CommsMessageRecord> _comms = new();
     HashSet<string> _checklist = new();
 
     // Capacity board + selected tester for the Assignment-stage picker (FR-ASG-02/03).
@@ -292,6 +300,7 @@ else
         new("access", "Access & Creds", "🔑", _access.Count > 0 ? _access.Count : null),
         new("evidence", "Evidence", "📎"),
         new("checklist", "Checklist", "✓"),
+        new("comms", "Comms", "💬", _comms.Count > 0 ? _comms.Count : null),
         new("audit", "Audit", "🔗"),
     };
 
@@ -325,6 +334,7 @@ else
             _chainOk = Store.VerifyChain();
             _findings = await Store.FindingsForAsync(Id);
             _access = await Store.AccessReqsForAsync(Id);
+            _comms = await Comms.MessagesForAsync(Id, Session.Caller);
             _checklist = await Store.ChecklistDoneAsync(Id);
             // Least exposure (SEC-CRD): only fetch test credentials for the assigned tester who may view
             // them — keyed on the stable AssignedTesterId, not the display name.
@@ -338,7 +348,7 @@ else
         else
         {
             _findings = new(); _access = new(); _checklist = new();
-            _credentials = new(); _capacity = new(); _chainOk = null;
+            _credentials = new(); _capacity = new(); _comms = new(); _chainOk = null;
         }
         _loaded = true;
     }
@@ -469,6 +479,16 @@ else
     async Task OnAccessChanged()
     {
         _access = await Store.AccessReqsForAsync(Id);
+        _chainOk = Store.VerifyChain();
+        InvalidateAudit();
+        if (_activeTab == "audit") await EnsureAuditAsync();
+    }
+
+    // Targeted refresh after a comms message is posted — only the comms collection (and the audit,
+    // since a post is audited) changed.
+    async Task OnCommsChanged()
+    {
+        _comms = await Comms.MessagesForAsync(Id, Session.Caller);
         _chainOk = Store.VerifyChain();
         InvalidateAudit();
         if (_activeTab == "audit") await EnsureAuditAsync();

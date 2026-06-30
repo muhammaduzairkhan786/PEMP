@@ -13,6 +13,7 @@ public sealed class PempDbContext(DbContextOptions<PempDbContext> options) : Ide
     public DbSet<ChecklistTickRecord> ChecklistTicks => Set<ChecklistTickRecord>();
     public DbSet<EvidenceRecord> Evidence => Set<EvidenceRecord>();
     public DbSet<TestCredentialRecord> TestCredentials => Set<TestCredentialRecord>();
+    public DbSet<CommsMessageRecord> CommsMessages => Set<CommsMessageRecord>();
 
     // Append-only enforcement for the audit log at the data layer (SEC-AUD-01). Registered here
     // (rather than only in DI) so EVERY context — app, seeder, and tests — gets it, regardless of
@@ -82,6 +83,13 @@ public sealed class PempDbContext(DbContextOptions<PempDbContext> options) : Ide
         fnd.Property(f => f.Status).HasConversion<string>().HasMaxLength(20);
         fnd.Property(f => f.Title).IsRequired().HasMaxLength(400);
         fnd.Property(f => f.Cvss).HasMaxLength(16);
+        // Numeric CVSS base score (FR-FND-01): persisted as a real number, not just the display string,
+        // so analytics sort/range by exposure NUMERICALLY (a string MAX orders "10.0" before "9.1"). On
+        // Azure SQL this is decimal(3,1); on SQLite (no native decimal type) it is stored as REAL via a
+        // double converter so ORDER BY / comparisons stay numeric rather than lexicographic over TEXT.
+        var cvssScore = fnd.Property(f => f.CvssScore);
+        if (Database.IsSqlite()) cvssScore.HasConversion<double>();
+        else cvssScore.HasPrecision(3, 1);
         fnd.Property(f => f.CvssVector).HasMaxLength(128);
         fnd.Property(f => f.Asset).HasMaxLength(200);
         fnd.Property(f => f.Remediation).HasMaxLength(4000);
@@ -131,5 +139,17 @@ public sealed class PempDbContext(DbContextOptions<PempDbContext> options) : Ide
         cred.Property(c => c.AddedBy).HasMaxLength(200);
         cred.Property(c => c.KeyVaultSecretUri).HasMaxLength(1024);
         cred.HasOne<EngagementRecord>().WithMany().HasForeignKey(c => c.EngagementId).OnDelete(DeleteBehavior.Restrict);
+
+        // ---- Engagement communications log (FR-NOT-01/03) ------------------
+        var comms = b.Entity<CommsMessageRecord>();
+        comms.HasKey(m => m.Id);
+        // The badge/timeline query filters by engagement and orders by recency — index both columns.
+        comms.HasIndex(m => m.EngagementId);
+        comms.HasIndex(m => m.CreatedAt);
+        comms.Property(m => m.Kind).HasConversion<string>().HasMaxLength(20);
+        comms.Property(m => m.AuthorName).IsRequired().HasMaxLength(200);
+        comms.Property(m => m.AuthorRole).HasMaxLength(50);
+        comms.Property(m => m.Body).IsRequired().HasMaxLength(4000);
+        comms.HasOne<EngagementRecord>().WithMany().HasForeignKey(m => m.EngagementId).OnDelete(DeleteBehavior.Restrict);
     }
 }

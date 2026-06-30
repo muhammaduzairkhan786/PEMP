@@ -21,7 +21,13 @@ public sealed class FindingRecord
     public Guid EngagementId { get; set; }
     public string Title { get; set; } = "";
     public Severity Severity { get; set; }
-    public string Cvss { get; set; } = "";           // CVSS base score (e.g. "8.1")
+    public string Cvss { get; set; } = "";           // CVSS base score, display string (e.g. "8.1")
+    /// <summary>
+    /// The CVSS base score as a real NUMBER (0.0–10.0), not just the <see cref="Cvss"/> display string
+    /// (FR-FND-01). Persisted numerically so analytics sort/range by exposure correctly — a string MAX
+    /// would order "10.0" before "9.1" lexicographically. Null when no score has been resolved yet.
+    /// </summary>
+    public decimal? CvssScore { get; set; }
     public string CvssVector { get; set; } = "";      // CVSS vector string (e.g. "CVSS:3.1/AV:N/...")
     public string Asset { get; set; } = "";
     public string Remediation { get; set; } = "";

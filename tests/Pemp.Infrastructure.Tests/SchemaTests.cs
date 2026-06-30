@@ -20,7 +20,7 @@ public sealed class SchemaTests
     {
         typeof(EngagementRecord), typeof(AuditEntryRow), typeof(FindingRecord),
         typeof(AssessmentAnswerRecord), typeof(AccessRequirementRecord), typeof(ChecklistTickRecord),
-        typeof(EvidenceRecord), typeof(TestCredentialRecord),
+        typeof(EvidenceRecord), typeof(TestCredentialRecord), typeof(CommsMessageRecord),
     };
 
     private static IModel SqlServerModel()
