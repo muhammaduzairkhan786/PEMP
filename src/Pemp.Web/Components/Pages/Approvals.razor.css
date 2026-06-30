@@ -1,0 +1,40 @@
+/* ============================================================================
+   Approvals / Reviews rollup — the sign-off queue as confident action cards.
+   ============================================================================ */
+.pile.queue .row {
+    position: relative;
+    overflow: hidden;
+    padding-left: 18px;
+    background: linear-gradient(100deg, color-mix(in srgb, var(--brand) 5%, var(--surface)), var(--surface));
+    border-color: color-mix(in srgb, var(--brand) 20%, var(--border));
+}
+.pile.queue .row::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: linear-gradient(var(--brand), var(--brand-glow));
+}
+.pile.queue .row .verb {
+    color: var(--ink);
+}
+
+/* Editorial empty state */
+.card.empty {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+.card.empty .empty-mark {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    flex: none;
+    border-radius: var(--radius-pill);
+    background: var(--surface-raised);
+    color: var(--state-done);
+    font-size: var(--text-base);
+}

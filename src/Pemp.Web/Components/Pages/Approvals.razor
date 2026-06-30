@@ -21,11 +21,14 @@
     }
     else if (_items.Count == 0)
     {
-        <div class="card muted">Nothing waiting on you right now.</div>
+        <div class="card empty">
+            <span class="empty-mark" aria-hidden="true">✓</span>
+            <div><b>Nothing waiting on you</b><span class="muted"> right now. The queue is clear.</span></div>
+        </div>
     }
     else
     {
-        <div class="pile">
+        <div class="pile queue">
             @foreach (var r in _items)
             {
                 <div class="row">

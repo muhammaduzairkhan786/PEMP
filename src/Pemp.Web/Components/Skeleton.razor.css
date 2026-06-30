@@ -1,0 +1,8 @@
+/* ============================================================================
+   Loading skeleton — a calm, warm placeholder; softer corners, a faint frame.
+   ============================================================================ */
+.skel-row {
+    height: 58px;
+    border-radius: var(--radius-lg);
+    box-shadow: inset 0 0 0 1px var(--border);
+}

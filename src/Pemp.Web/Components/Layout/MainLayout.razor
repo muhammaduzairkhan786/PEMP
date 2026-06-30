@@ -7,7 +7,7 @@
 <a class="skip-link" href="#main">Skip to content</a>
 
 <div class="shell">
-    <a class="brand" href="dashboard" aria-label="PEMP home"><div class="logo">P</div><b>PEMP</b></a>
+    <a class="brand" href="dashboard" aria-label="PEMP home"><div class="logo">P</div><span class="wordmark"><b>PEMP</b><small>Engagement Platform</small></span></a>
 
     <header class="topbar">
         <span class="eyebrow">Pentest Engagement Management</span>
@@ -18,9 +18,12 @@
         <a class="notif" href="dashboard" title="@NotifTitle" aria-label="@NotifTitle">
             🔔@if (_recentComms > 0){<span class="notif-badge">@_recentComms</span>}
         </a>
-        <div class="whoami">
-            <span class="whoami-name">@Session.Actor</span>
-            <span class="whoami-role">@Session.Role</span>
+        <div class="identity">
+            <span class="avatar" aria-hidden="true">@Initial</span>
+            <div class="whoami">
+                <span class="whoami-name">@Session.Actor</span>
+                <span class="whoami-role">@Session.Role</span>
+            </div>
         </div>
         <form action="Account/Logout" method="post" class="logout-form">
             <AntiforgeryToken />
@@ -78,6 +81,8 @@
     // the whoami + role-gated nav never flash a default identity (the SSR ordering fix). The
     // 2FA-enrollment gate is now enforced SERVER-SIDE in Program.cs (a real 302), not here.
     int _recentComms;
+    // Monogram for the topbar identity disc — derived from the resolved actor name (display-only).
+    string Initial => string.IsNullOrWhiteSpace(Session.Actor) ? "·" : Session.Actor.TrimStart()[..1].ToUpperInvariant();
     string NotifTitle => _recentComms == 0
         ? "No recent messages across your engagements (last 7 days)"
         : $"{_recentComms} recent message{(_recentComms == 1 ? "" : "s")} across your engagements (last 7 days)";

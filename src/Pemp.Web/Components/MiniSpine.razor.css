@@ -1,0 +1,24 @@
+/* ============================================================================
+   Mini spine for portfolio cards — a compact echo of the lifecycle motif.
+   Decorative (aria-hidden); just enough refinement to read at a glance.
+   ============================================================================ */
+.minispine {
+    gap: 0;
+}
+.minispine .b {
+    width: 8px;
+    height: 8px;
+    transition: transform var(--dur-fast) var(--ease-standard);
+}
+.minispine .b.done {
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--state-done) 30%, transparent);
+}
+.minispine .b.cur {
+    width: 10px;
+    height: 10px;
+    transform: translateY(-.5px);
+}
+.minispine .c {
+    height: 2px;
+    border-radius: var(--radius-pill);
+}

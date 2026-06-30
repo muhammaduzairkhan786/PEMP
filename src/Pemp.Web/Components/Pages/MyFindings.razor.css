@@ -1,0 +1,63 @@
+/* ============================================================================
+   My findings rollup — the tester's open register, worst-first, set calmly.
+   ============================================================================ */
+.tiles.stats .tile .v {
+    font-optical-sizing: auto;
+    font-variant-numeric: tabular-nums lining-nums;
+    font-size: var(--text-3xl);
+    line-height: 1;
+}
+.tiles.stats .tile.danger {
+    background: linear-gradient(165deg, color-mix(in srgb, var(--sev-critical) 10%, var(--surface)), var(--surface));
+    border-color: color-mix(in srgb, var(--sev-critical) 34%, var(--border-strong));
+}
+.tiles.stats .tile.danger .v {
+    color: var(--sev-critical);
+}
+
+.sectionlabel {
+    position: relative;
+    padding-left: 15px;
+}
+.sectionlabel::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: .2em;
+    height: .88em;
+    width: 3px;
+    border-radius: var(--radius-pill);
+    background: var(--brand);
+}
+
+/* Register table — tabular CVSS, gentle hover, the finding title carries weight */
+table.t {
+    font-variant-numeric: tabular-nums lining-nums;
+}
+table.t tbody tr {
+    transition: background var(--dur-fast);
+}
+table.t tbody tr:hover {
+    background: color-mix(in srgb, var(--brand) 4%, transparent);
+}
+table.t tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* Editorial empty state */
+.card.empty {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+.card.empty .empty-mark {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    flex: none;
+    border-radius: var(--radius-pill);
+    background: var(--surface-raised);
+    color: var(--state-done);
+    font-size: var(--text-base);
+}

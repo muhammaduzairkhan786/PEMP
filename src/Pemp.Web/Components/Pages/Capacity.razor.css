@@ -1,0 +1,54 @@
+/* ============================================================================
+   Capacity board — a tasteful tester roster with a calm load meter.
+   ============================================================================ */
+.tiles.stats .tile .v {
+    font-optical-sizing: auto;
+    font-variant-numeric: tabular-nums lining-nums;
+    font-size: var(--text-3xl);
+    line-height: 1;
+}
+
+.sectionlabel {
+    position: relative;
+    padding-left: 15px;
+}
+.sectionlabel::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: .2em;
+    height: .88em;
+    width: 3px;
+    border-radius: var(--radius-pill);
+    background: var(--brand);
+}
+
+.roster table.t tbody tr {
+    transition: background var(--dur-fast);
+}
+.roster table.t tbody tr:hover {
+    background: color-mix(in srgb, var(--brand) 4%, transparent);
+}
+.roster table.t tbody tr:last-child td {
+    border-bottom: none;
+}
+.roster td.name {
+    font-weight: 600;
+}
+.roster .meter {
+    margin: 0;
+}
+
+/* a free tester reads as an available slot, not an empty count */
+.freepill {
+    display: inline-flex;
+    align-items: center;
+    font-family: var(--font-sans);
+    font-size: var(--text-xs);
+    font-weight: 650;
+    padding: 2px 10px;
+    border-radius: var(--radius-pill);
+    color: var(--state-done);
+    background: color-mix(in srgb, var(--state-done) 13%, transparent);
+    border: 1px solid color-mix(in srgb, var(--state-done) 32%, transparent);
+}
