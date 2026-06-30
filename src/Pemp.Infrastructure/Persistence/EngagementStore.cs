@@ -1,4 +1,7 @@
+using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Pemp.Domain;
 using Pemp.Domain.Audit;
 
@@ -16,8 +19,14 @@ namespace Pemp.Infrastructure.Persistence;
 /// before any record is touched — so anti-BOLA / anti-priv-esc holds even when these become API
 /// endpoints, not only behind the UI gates.
 /// </summary>
-public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock, AuditHmacKey auditKey)
+public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock, AuditHmacKey auditKey,
+    ILogger<EngagementStore>? logger = null)
 {
+    // Structured logging (rank 6 / NFR-MNT). Never logs secrets, TOTP codes, or audit detail that may
+    // carry a credential label/value — only ids, actor, role, action, and a correlation id. Optional so
+    // the seeder/tests can construct the store without DI; production gets the DI ILogger.
+    private readonly ILogger _log = logger ?? NullLogger<EngagementStore>.Instance;
+    private static string? Corr => Activity.Current?.Id;
     /// <summary>
     /// Roles entitled to the WHOLE portfolio (SEC-AZN/SEC-INS-01). Every other role is "scoped":
     /// it must arrive with a concrete object filter and a blank/unresolved filter must match
@@ -60,7 +69,7 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
             [EngagementAction.SetChecklist]           = new(ActionAuth.Roles(PempRoles.Tester), MustBeAssignedTester: true),
         };
 
-    private EfAuditChain NewChain() => new(db, auditKey.Value);
+    private EfAuditChain NewChain() => new(db, auditKey.Value, _log);
 
     /// <summary>
     /// The object-level scope predicate (SEC-AZN-02). Used identically for reads (<see cref="GetScopedAsync"/>)
@@ -110,7 +119,13 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
         var rec = await db.Engagements.FirstOrDefaultAsync(e => e.Id == engagementId)
                   ?? throw new InvalidOperationException("Engagement not found.");
         var result = Authorize(rec, c, action);
-        if (result.Failed) throw new UnauthorizedAccessException(result.Error);
+        if (result.Failed)
+        {
+            _log.LogWarning(
+                "SEC-AZN: data mutation {Action} REJECTED on engagement {EngagementId} for actor={Actor} role={Role}: {Reason}. CorrelationId={CorrelationId}",
+                action, engagementId, c.Actor, c.Role, result.Error, Corr);
+            throw new UnauthorizedAccessException(result.Error);
+        }
         return rec;
     }
 
@@ -351,7 +366,12 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
     public async Task<Guid> RaiseAsync(EngagementType type, string appName, string criticality, CallerContext caller)
     {
         if (caller.Role != PempRoles.AcmeOfficer)
+        {
+            _log.LogWarning(
+                "SEC-AZN: Raise REJECTED for actor={Actor} role={Role} (Acme CA Officer only). CorrelationId={CorrelationId}",
+                caller.Actor, caller.Role, Corr);
             throw new UnauthorizedAccessException("Raising requests is the Acme CA Officer's action (FR-REQ-01).");
+        }
 
         // Retry on the unique-index backstop: two concurrent raises can compute the same next number;
         // the loser's SaveChanges violates the unique Reference index and we recompute + retry.
@@ -484,11 +504,20 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
         var rec = await db.Engagements.FirstOrDefaultAsync(e => e.Id == id);
         if (rec is null) return Result.Fail("Engagement not found.");
         var authz = Authorize(rec, caller, EngagementAction.AssignTester);
-        if (authz.Failed) return authz;
+        if (authz.Failed)
+        {
+            _log.LogWarning("SEC-AZN: AssignTester REJECTED on {EngagementId} for actor={Actor} role={Role}: {Reason}. CorrelationId={CorrelationId}",
+                id, caller.Actor, caller.Role, authz.Error, Corr);
+            return authz;
+        }
         var chain = NewChain();
         var aggregate = rec.ToDomain(chain, clock);
         var result = aggregate.AssignTester(testerId, caller.Actor, testerLabel: testerName);
-        if (result.Failed) return result;
+        if (result.Failed)
+        {
+            _log.LogWarning("Guard rejected AssignTester on {EngagementId}: {Reason}. CorrelationId={CorrelationId}", id, result.Error, Corr);
+            return result;
+        }
         rec.CopyFrom(aggregate);
         rec.AssignedTesterName = testerName;
         rec.RowVersion = Guid.NewGuid().ToByteArray();
@@ -507,7 +536,12 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
         var parent = await db.Engagements.FirstOrDefaultAsync(e => e.Id == parentId);
         if (parent is null) return (Result.Fail("Engagement not found."), null);
         var authz = Authorize(parent, caller, EngagementAction.RequestRetest);
-        if (authz.Failed) return (authz, null);
+        if (authz.Failed)
+        {
+            _log.LogWarning("SEC-AZN: RequestRetest REJECTED on {EngagementId} for actor={Actor} role={Role}: {Reason}. CorrelationId={CorrelationId}",
+                parentId, caller.Actor, caller.Role, authz.Error, Corr);
+            return (authz, null);
+        }
 
         var chain = NewChain();
         var aggregate = parent.ToDomain(chain, clock);
@@ -552,13 +586,27 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
         if (rec is null) return Result.Fail("Engagement not found.");
 
         var authz = Authorize(rec, caller, action);
-        if (authz.Failed) return authz; // not authorized — nothing appended, nothing saved
+        if (authz.Failed)
+        {
+            _log.LogWarning(
+                "SEC-AZN: transition {Action} REJECTED on {EngagementId} for actor={Actor} role={Role}: {Reason}. CorrelationId={CorrelationId}",
+                action, id, caller.Actor, caller.Role, authz.Error, Corr);
+            return authz; // not authorized — nothing appended, nothing saved
+        }
 
         var chain = NewChain();
         var aggregate = rec.ToDomain(chain, clock);
 
         var result = act(aggregate);
-        if (result.Failed) return result; // guard rejected — nothing appended, nothing saved
+        if (result.Failed)
+        {
+            // Guard rejection — the defining-trait enforcement firing. Logged so blocked actions are
+            // observable (NFR-MNT); the reason text carries no secret.
+            _log.LogInformation(
+                "Guard rejected {Action} on {EngagementId} for actor={Actor} role={Role}: {Reason}. CorrelationId={CorrelationId}",
+                action, id, caller.Actor, caller.Role, result.Error, Corr);
+            return result; // nothing appended, nothing saved
+        }
 
         rec.CopyFrom(aggregate);
         rec.RowVersion = Guid.NewGuid().ToByteArray(); // bump the concurrency token (checked in the UPDATE WHERE)
@@ -573,8 +621,14 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
             // left dirty, and ask the caller to reload and retry against fresh state.
             foreach (var entry in db.ChangeTracker.Entries().Where(e => e.State == EntityState.Added).ToList())
                 entry.State = EntityState.Detached;
+            _log.LogWarning(
+                "Optimistic-concurrency conflict on {Action} for {EngagementId} (actor={Actor}). CorrelationId={CorrelationId}",
+                action, id, caller.Actor, Corr);
             return Result.Fail("This engagement changed in another session. Reload and try again.");
         }
+        _log.LogInformation(
+            "{Action} committed on {EngagementId} by actor={Actor} role={Role}. CorrelationId={CorrelationId}",
+            action, id, caller.Actor, caller.Role, Corr);
         return result;
     }
 

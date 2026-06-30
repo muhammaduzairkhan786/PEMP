@@ -8,6 +8,7 @@
 @inject IConfiguration Configuration
 @inject IServiceProvider Services
 @inject IJSRuntime JS
+@inject ILogger<EngagementView> Logger
 @implements IAsyncDisposable
 <PageTitle>Engagement · PEMP</PageTitle>
 
@@ -309,6 +310,9 @@ else
         }
         else
         {
+            // Re-auth failure for a privileged action (SEC-IAM-04). Log WHO/WHAT — never the code.
+            Logger.LogWarning("Re-auth (TOTP) failed for {Action} on {EngagementId} by actor={Actor}",
+                action, Id, Session.Actor);
             _modalError = "That authenticator code wasn't valid. Re-enter the current 6-digit code from your app.";
         }
     }

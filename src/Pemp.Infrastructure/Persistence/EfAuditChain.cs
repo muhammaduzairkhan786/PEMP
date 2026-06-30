@@ -1,4 +1,7 @@
+using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Pemp.Domain.Audit;
 
 namespace Pemp.Infrastructure.Persistence;
@@ -9,8 +12,9 @@ namespace Pemp.Infrastructure.Persistence;
 /// appends in order, adding rows to the context. They persist when the caller saves —
 /// keeping the append atomic with the engagement state change it records.
 /// </summary>
-public sealed class EfAuditChain(PempDbContext db, byte[] key) : IAuditChain
+public sealed class EfAuditChain(PempDbContext db, byte[] key, ILogger? logger = null) : IAuditChain
 {
+    private readonly ILogger _log = logger ?? NullLogger.Instance;
     private bool _init;
     private string _prev = HashChain.GenesisHash;
 
@@ -39,8 +43,17 @@ public sealed class EfAuditChain(PempDbContext db, byte[] key) : IAuditChain
         foreach (var r in db.AuditEntries.AsNoTracking().OrderBy(e => e.Sequence))
         {
             var e = r.ToEntry();
-            if (e.PrevHash != prev) return false;
-            if (e.Hash != HashChain.ComputeHash(e.Canonical(), key)) return false;
+            if (e.PrevHash != prev || e.Hash != HashChain.ComputeHash(e.Canonical(), key))
+            {
+                // ACTIVE tamper signal (SEC-AUD-01): a broken/forged chain is a high-severity security
+                // event, never a silent false. When App Insights is configured, this ILogger record flows
+                // to it automatically (no hard dependency). The audit ROW detail is not logged here (it may
+                // reference secrets/labels) — only the position + correlation id.
+                _log.LogCritical(
+                    "SEC-AUD-01: audit chain verification FAILED at sequence {Sequence} — possible tampering. CorrelationId={CorrelationId}",
+                    r.Sequence, Activity.Current?.Id);
+                return false;
+            }
             prev = e.Hash;
         }
         return true;

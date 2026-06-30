@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Pemp.Domain;
 using Pemp.Domain.Audit;
 using Pemp.Infrastructure.Persistence;
@@ -557,6 +558,31 @@ public sealed class PersistenceTests : IDisposable
         var seqs = _db.AuditEntries.Select(a => a.Sequence).ToList();
         Assert.Equal(seqs.Count, seqs.Distinct().Count());  // DB-generated sequence — no duplicate PK
         Assert.Equal(seqBefore + 1, seqs.Count);            // only the winner appended
+    }
+
+    [Fact]
+    public void Tamper_is_logged_as_a_high_severity_event_not_silent()  // rank 6 / SEC-AUD-01 (active tamper signal)
+    {
+        var captured = new List<(LogLevel Level, string Message)>();
+        var logger = new CapturingLogger<EngagementStore>(captured);
+        var store = new EngagementStore(_db, Clock, new AuditHmacKey(Key), logger);
+
+        // Forge a row directly (bypassing EF / the append-only interceptor), as a DBA with table access would.
+        _db.Database.ExecuteSqlRaw(
+            "UPDATE AuditEntries SET Actor='mallory' WHERE Sequence=(SELECT MIN(Sequence) FROM AuditEntries)");
+
+        Assert.False(store.VerifyChain());  // tamper detected ...
+        // ... AND surfaced as a high-severity log (App Insights captures this automatically in prod), not silent.
+        Assert.Contains(captured, e => e.Level == LogLevel.Critical && e.Message.Contains("verification FAILED"));
+    }
+
+    // Minimal capturing logger so a test can assert a security event was LOGGED, not silently swallowed.
+    private sealed class CapturingLogger<T>(List<(LogLevel, string)> sink) : ILogger<T>
+    {
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter) => sink.Add((logLevel, formatter(state, exception)));
     }
 
     public void Dispose()
