@@ -159,6 +159,21 @@ public static class DemoSeeder
         foreach (var code in new[] { "PRE-01", "PRE-02", "PRE-03", "PRE-04", "PRE-05", "PRE-06", "DUR-01", "DUR-02", "DUR-03" })
             db.ChecklistTicks.Add(new ChecklistTickRecord { Id = Guid.NewGuid(), EngagementId = retail.Id, Code = code, Done = true });
 
+        // Engagement communications (FR-NOT-01/03): a couple of demo messages so the comms timeline and
+        // the notification badge have content. Seeded directly (like findings/evidence) — the live post
+        // path is the audited one.
+        var seedAt = clock();
+        CommsMessageRecord M(Guid eng, string author, string role, CommsKind kind, string body, TimeSpan ago)
+            => new() { Id = Guid.NewGuid(), EngagementId = eng, AuthorName = author, AuthorRole = role,
+                       Kind = kind, Body = body, CreatedAt = seedAt - ago };
+        db.CommsMessages.AddRange(
+            M(retail.Id, "A. Khan", "Tester", CommsKind.FindingsSummary,
+              "Same-day findings summary: 1 Critical (auth bypass), 2 High (SQLi, stored XSS). Full register in the Findings tab; draft report to follow after end-of-test.", TimeSpan.FromHours(3)),
+            M(retail.Id, "J. Okafor", "Acme CA Officer", CommsKind.Note,
+              "Thanks — please prioritise the auth-bypass write-up for the post-test call.", TimeSpan.FromHours(2)),
+            M(broker.Id, "R. Patel", "Tester", CommsKind.StatusUpdate,
+              "Peer QA passed; final report released and stored immutable. Retest can be requested once fixes land.", TimeSpan.FromDays(1)));
+
         db.SaveChanges();
     }
 }

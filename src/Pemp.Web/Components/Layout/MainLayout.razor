@@ -1,5 +1,7 @@
 @inherits LayoutComponentBase
 @inject DemoSession Session
+@inject CommsStore Comms
+@inject Func<DateTimeOffset> Clock
 @inject NavigationManager Nav
 
 <a class="skip-link" href="#main">Skip to content</a>
@@ -11,6 +13,11 @@
         <span class="eyebrow">Pentest Engagement Management</span>
         <span class="sp"></span>
         <button type="button" class="btn ghost themebtn" onclick="window.pempToggleTheme()" title="Toggle light / dark" aria-label="Toggle light or dark theme">◐ Theme</button>
+        @* Recent-comms notification badge (FR-NOT-03): a scoped count of messages from the last 7 days
+           across the current user's engagements — recency, not per-user read receipts. *@
+        <a class="notif" href="dashboard" title="@NotifTitle" aria-label="@NotifTitle">
+            🔔@if (_recentComms > 0){<span class="notif-badge">@_recentComms</span>}
+        </a>
         <div class="whoami">
             <span class="whoami-name">@Session.Actor</span>
             <span class="whoami-role">@Session.Role</span>
@@ -70,7 +77,17 @@
     // Role/actor come from the authenticated principal, resolved before any markup renders so
     // the whoami + role-gated nav never flash a default identity (the SSR ordering fix). The
     // 2FA-enrollment gate is now enforced SERVER-SIDE in Program.cs (a real 302), not here.
-    protected override Task OnInitializedAsync() => Session.EnsureInitializedAsync();
+    int _recentComms;
+    string NotifTitle => _recentComms == 0
+        ? "No recent messages across your engagements (last 7 days)"
+        : $"{_recentComms} recent message{(_recentComms == 1 ? "" : "s")} across your engagements (last 7 days)";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureInitializedAsync();
+        // Scoped recency count for the badge (fail-closed: an unscoped role sees 0).
+        _recentComms = await Comms.RecentCountAsync(Session.Caller, Clock().AddDays(-7));
+    }
 
     // aria-current="page" on the NavLink whose route matches the current path; null elsewhere so the
     // attribute is omitted. The layout re-renders on navigation (@Body changes), so this recomputes.

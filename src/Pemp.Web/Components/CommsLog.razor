@@ -1,0 +1,98 @@
+@* Engagement communications timeline (FR-NOT-01/03): the home for the cross-role journeys — the
+   same-day findings summary, post-test notes, status updates. Posting is scoped + audited server-side. *@
+@inject CommsStore Comms
+@inject DemoSession Session
+
+<h2 class="sectionlabel">Communications <Srs>FR-NOT-01/03</Srs></h2>
+<div class="card">
+    @if (Messages.Count == 0)
+    {
+        <p class="muted">No messages yet.</p>
+    }
+    else
+    {
+        <ul class="commslist">
+            @foreach (var m in Messages)
+            {
+                <li class="commsitem">
+                    <div class="commshead">
+                        <span class="pill @KindClass(m.Kind)">@KindLabel(m.Kind)</span>
+                        <b>@m.AuthorName</b>
+                        <span class="muted">@m.AuthorRole</span>
+                        <span class="muted" style="margin-left:auto">@m.CreatedAt.ToString("dd MMM HH:mm")</span>
+                    </div>
+                    <div class="commsbody">@m.Body</div>
+                </li>
+            }
+        </ul>
+    }
+</div>
+
+@if (CanPost)
+{
+    <div class="card">
+        <h3 class="sectionlabel" style="margin-top:0">Post a message <Srs>FR-NOT-01</Srs></h3>
+        <div class="q"><label class="qlabel" for="comms-kind">Kind</label>
+            <select id="comms-kind" class="inp" style="max-width:240px" @bind="_kind">
+                @foreach (var k in Enum.GetValues<CommsKind>()){<option value="@k">@KindLabel(k)</option>}
+            </select>
+        </div>
+        <div class="q" style="border:none">
+            <label class="qlabel" for="comms-body">Message</label>
+            <textarea id="comms-body" class="inp" rows="3" placeholder="message" @bind="_body" @ref="_bodyRef"
+                      aria-invalid="@(_invalid ? "true" : null)" aria-describedby="@(_invalid ? "comms-msg" : null)"></textarea>
+            <button class="btn primary" style="margin-top:8px" @onclick="Post">Post message ▶</button>
+            @if (_msg is not null){<span id="comms-msg" class="muted" style="margin-left:10px" role="status" aria-live="polite">@_msg</span>}
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid EngagementId { get; set; }
+    [Parameter] public List<CommsMessageRecord> Messages { get; set; } = new();
+    [Parameter] public bool CanPost { get; set; }
+    [Parameter] public EventCallback OnPosted { get; set; }
+
+    CommsKind _kind = CommsKind.Note;
+    string _body = "";
+    string? _msg;
+    bool _invalid, _focusError;
+    ElementReference _bodyRef;
+
+    async Task Post()
+    {
+        if (string.IsNullOrWhiteSpace(_body))
+        {
+            _invalid = true; _msg = "Enter a message."; _focusError = true;
+            return;
+        }
+        var result = await Comms.PostMessageAsync(EngagementId, _kind, _body.Trim(), Session.Caller);
+        if (result.Failed) { _invalid = false; _msg = result.Error; return; }
+        _invalid = false; _body = ""; _kind = CommsKind.Note;
+        _msg = "Posted — recorded in the audit log (FR-NOT-01).";
+        if (OnPosted.HasDelegate) await OnPosted.InvokeAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusError)
+        {
+            _focusError = false;
+            try { await _bodyRef.FocusAsync(); } catch { /* not rendered */ }
+        }
+    }
+
+    static string KindLabel(CommsKind k) => k switch
+    {
+        CommsKind.FindingsSummary => "Findings summary",
+        CommsKind.StatusUpdate => "Status update",
+        _ => "Note",
+    };
+
+    static string KindClass(CommsKind k) => k switch
+    {
+        CommsKind.FindingsSummary => "warn",
+        CommsKind.StatusUpdate => "ok",
+        _ => "",
+    };
+}

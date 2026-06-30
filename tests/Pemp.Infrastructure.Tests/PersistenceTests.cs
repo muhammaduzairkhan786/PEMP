@@ -696,6 +696,69 @@ public sealed class PersistenceTests : IDisposable
         Assert.Empty(await _store.OpenFindingCountsAsync(Array.Empty<Guid>()));
     }
 
+    // ---- Communications log (rank 34 / FR-NOT-01/03) ----------------------
+
+    private CommsStore NewComms() => new(_db, Clock, new AuditHmacKey(Key), _store);
+
+    [Fact]
+    public async Task Comms_post_is_scoped_and_audited_without_logging_the_body()  // FR-NOT-01 / SEC-AUD
+    {
+        var comms = NewComms();
+        var id = IdOf("ENG-2026-0408"); // Retail Web, assigned A. Khan
+        var auditBefore = _db.AuditEntries.Count();
+        const string body = "Confidential post-test note with sensitive detail.";
+
+        var before = (await comms.MessagesForAsync(id, Khan)).Count;
+        var result = await comms.PostMessageAsync(id, CommsKind.Note, body, Khan);
+
+        Assert.False(result.Failed);
+        var after = await comms.MessagesForAsync(id, Khan);
+        Assert.Equal(before + 1, after.Count);
+        Assert.Equal("A. Khan", after[0].AuthorName);   // newest first
+        Assert.Equal(body, after[0].Body);
+
+        // Audited (kind only — never the body) and the chain still verifies.
+        Assert.Equal(auditBefore + 1, _db.AuditEntries.Count());
+        var last = _db.AuditEntries.OrderByDescending(a => a.Sequence).First();
+        Assert.Equal("Comms.Posted", last.Action);
+        Assert.Equal("Note", last.After);
+        Assert.DoesNotContain(_db.AuditEntries, a => a.After.Contains(body) || a.Before.Contains(body));
+        Assert.True(new EfAuditChain(_db, Key).Verify());
+    }
+
+    [Fact]
+    public async Task Comms_out_of_scope_post_and_read_are_blocked()  // FR-NOT / anti-BOLA
+    {
+        var comms = NewComms();
+        var id = IdOf("ENG-2026-0408"); // assigned A. Khan
+        var lee = CallerContext.ForTester(DemoSeeder.TesterLee, "S. Lee"); // not assigned
+        var auditBefore = _db.AuditEntries.Count();
+
+        var result = await comms.PostMessageAsync(id, CommsKind.Note, "intrusion", lee);
+        Assert.True(result.Failed);
+        Assert.Contains("scope", result.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(auditBefore, _db.AuditEntries.Count());        // nothing appended on denial
+
+        Assert.Empty(await comms.MessagesForAsync(id, lee));        // out-of-scope read sees nothing
+    }
+
+    [Fact]
+    public async Task Comms_recent_count_is_scoped_to_the_callers_engagements()  // FR-NOT-03 (badge count)
+    {
+        var comms = NewComms();
+        var since = Clock().AddDays(-7);
+
+        // Seeded: Retail Web (assigned A. Khan) has 2 messages; Broker Portal (assigned A. Khan) has 1.
+        Assert.Equal(3, await comms.RecentCountAsync(Khan, since));
+
+        // The Retail Web stakeholder sees only their own app's 2 messages.
+        var stakeholder = CallerContext.ForStakeholder("P. Devlin", DemoSeeder.AppIdFor("Retail Web"));
+        Assert.Equal(2, await comms.RecentCountAsync(stakeholder, since));
+
+        // A scoped role with no scope fails closed → 0.
+        Assert.Equal(0, await comms.RecentCountAsync(new CallerContext("Tester", "Nobody", null, null), since));
+    }
+
     // ---- Evidence download: scope + audit (rank 33 / SEC-EVD-02/03) --------
 
     [Fact]

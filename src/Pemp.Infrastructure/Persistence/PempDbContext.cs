@@ -13,6 +13,7 @@ public sealed class PempDbContext(DbContextOptions<PempDbContext> options) : Ide
     public DbSet<ChecklistTickRecord> ChecklistTicks => Set<ChecklistTickRecord>();
     public DbSet<EvidenceRecord> Evidence => Set<EvidenceRecord>();
     public DbSet<TestCredentialRecord> TestCredentials => Set<TestCredentialRecord>();
+    public DbSet<CommsMessageRecord> CommsMessages => Set<CommsMessageRecord>();
 
     // Append-only enforcement for the audit log at the data layer (SEC-AUD-01). Registered here
     // (rather than only in DI) so EVERY context — app, seeder, and tests — gets it, regardless of
@@ -138,5 +139,17 @@ public sealed class PempDbContext(DbContextOptions<PempDbContext> options) : Ide
         cred.Property(c => c.AddedBy).HasMaxLength(200);
         cred.Property(c => c.KeyVaultSecretUri).HasMaxLength(1024);
         cred.HasOne<EngagementRecord>().WithMany().HasForeignKey(c => c.EngagementId).OnDelete(DeleteBehavior.Restrict);
+
+        // ---- Engagement communications log (FR-NOT-01/03) ------------------
+        var comms = b.Entity<CommsMessageRecord>();
+        comms.HasKey(m => m.Id);
+        // The badge/timeline query filters by engagement and orders by recency — index both columns.
+        comms.HasIndex(m => m.EngagementId);
+        comms.HasIndex(m => m.CreatedAt);
+        comms.Property(m => m.Kind).HasConversion<string>().HasMaxLength(20);
+        comms.Property(m => m.AuthorName).IsRequired().HasMaxLength(200);
+        comms.Property(m => m.AuthorRole).HasMaxLength(50);
+        comms.Property(m => m.Body).IsRequired().HasMaxLength(4000);
+        comms.HasOne<EngagementRecord>().WithMany().HasForeignKey(m => m.EngagementId).OnDelete(DeleteBehavior.Restrict);
     }
 }
