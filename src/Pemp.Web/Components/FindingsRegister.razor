@@ -71,22 +71,28 @@ else if (ShowEmpty)
 {
     <div class="card">
         <div class="sectionlabel" style="margin-top:0">Record a finding <span class="srs">FR-FND-01/03</span></div>
-        <div class="q"><input class="inp" placeholder="title (e.g. SQLi in /search)" @bind="_title" /></div>
-        <div class="q">
-            <select class="inp" style="max-width:210px" @bind="_severity">
+        <div class="q"><label class="qlabel" for="fnd-title">Title</label>
+            <input id="fnd-title" class="inp" placeholder="title (e.g. SQLi in /search)" @bind="_title" /></div>
+        <div class="q"><label class="qlabel" for="fnd-severity">Severity</label>
+            <select id="fnd-severity" class="inp" style="max-width:210px" @bind="_severity">
                 @foreach (var s in Order){<option value="@s">@s</option>}
             </select>
         </div>
-        <div class="q"><input class="inp" placeholder="asset (e.g. Web, API)" @bind="_asset" /></div>
-        <div class="q"><input class="inp" placeholder="CVSS vector (e.g. CVSS:3.1/AV:N/AC:L/...)" @bind="_cvssVector" /></div>
-        <div class="q"><input class="inp" style="max-width:160px" placeholder="CVSS score (e.g. 8.1)" @bind="_cvss" /></div>
-        <div class="q"><textarea class="inp" rows="2" placeholder="remediation" @bind="_remediation"></textarea></div>
+        <div class="q"><label class="qlabel" for="fnd-asset">Asset</label>
+            <input id="fnd-asset" class="inp" placeholder="asset (e.g. Web, API)" @bind="_asset" /></div>
+        <div class="q"><label class="qlabel" for="fnd-cvssvec">CVSS vector</label>
+            <input id="fnd-cvssvec" class="inp" placeholder="CVSS vector (e.g. CVSS:3.1/AV:N/AC:L/...)" @bind="_cvssVector" /></div>
+        <div class="q"><label class="qlabel" for="fnd-cvss">CVSS score</label>
+            <input id="fnd-cvss" class="inp" style="max-width:160px" placeholder="CVSS score (e.g. 8.1)" @bind="_cvss" /></div>
+        <div class="q"><label class="qlabel" for="fnd-remediation">Remediation</label>
+            <textarea id="fnd-remediation" class="inp" rows="2" placeholder="remediation" @bind="_remediation"></textarea></div>
         <div class="q" style="border:none">
-            <select class="inp" style="max-width:210px" @bind="_status">
+            <label class="qlabel" for="fnd-status">Status</label>
+            <select id="fnd-status" class="inp" style="max-width:210px" @bind="_status">
                 @foreach (var st in Enum.GetValues<FindingStatus>()){<option value="@st">@StatusLabel(st)</option>}
             </select>
             <button class="btn primary" style="margin-top:8px" @onclick="Add">Add finding ▶</button>
-            @if (_msg is not null){<span class="muted" style="margin-left:10px">@_msg</span>}
+            @if (_msg is not null){<span class="muted" style="margin-left:10px" role="status" aria-live="polite">@_msg</span>}
         </div>
     </div>
 }

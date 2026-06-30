@@ -61,6 +61,10 @@
             <table class="t">
                 <thead><tr><th>Application</th><th>Stage</th><th>Open findings</th><th>Worst severity</th></tr></thead>
                 <tbody>
+                    @if (_engs.Count == 0)
+                    {
+                        <tr><td colspan="4" class="muted">No engagements yet.</td></tr>
+                    }
                     @foreach (var e in _engs)
                     {
                         var of = _findings.Where(f => f.EngagementId == e.Id && (f.Status is FindingStatus.Open or FindingStatus.RetestPending)).ToList();

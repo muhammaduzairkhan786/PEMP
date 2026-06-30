@@ -46,14 +46,17 @@ else if (ShowEmpty)
 {
     <div class="card">
         <div class="sectionlabel" style="margin-top:0">Add an access requirement <span class="srs">FR-ACC-01</span></div>
-        <div class="q"><input class="inp" placeholder="environment / asset (e.g. Pre-production)" @bind="_env" /></div>
-        <div class="q"><input class="inp" placeholder="URL / detail" @bind="_url" /></div>
+        <div class="q"><label class="qlabel" for="acc-env">Environment / asset</label>
+            <input id="acc-env" class="inp" placeholder="environment / asset (e.g. Pre-production)" @bind="_env" /></div>
+        <div class="q"><label class="qlabel" for="acc-url">URL / detail</label>
+            <input id="acc-url" class="inp" placeholder="URL / detail" @bind="_url" /></div>
         <div class="q" style="border:none">
-            <select class="inp" style="max-width:210px" @bind="_type">
+            <label class="qlabel" for="acc-type">Access</label>
+            <select id="acc-type" class="inp" style="max-width:210px" @bind="_type">
                 @foreach (var t in new[] { "Read", "Read-Write", "Admin", "Other" }){<option value="@t">@t</option>}
             </select>
             <button class="btn primary" style="margin-top:8px" @onclick="AddRow">Add requirement ▶</button>
-            @if (_msg is not null){<span class="muted" style="margin-left:10px">@_msg</span>}
+            @if (_msg is not null){<span class="muted" style="margin-left:10px" role="status" aria-live="polite">@_msg</span>}
         </div>
     </div>
 }
