@@ -1,0 +1,62 @@
+@page "/approvals"
+@attribute [Authorize(Roles = PempRoles.AcmeOfficer + "," + PempRoles.DeliveryManager)]
+@inject EngagementStore Store
+@inject DemoSession Session
+<PageTitle>Approvals · PEMP</PageTitle>
+
+@* Role-tailored rollup (DESIGN_PLAN — role noun-tabs). Acme CA Officer: SoWs awaiting their
+   sign-off (FR-SOW-06). Delivery Manager: Project SoWs awaiting their review (FR-SOW-03). Reuses
+   the scoped store read; both roles are all-portfolio, so scope is honest, not bypassed. *@
+
+<div class="wrap">
+    <div class="eyebrow">@(IsDm ? "Reviews" : "Sign-off queue")</div>
+    <h1 class="title">@(IsDm ? "SoW reviews" : "Approvals")</h1>
+    <p class="sub">@(IsDm
+        ? "Project Statements of Work awaiting your review before Acme sign-off."
+        : "Statements of Work waiting on your signature — testing is blocked until signed.")</p>
+
+    @if (_items is null)
+    {
+        <div aria-busy="true"><Skeleton Rows="4" /></div>
+    }
+    else if (_items.Count == 0)
+    {
+        <div class="card muted">Nothing waiting on you right now.</div>
+    }
+    else
+    {
+        <div class="pile">
+            @foreach (var r in _items)
+            {
+                <div class="row">
+                    <div class="grow">
+                        <span class="verb">@(IsDm ? "Review Project SoW" : "Review & sign SoW")</span> · @r.AppName
+                        <br><span class="ref">@r.Reference · @r.Type.ToString().ToUpperInvariant() · ▸ @(r.AssignedTesterName ?? "—")</span>
+                    </div>
+                    <a class="btn primary" href="@($"engagement/{r.Id}")" aria-label="Open @r.AppName">Open ▶</a>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    bool IsDm => Session.Role == PempRoles.DeliveryManager;
+    List<EngagementRecord>? _items;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureInitializedAsync(); // resolve role/scope before any query (SSR-safe)
+        var recs = await Store.ListScopedAsync(Session.AppScope, Session.TesterScope, Session.Role);
+        _items = recs.Where(AwaitsMe).OrderBy(r => r.Reference).ToList();
+    }
+
+    // The SoW-stage engagements whose NEXT owned action is this role's — derived from the same
+    // workflow projection the rest of the UI uses, so the queue can't drift from "whose turn".
+    bool AwaitsMe(EngagementRecord r)
+    {
+        if (r.CurrentStage != Stage.Sow) return false;
+        var owner = Workflow.Next(r).OwnerRole;
+        return IsDm ? owner == PempRoles.DeliveryManager : owner == PempRoles.AcmeOfficer;
+    }
+}

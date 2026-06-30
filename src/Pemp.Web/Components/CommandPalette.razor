@@ -1,0 +1,230 @@
+@* ⌘K command palette (DESIGN_PLAN — the power-user spine). Searches the CURRENT USER'S scoped
+   engagements (app name + reference) and surfaces quick actions; Enter runs the top hit, ↑↓ move,
+   Esc closes. RBAC-correct: every engagement comes from the scoped store reads (SEC-AZN), never the
+   full portfolio. Mounted once in MainLayout; the global ⌘K listener lives in command-palette.js. *@
+@implements IAsyncDisposable
+@inject EngagementStore Store
+@inject DemoSession Session
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+@if (_open)
+{
+    <div class="cmdk-scrim" @onclick="CloseAsync">
+        <div class="cmdk" @ref="_dialog" role="dialog" aria-modal="true" aria-label="Command palette"
+             tabindex="-1" @onclick:stopPropagation="true" @onkeydown="OnKeyAsync">
+            <div class="cmdk-search">
+                <span class="cmdk-ic" aria-hidden="true">⌘K</span>
+                <input class="cmdk-input" @bind="_query" @bind:event="oninput" @bind:after="OnQueryChanged"
+                       type="text" placeholder="Search engagements & actions…" aria-label="Search engagements and actions"
+                       role="combobox" aria-expanded="true" aria-controls="cmdk-list" autocomplete="off" spellcheck="false" />
+            </div>
+
+            <ul class="cmdk-list" id="cmdk-list" role="listbox" aria-label="Results">
+                @if (_results.Count == 0)
+                {
+                    <li class="cmdk-empty" role="option" aria-disabled="true">No matches in your scope.</li>
+                }
+                else
+                {
+                    @for (var i = 0; i < _results.Count; i++)
+                    {
+                        var idx = i;
+                        var r = _results[i];
+                        <li class="cmdk-item @(idx == _selected ? "on" : "")" role="option"
+                            aria-selected="@(idx == _selected ? "true" : "false")"
+                            @onclick="() => RunAsync(idx)" @onmouseenter="() => _selected = idx">
+                            <span class="cmdk-item-ic" aria-hidden="true">@r.Icon</span>
+                            <span class="cmdk-item-body">
+                                <span class="cmdk-item-title">@r.Title</span>
+                                @if (!string.IsNullOrEmpty(r.Sub))
+                                {
+                                    <span class="cmdk-item-sub">@r.Sub</span>
+                                }
+                            </span>
+                            <span class="cmdk-item-kind">@r.Kind</span>
+                        </li>
+                    }
+                }
+            </ul>
+
+            <div class="cmdk-foot">
+                <span><kbd>↑</kbd><kbd>↓</kbd> move</span>
+                <span><kbd>↵</kbd> open</span>
+                <span><kbd>esc</kbd> close</span>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    // A single result row: a quick action or a scoped engagement match.
+    sealed record Cmd(string Icon, string Title, string Sub, string Kind, string Href);
+
+    bool _open;
+    string _query = "";
+    int _selected;
+    List<Cmd> _results = new();
+
+    // The user's scoped engagements, loaded once on first open and reused while the palette lives.
+    List<EngagementRecord>? _engagements;
+
+    IJSObjectReference? _js;
+    DotNetObjectReference<CommandPalette>? _self;
+    ElementReference _dialog;
+    bool _focusPending;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Register the global ⌘K opener once the component is interactive.
+            _js = await JS.InvokeAsync<IJSObjectReference>("import", "./js/command-palette.js");
+            _self = DotNetObjectReference.Create(this);
+            await _js.InvokeVoidAsync("register", _self);
+        }
+        // After the dialog has rendered, trap focus and move it to the search box.
+        if (_focusPending && _open && _js is not null)
+        {
+            _focusPending = false;
+            await _js.InvokeVoidAsync("trap", _dialog, ".cmdk-input");
+        }
+    }
+
+    // Invoked from command-palette.js when the user presses ⌘K / Ctrl+K.
+    [JSInvokable]
+    public async Task OpenFromJs()
+    {
+        if (_open) { await CloseAsync(); return; } // ⌘K toggles
+        await Session.EnsureInitializedAsync(); // resolve role/scope before any query (SSR-safe / RBAC)
+        // Load the caller's scoped engagements once; the SAME fail-closed scoped read the pages use.
+        _engagements ??= await Store.ListScopedAsync(Session.AppScope, Session.TesterScope, Session.Role);
+        _query = "";
+        _selected = 0;
+        Rebuild();
+        _open = true;
+        _focusPending = true;
+        StateHasChanged();
+    }
+
+    async Task CloseAsync()
+    {
+        if (!_open) return;
+        if (_js is not null)
+        {
+            try { await _js.InvokeVoidAsync("untrap", _dialog); } catch { /* circuit gone */ }
+        }
+        _open = false;
+        StateHasChanged();
+    }
+
+    void OnQueryChanged()
+    {
+        _selected = 0;
+        Rebuild();
+    }
+
+    async Task OnKeyAsync(KeyboardEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case "Escape":
+                await CloseAsync();
+                break;
+            case "ArrowDown":
+                if (_results.Count > 0) _selected = (_selected + 1) % _results.Count;
+                break;
+            case "ArrowUp":
+                if (_results.Count > 0) _selected = (_selected - 1 + _results.Count) % _results.Count;
+                break;
+            case "Enter":
+                await RunAsync(_selected);
+                break;
+        }
+    }
+
+    async Task RunAsync(int idx)
+    {
+        if (idx < 0 || idx >= _results.Count) return;
+        var href = _results[idx].Href;
+        await CloseAsync();
+        Nav.NavigateTo(href);
+    }
+
+    // Build the ranked result list from the static quick actions + the scoped engagements.
+    void Rebuild()
+    {
+        var q = _query.Trim();
+        var scored = new List<(int Score, Cmd Cmd)>();
+
+        foreach (var c in QuickActions())
+        {
+            var s = Score(c.Title, q);
+            if (s >= 0) scored.Add((s, c));
+        }
+
+        foreach (var r in _engagements ?? Enumerable.Empty<EngagementRecord>())
+        {
+            // Match on app name OR reference; the better (lower) of the two wins.
+            var s = Math.Min(Score(r.AppName, q), Score(r.Reference, q));
+            if (s < 0) continue;
+            var next = Workflow.Next(r);
+            var sub = $"{r.Reference} · {Workflow.Label(r.CurrentStage)}" + (next.Label == "—" ? "" : $" — next: {next.Label}");
+            // +100 so quick actions sort above engagements at an equal text score.
+            scored.Add((s + 100, new Cmd("◉", r.AppName, sub, "Engagement", $"engagement/{r.Id}")));
+        }
+
+        _results = scored
+            .OrderBy(x => x.Score)
+            .ThenBy(x => x.Cmd.Title, StringComparer.OrdinalIgnoreCase)
+            .Select(x => x.Cmd)
+            .Take(50)
+            .ToList();
+
+        if (_selected >= _results.Count) _selected = Math.Max(0, _results.Count - 1);
+    }
+
+    // Role-aware quick actions (only what the role can reach — Analytics is portfolio-only, mirroring nav).
+    IEnumerable<Cmd> QuickActions()
+    {
+        yield return new Cmd("⌂", "My Turn", "What needs you now", "Go to", "dashboard");
+        yield return new Cmd("◉", "Engagements", "Your engagement portfolio", "Go to", "engagements");
+        if (Session.Role == PempRoles.AcmeOfficer)
+            yield return new Cmd("＋", "New Request", "Raise a pentest request", "Action", "new-request");
+        if (PempRoles.IsPortfolio(Session.Role))
+            yield return new Cmd("▦", "Analytics", "Exposure at a glance", "Go to", "analytics");
+    }
+
+    // Tiny fuzzy matcher: -1 = no match; lower score = better. Exact substring beats subsequence;
+    // an empty query matches everything (rank 0) so the palette shows recents/quick actions.
+    static int Score(string text, string q)
+    {
+        if (q.Length == 0) return 0;
+        var t = text.ToLowerInvariant();
+        q = q.ToLowerInvariant();
+        var idx = t.IndexOf(q, StringComparison.Ordinal);
+        if (idx >= 0) return idx;            // substring — rank by how early it appears
+        var ti = 0;                          // subsequence fallback
+        foreach (var ch in q)
+        {
+            ti = t.IndexOf(ch, ti);
+            if (ti < 0) return -1;
+            ti++;
+        }
+        return 500;                          // matched as subsequence — ranks below substrings
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_js is not null)
+        {
+            try
+            {
+                await _js.InvokeVoidAsync("unregister");
+                await _js.DisposeAsync();
+            }
+            catch { /* circuit already gone */ }
+        }
+        _self?.Dispose();
+    }
+}
