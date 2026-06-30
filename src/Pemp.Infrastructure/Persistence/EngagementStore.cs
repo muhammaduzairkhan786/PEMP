@@ -625,6 +625,23 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
 
         rec.CopyFrom(aggregate);
         rec.RowVersion = Guid.NewGuid().ToByteArray(); // bump the concurrency token (checked in the UPDATE WHERE)
+
+        // Auto-revoke test credentials the moment the engagement closes (SEC-CRD: time-boxed, revoked
+        // after the engagement). Done in the SAME unit of work as the closing transition + its audit
+        // append, with one chained audit entry — so a closed engagement never leaves live secrets behind.
+        if (rec.CurrentStage == Stage.Closed)
+        {
+            var live = await db.TestCredentials.Where(c => c.EngagementId == id && !c.Revoked).ToListAsync();
+            if (live.Count > 0)
+            {
+                var now = clock();
+                foreach (var c in live) { c.Revoked = true; c.RevokedAt = now; }
+                // Count only — never the labels/secrets.
+                chain.Append(id, caller.Actor, "Credential.AutoRevoked", $"{live.Count} active",
+                    "revoked on engagement close", string.IsNullOrEmpty(caller.Role) ? "system" : $"system:{caller.Role}", now);
+            }
+        }
+
         try
         {
             await db.SaveChangesAsync();

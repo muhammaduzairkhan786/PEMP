@@ -696,6 +696,43 @@ public sealed class PersistenceTests : IDisposable
         Assert.Empty(await _store.OpenFindingCountsAsync(Array.Empty<Guid>()));
     }
 
+    // ---- Credential lifecycle (rank 20 / SEC-CRD) --------------------------
+
+    [Fact]
+    public async Task Expired_or_revoked_credentials_never_return_their_secret()  // SEC-CRD (read enforcement)
+    {
+        var id = IdOf("ENG-2026-0419"); // Payments API at Access, assigned A. Khan
+        var expiredId = await _store.AddTestCredentialAsync(id, "Old QA", "old@test", "expired-secret", Khan,
+            expiresAt: Clock().AddDays(-1));
+        var liveId = await _store.AddTestCredentialAsync(id, "Fresh QA", "fresh@test", "live-secret", Khan,
+            expiresAt: Clock().AddDays(7));
+
+        var creds = await _store.CredentialsForAsync(id);
+        Assert.Equal("", creds.Single(c => c.Id == expiredId).Secret);          // expired → secret withheld
+        Assert.Equal("live-secret", creds.Single(c => c.Id == liveId).Secret);  // in-date → returned
+    }
+
+    [Fact]
+    public async Task Closing_an_engagement_auto_revokes_its_test_credentials()  // SEC-CRD (revoke on close)
+    {
+        var id = IdOf("ENG-2026-0408"); // Retail Web at Findings, assigned A. Khan, has a seeded credential
+        Assert.All(await _store.CredentialsForAsync(id), c => Assert.False(c.Revoked));
+
+        // Drive it to Closed through the enforced path (author → independent QA → release).
+        Assert.False((await _store.ExecuteAsync(id, Khan, EngagementAction.GenerateDraft, e => e.GenerateDraft("A. Khan"))).Failed);
+        Assert.False((await _store.ExecuteAsync(id, Patel, EngagementAction.PeerReview, e => e.PeerReview(DemoSeeder.TesterPatel, true, "R. Patel"))).Failed);
+        Assert.False((await _store.ExecuteAsync(id, Acme, EngagementAction.ReleaseFinal, e => e.ReleaseFinal("J. Okafor", reAuthenticated: true))).Failed);
+        Assert.Equal(Stage.Closed, (await _store.GetAsync(id))!.CurrentStage);
+
+        // Every credential is now revoked and its secret is no longer returned on read.
+        var creds = await _store.CredentialsForAsync(id);
+        Assert.NotEmpty(creds);
+        Assert.All(creds, c => Assert.True(c.Revoked));
+        Assert.All(creds, c => Assert.NotNull(c.RevokedAt));
+        Assert.All(creds, c => Assert.Equal("", c.Secret));
+        Assert.True(new EfAuditChain(_db, Key).Verify());   // the auto-revoke audit entry chains correctly
+    }
+
     // ---- Reference minting (rank 29) ---------------------------------------
 
     [Fact]
