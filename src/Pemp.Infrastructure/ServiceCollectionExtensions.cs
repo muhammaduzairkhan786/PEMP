@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Pemp.Infrastructure.Assessment;
 using Pemp.Infrastructure.Evidence;
 using Pemp.Infrastructure.Persistence;
 
@@ -31,6 +32,8 @@ public static class ServiceCollectionExtensions
         // HMAC-signed tokens (singleton so the pending-token map is shared). PROD swaps this for
         // AzureBlobEvidenceStorage (Blob user-delegation SAS) — see that class's documented seam.
         services.AddSingleton<IEvidenceStorage, LocalEvidenceStorage>();
+        // Assessment .docx import (FR-SCO-01): stateless OpenXML parser/writer — safe to share.
+        services.AddSingleton<IAssessmentDocImporter, DocxAssessmentImporter>();
         return services;
     }
 }

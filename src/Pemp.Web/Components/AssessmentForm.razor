@@ -1,74 +1,135 @@
-@* Conditional assessment questionnaire (workbook Tab 1 / FR-SCO-01). Auto-saves answers. *@
+@* Conditional assessment questionnaire (workbook Tab 1 / FR-SCO-01). Auto-saves answers, with a live
+   completeness payoff, per-field save affordance, smooth reveal of conditional questions, and an
+   "imported" badge on fields filled from an uploaded .docx. Read-only out of stage / wrong role. *@
 @inject EngagementStore Store
 @inject DemoSession Session
 
-<h2 class="sectionlabel" style="margin-top:0">
-    Completeness <Srs>FR-SCO-03</Srs>
-    <span class="muted" style="margin-left:8px">@_answered / @_visible answered (@Pct%)</span>
-</h2>
-<div class="meter"><i style="width:@Pct%"></i></div>
+<div class="asm">
+    @{
+        var complete = _visible > 0 && _answered >= _visible;
+    }
+    <div class="asm-head @(complete ? "complete" : "")">
+        <div class="asm-chip" title="@_answered of @_visible questions answered">
+            <span class="asm-chip-ic" aria-hidden="true">@(complete ? "✓" : "◔")</span>
+            <span class="asm-chip-count">@_answered / @_visible</span>
+            <span class="asm-chip-lbl">answered</span>
+        </div>
+        <div class="asm-head-body">
+            <div class="asm-head-title">Assessment completeness <Srs>FR-SCO-03</Srs></div>
+            <div class="asm-bar" role="progressbar" aria-valuenow="@Pct" aria-valuemin="0" aria-valuemax="100"
+                 aria-label="Assessment completeness">
+                <i style="width:@Pct%"></i>
+            </div>
+            <div class="asm-status" aria-live="polite">@StatusLine</div>
+        </div>
+    </div>
 
-@foreach (var section in VisibleSections())
-{
-    <div class="card">
-        <h3 class="sectionlabel" style="margin-top:0">@section.Name</h3>
-        @foreach (var q in VisibleQuestions(section))
-        {
-            <div class="q">
-                @if (q.Type == QType.Checkbox)
+    @foreach (var section in VisibleSections())
+    {
+        var secQs = VisibleQuestions(section).ToList();
+        var secDone = secQs.Count(q => Answered(q.Id));
+        var secComplete = secQs.Count > 0 && secDone == secQs.Count;
+        <section class="asm-section @(section.ShowIf is not null ? "reveal" : "")" @key="section.Name">
+            <header class="asm-section-head">
+                <h3 class="asm-section-name">@section.Name</h3>
+                <span class="asm-section-prog @(secComplete ? "done" : "")">@secDone / @secQs.Count</span>
+            </header>
+            <div class="asm-fields">
+                @foreach (var q in secQs)
                 {
-                    @* Checkbox group: the caption labels the set; each option is its own wrapped <label>. *@
-                    <span class="qlabel">@q.Text</span>
-                }
-                else
-                {
-                    <label class="qlabel" for="@q.Id">@q.Text</label>
-                }
-                @switch (q.Type)
-                {
-                    case QType.YesNo:
-                        <select id="@q.Id" class="inp" disabled="@ReadOnly" value="@Val(q.Id)" @onchange="e => Save(q.Id, e)">
-                            <option value="">—</option><option>Yes</option><option>No</option>
-                        </select>
-                        break;
-                    case QType.Radio:
-                        <select id="@q.Id" class="inp" disabled="@ReadOnly" value="@Val(q.Id)" @onchange="e => Save(q.Id, e)">
-                            <option value="">—</option>
-                            @foreach (var o in q.Options!){ <option>@o</option> }
-                        </select>
-                        break;
-                    case QType.Checkbox:
-                        <div class="opts">
-                            @foreach (var o in q.Options!)
+                    <div class="asm-field @(q.ShowIf is not null ? "reveal" : "") @(IsImported(q.Id) ? "imported" : "")" @key="q.Id">
+                        <div class="asm-field-top">
+                            @if (q.Type == QType.Checkbox)
                             {
-                                <label class="opt"><input type="checkbox" disabled="@ReadOnly" checked="@HasOpt(q.Id, o)" @onchange="e => ToggleOpt(q.Id, o, e)" /> @o</label>
+                                <span class="asm-label">@q.Text</span>
                             }
+                            else
+                            {
+                                <label class="asm-label" for="@q.Id">@q.Text</label>
+                            }
+                            <span class="asm-field-meta">
+                                @if (IsImported(q.Id))
+                                {
+                                    <span class="asm-badge imported" title="Auto-filled from the uploaded document — review and edit as needed">⇲ imported</span>
+                                }
+                                @switch (SaveStateOf(q.Id))
+                                {
+                                    case SaveState.Saving:
+                                        <span class="asm-save saving">Saving…</span>
+                                        break;
+                                    case SaveState.Saved:
+                                        <span class="asm-save saved">Saved ✓</span>
+                                        break;
+                                }
+                                @if (Answered(q.Id) && SaveStateOf(q.Id) == SaveState.Idle)
+                                {
+                                    <span class="asm-tick" aria-hidden="true">✓</span>
+                                }
+                            </span>
                         </div>
-                        break;
-                    case QType.LongText:
-                        <textarea id="@q.Id" class="inp" rows="2" disabled="@ReadOnly" value="@Val(q.Id)" @onchange="e => Save(q.Id, e)"></textarea>
-                        break;
-                    default:
-                        <input id="@q.Id" class="inp" disabled="@ReadOnly" value="@Val(q.Id)" @onchange="e => Save(q.Id, e)" />
-                        break;
+                        @switch (q.Type)
+                        {
+                            case QType.YesNo:
+                                <select id="@q.Id" class="inp" disabled="@ReadOnly" value="@Val(q.Id)" @onchange="e => Save(q.Id, e)">
+                                    <option value="">—</option><option>Yes</option><option>No</option>
+                                </select>
+                                break;
+                            case QType.Radio:
+                                <select id="@q.Id" class="inp" disabled="@ReadOnly" value="@Val(q.Id)" @onchange="e => Save(q.Id, e)">
+                                    <option value="">—</option>
+                                    @foreach (var o in q.Options!){ <option>@o</option> }
+                                </select>
+                                break;
+                            case QType.Checkbox:
+                                <div class="opts">
+                                    @foreach (var o in q.Options!)
+                                    {
+                                        <label class="opt"><input type="checkbox" disabled="@ReadOnly" checked="@HasOpt(q.Id, o)" @onchange="e => ToggleOpt(q.Id, o, e)" /> @o</label>
+                                    }
+                                </div>
+                                break;
+                            case QType.LongText:
+                                <textarea id="@q.Id" class="inp" rows="2" disabled="@ReadOnly" value="@Val(q.Id)" @onchange="e => Save(q.Id, e)"></textarea>
+                                break;
+                            default:
+                                <input id="@q.Id" class="inp" disabled="@ReadOnly" value="@Val(q.Id)" @onchange="e => Save(q.Id, e)" />
+                                break;
+                        }
+                    </div>
                 }
             </div>
-        }
-    </div>
-}
+        </section>
+    }
+</div>
 
 @code {
     [Parameter] public Guid EngagementId { get; set; }
     [Parameter] public Dictionary<string, string> Answers { get; set; } = new();
     [Parameter] public bool ReadOnly { get; set; }
+    /// <summary>Question ids just auto-filled from an uploaded .docx — flagged for review.</summary>
+    [Parameter] public HashSet<string>? ImportedIds { get; set; }
+    /// <summary>Raised after an answer is saved so the parent can re-evaluate (e.g. the Complete gate).</summary>
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    enum SaveState { Idle, Saving, Saved }
+    readonly Dictionary<string, SaveState> _save = new();
 
     int _visible, _answered;
     int Pct => _visible == 0 ? 0 : (int)Math.Round(100.0 * _answered / _visible);
 
+    string StatusLine => _visible == 0
+        ? "No questions apply yet."
+        : _answered >= _visible
+            ? "All applicable questions answered — ready to confirm."
+            : $"{_visible - _answered} question{(_visible - _answered == 1 ? "" : "s")} left · {Pct}% complete";
+
     protected override void OnParametersSet() => Recount();
 
     string Val(string id) => Answers.TryGetValue(id, out var v) ? v : "";
+    bool Answered(string id) => !string.IsNullOrWhiteSpace(Val(id));
     bool HasOpt(string id, string opt) => Val(id).Split('|', StringSplitOptions.RemoveEmptyEntries).Contains(opt);
+    bool IsImported(string id) => ImportedIds is not null && ImportedIds.Contains(id);
+    SaveState SaveStateOf(string id) => _save.TryGetValue(id, out var s) ? s : SaveState.Idle;
 
     bool Show(string? showIf)
     {
@@ -88,15 +149,14 @@
     void Recount()
     {
         _visible = VisibleSections().Sum(s => VisibleQuestions(s).Count());
-        _answered = VisibleSections().SelectMany(VisibleQuestions).Count(q => !string.IsNullOrWhiteSpace(Val(q.Id)));
+        _answered = VisibleSections().SelectMany(VisibleQuestions).Count(q => Answered(q.Id));
     }
 
     async Task Save(string id, ChangeEventArgs e)
     {
         if (ReadOnly) return;
         Answers[id] = e.Value?.ToString() ?? "";
-        await Store.SaveAssessmentAnswerAsync(EngagementId, id, Answers[id], Session.Caller);
-        Recount();
+        await PersistAsync(id);
     }
 
     async Task ToggleOpt(string id, string opt, ChangeEventArgs e)
@@ -106,7 +166,20 @@
         if (e.Value is true) { if (!set.Contains(opt)) set.Add(opt); }
         else set.Remove(opt);
         Answers[id] = string.Join('|', set);
-        await Store.SaveAssessmentAnswerAsync(EngagementId, id, Answers[id], Session.Caller);
+        await PersistAsync(id);
+    }
+
+    // Optimistic per-field save: show "Saving…" immediately, persist via the scoped + audited store
+    // path, then "Saved ✓". A field edited via import loses its "imported" badge once re-saved here.
+    async Task PersistAsync(string id)
+    {
+        _save[id] = SaveState.Saving;
+        ImportedIds?.Remove(id);
         Recount();
+        StateHasChanged();
+        await Store.SaveAssessmentAnswerAsync(EngagementId, id, Answers[id], Session.Caller);
+        _save[id] = SaveState.Saved;
+        Recount();
+        await OnChanged.InvokeAsync();
     }
 }

@@ -285,4 +285,13 @@ app.MapGet("/evidence/download/{token}", (string token, Pemp.Infrastructure.Evid
     return Results.File(bytes, contentType, downloadName);
 }).RequireAuthorization();
 
+// Blank, structured assessment template (FR-SCO-01). Generated server-side from the live question list
+// so business teams fill the exact 2-column form the importer reads back. Behind sign-in; not engagement
+// specific (the same template applies to every assessment).
+app.MapGet("/assessment/template.docx", (Pemp.Infrastructure.Assessment.IAssessmentDocImporter importer) =>
+    Results.File(importer.BuildBlankTemplate(),
+        Pemp.Infrastructure.Assessment.AssessmentUpload.DocxContentType,
+        "pemp-assessment-template.docx"))
+    .RequireAuthorization();
+
 app.Run();
