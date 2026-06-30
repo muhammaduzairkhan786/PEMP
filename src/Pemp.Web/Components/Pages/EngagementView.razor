@@ -7,7 +7,7 @@
 
 @if (!_loaded)
 {
-    <div class="wrap"><Skeleton Rows="5" /></div>
+    <div class="wrap" aria-busy="true"><Skeleton Rows="5" /></div>
 }
 else if (_rec is null)
 {
@@ -39,9 +39,10 @@ else
 
         @if (_reauthFor != ActionKind.None)
         {
-            <div class="scrim" @onclick="Cancel">
-                <div class="modal" @onclick:stopPropagation="true">
-                    <h3>@ModalTitle()</h3>
+            <div class="scrim" @onclick="Cancel" @onkeydown="OnModalKey">
+                <div class="modal" @ref="_modalRef" tabindex="-1" role="dialog" aria-modal="true"
+                     aria-labelledby="gate-title" @onclick:stopPropagation="true">
+                    <h3 id="gate-title">@ModalTitle()</h3>
                     <p class="muted" style="margin-bottom:12px">@ModalIntro()</p>
                     <ul class="attest">@foreach (var l in ModalLines()){<li>@l</li>}</ul>
                     <div class="chainline"><span class="tick">🔗</span> Creates an immutable, hash-chained record · <span class="srs">SEC-AUD-01</span></div>
@@ -154,6 +155,8 @@ else
     string? _error, _ok;
     bool? _chainOk;
     ActionKind _reauthFor = ActionKind.None;
+    ElementReference _modalRef;
+    bool _focusModal;
 
     // QA peer reviewer must differ from the assigned tester (no self-review, FR-REP-02).
     Guid Reviewer() => _rec!.AssignedTesterId == DemoSeeder.TesterPatel ? DemoSeeder.TesterKhan : DemoSeeder.TesterPatel;
@@ -192,8 +195,23 @@ else
     async Task OnAct(ActionKind k)
     {
         _error = _ok = null; _chainOk = null;
-        if (Workflow.NeedsReauth(k)) _reauthFor = k;       // show the re-auth confirm step
+        if (Workflow.NeedsReauth(k)) { _reauthFor = k; _focusModal = true; } // show the re-auth confirm step
         else await Run(k, false);                          // await so the UI re-renders (async DB providers)
+    }
+
+    // Move focus into the gate-ceremony dialog when it opens (accessibility).
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusModal && _reauthFor != ActionKind.None)
+        {
+            _focusModal = false;
+            await _modalRef.FocusAsync();
+        }
+    }
+
+    void OnModalKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape") Cancel();
     }
 
     void Cancel() => _reauthFor = ActionKind.None;

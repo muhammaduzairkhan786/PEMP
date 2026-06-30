@@ -26,6 +26,22 @@
             </div>
         </section>
 
+        <div class="landing-spine" aria-hidden="true">
+            @{ var stages = new[] { "Intake", "Scoping", "Sign-off", "Access", "Testing", "Findings", "Report" }; }
+            @for (var i = 0; i < stages.Length; i++)
+            {
+                var cls = i < 2 ? "done" : i == 2 ? "gate" : "future";
+                <div class="ls-node @cls">
+                    <span class="ls-bead">@(i == 2 ? "🔒" : "")</span>
+                    <span class="ls-lbl">@stages[i]</span>
+                </div>
+                @if (i < stages.Length - 1)
+                {
+                    <span class="ls-conn @(i < 2 ? "done" : "")"></span>
+                }
+            }
+        </div>
+
         <section class="landing-grid">
             <div class="landing-card">
                 <div class="landing-ic">⛓</div>

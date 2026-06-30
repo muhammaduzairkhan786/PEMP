@@ -5,6 +5,7 @@
 @using System.Globalization
 @using System.Text
 @using System.Text.Encodings.Web
+@using QRCoder
 @inject UserManager<ApplicationUser> UserManager
 @inject IdentityUserAccessor UserAccessor
 @inject IdentityRedirectManager RedirectManager
@@ -24,7 +25,12 @@
         Install an authenticator app — Microsoft Authenticator, Google Authenticator, or 1Password.
     </li>
     <li>
-        Add the account to your app — scan the link or type the key in manually:
+        Scan this QR code with your authenticator app:
+        <figure class="qr-figure">
+            <div class="qr-frame" role="img" aria-label="Authenticator setup QR code">@qrSvg</div>
+            <figcaption class="muted">Point your authenticator app's camera here</figcaption>
+        </figure>
+        <div class="qr-divider"><span>or enter the key by hand</span></div>
         <div class="auth-key">
             <span class="muted">Setup key</span>
             <code class="mono">@sharedKey</code>
@@ -33,7 +39,7 @@
             <span class="auth-otp-icon">⧉</span>
             <span>
                 <b>Open in authenticator app</b>
-                <span class="muted">Tap on mobile, or copy the link below to scan / paste</span>
+                <span class="muted">On mobile, tap to add it directly — no scanning needed</span>
             </span>
         </a>
         <details class="auth-uri">
@@ -63,6 +69,7 @@
     private string? message;
     private string sharedKey = "";
     private string authenticatorUri = "";
+    private MarkupString qrSvg;
 
     [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
 
@@ -116,6 +123,13 @@
             UrlEncoder.Default.Encode("PEMP"),
             UrlEncoder.Default.Encode(email!),
             unformattedKey);
+
+        // Render a real, scannable QR from the otpauth:// URI as inline SVG (no JS, works in static SSR).
+        // High dark/light contrast (modules on white) so it scans cleanly regardless of theme.
+        using var generator = new QRCodeGenerator();
+        var data = generator.CreateQrCode(authenticatorUri, QRCodeGenerator.ECCLevel.Q);
+        var svg = new SvgQRCode(data).GetGraphic(4, "#0b0f1a", "#ffffff");
+        qrSvg = new MarkupString(svg);
     }
 
     private static string FormatKey(string unformattedKey)

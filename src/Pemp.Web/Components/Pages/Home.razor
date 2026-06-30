@@ -11,7 +11,7 @@
 
     @if (_items is null)
     {
-        <Skeleton Rows="5" />
+        <div aria-busy="true"><Skeleton Rows="5" /></div>
     }
     else
     {
@@ -40,6 +40,10 @@
         </div>
 
         <div class="sectionlabel">Waiting on others <span class="srs">FR-NOT-03</span></div>
+        @if (others.Count == 0)
+        {
+            <div class="card muted">Nothing in flight elsewhere right now.</div>
+        }
         <div class="pile">
             @foreach (var i in others)
             {
