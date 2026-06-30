@@ -618,6 +618,30 @@ public sealed class PersistenceTests : IDisposable
         Assert.NotNull(await _store.GetScopedAsync(childId.Value, null, DemoSeeder.TesterKhan, role: "Tester"));
     }
 
+    // ---- Analytics SQL aggregate (rank 15 / FR-ANL-04) ---------------------
+
+    [Fact]
+    public async Task OpenFindingCounts_aggregates_open_findings_per_engagement_and_severity_in_sql()
+    {
+        var retail = IdOf("ENG-2026-0408");
+        var broker = IdOf("ENG-2026-0399");
+
+        var counts = await _store.OpenFindingCountsAsync(new[] { retail, broker });
+
+        // Retail Web open buckets: Critical 1, High 2, Low 1 — the Remediated Medium finding is excluded.
+        Assert.Equal(1, counts.Single(c => c.EngagementId == retail && c.Severity == Severity.Critical).Count);
+        Assert.Equal(2, counts.Single(c => c.EngagementId == retail && c.Severity == Severity.High).Count);
+        Assert.Equal(1, counts.Single(c => c.EngagementId == retail && c.Severity == Severity.Low).Count);
+        Assert.DoesNotContain(counts, c => c.EngagementId == retail && c.Severity == Severity.Medium);
+
+        // Broker Portal: only the RetestPending IDOR (High) is open; the Closed Medium is excluded.
+        Assert.Equal(1, counts.Single(c => c.EngagementId == broker && c.Severity == Severity.High).Count);
+        Assert.DoesNotContain(counts, c => c.EngagementId == broker && c.Severity == Severity.Medium);
+
+        // An empty scope yields no rows (a scoped role with no engagements sees nothing).
+        Assert.Empty(await _store.OpenFindingCountsAsync(Array.Empty<Guid>()));
+    }
+
     // ---- Reference minting (rank 29) ---------------------------------------
 
     [Fact]

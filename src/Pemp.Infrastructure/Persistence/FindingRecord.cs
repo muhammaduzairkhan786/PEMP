@@ -6,6 +6,12 @@ namespace Pemp.Infrastructure.Persistence;
 public enum Severity { Critical, High, Medium, Low, Info }
 
 /// <summary>
+/// A SQL-side analytics aggregate (FR-ANL-04): the number of OPEN findings of one <see cref="Severity"/>
+/// for one engagement. Produced by a GROUP BY so the dashboard never materializes raw findings.
+/// </summary>
+public sealed record OpenFindingCount(Guid EngagementId, Severity Severity, int Count);
+
+/// <summary>
 /// A vulnerability finding in the live register (FR-FND-01/03/04). Entered once,
 /// flows into the consolidated register; status tracked through remediation/retest.
 /// </summary>

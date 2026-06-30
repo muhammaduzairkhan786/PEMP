@@ -217,14 +217,24 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
         db.Findings.AsNoTracking().ToListAsync();
 
     /// <summary>
-    /// DB-side scoped findings aggregate feed (FR-ANL-04): only findings for the supplied (already
-    /// scope-filtered) engagement ids, filtered in SQL — no portfolio-wide client materialization.
+    /// DB-side scoped analytics feed (FR-ANL-04): the count of OPEN findings (Open | RetestPending)
+    /// per (engagement, severity) for the supplied — already scope-filtered — engagement ids. The
+    /// filter + GROUP BY run in SQL, so only the compact per-bucket counts come back, never the full
+    /// portfolio of finding rows. The dashboard derives totals, the severity distribution, and each
+    /// app's worst severity from this small set (worst = enum-min, computed correctly client-side —
+    /// Severity is persisted as a string, so a SQL MIN would order alphabetically, not by severity).
+    /// An empty id set short-circuits to an empty result (a scoped role with no scope sees nothing).
     /// </summary>
-    public Task<List<FindingRecord>> ScopedFindingsAsync(IReadOnlyCollection<Guid> engagementIds)
+    public Task<List<OpenFindingCount>> OpenFindingCountsAsync(IReadOnlyCollection<Guid> engagementIds)
     {
-        if (engagementIds.Count == 0) return Task.FromResult(new List<FindingRecord>());
+        if (engagementIds.Count == 0) return Task.FromResult(new List<OpenFindingCount>());
         var ids = engagementIds.ToList();
-        return db.Findings.AsNoTracking().Where(f => ids.Contains(f.EngagementId)).ToListAsync();
+        return db.Findings.AsNoTracking()
+            .Where(f => ids.Contains(f.EngagementId)
+                        && (f.Status == FindingStatus.Open || f.Status == FindingStatus.RetestPending))
+            .GroupBy(f => new { f.EngagementId, f.Severity })
+            .Select(g => new OpenFindingCount(g.Key.EngagementId, g.Key.Severity, g.Count()))
+            .ToListAsync();
     }
 
     public Task<List<AuditEntryRow>> AuditForAsync(Guid id) =>
