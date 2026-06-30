@@ -14,6 +14,11 @@
             h.setAttribute('data-theme', t);
             try { localStorage.setItem('pemp-theme', t); } catch (e) { }
         };
+        // Delegated handler so the theme buttons work under the strict CSP (inline onclick=
+        // attributes are blocked by script-src; a listener from this nonce'd block is allowed).
+        document.addEventListener('click', function (e) {
+            if (e.target && e.target.closest && e.target.closest('.themebtn')) window.pempToggleTheme();
+        });
         // Client-side file download (used by the admin audit CSV export).
         window.pempDownload = function (filename, text) {
             var blob = new Blob([text], { type: 'text/csv;charset=utf-8;' });
