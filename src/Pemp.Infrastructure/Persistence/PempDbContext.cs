@@ -82,6 +82,13 @@ public sealed class PempDbContext(DbContextOptions<PempDbContext> options) : Ide
         fnd.Property(f => f.Status).HasConversion<string>().HasMaxLength(20);
         fnd.Property(f => f.Title).IsRequired().HasMaxLength(400);
         fnd.Property(f => f.Cvss).HasMaxLength(16);
+        // Numeric CVSS base score (FR-FND-01): persisted as a real number, not just the display string,
+        // so analytics sort/range by exposure NUMERICALLY (a string MAX orders "10.0" before "9.1"). On
+        // Azure SQL this is decimal(3,1); on SQLite (no native decimal type) it is stored as REAL via a
+        // double converter so ORDER BY / comparisons stay numeric rather than lexicographic over TEXT.
+        var cvssScore = fnd.Property(f => f.CvssScore);
+        if (Database.IsSqlite()) cvssScore.HasConversion<double>();
+        else cvssScore.HasPrecision(3, 1);
         fnd.Property(f => f.CvssVector).HasMaxLength(128);
         fnd.Property(f => f.Asset).HasMaxLength(200);
         fnd.Property(f => f.Remediation).HasMaxLength(4000);

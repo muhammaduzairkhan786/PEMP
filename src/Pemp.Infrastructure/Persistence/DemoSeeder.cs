@@ -108,7 +108,11 @@ public static class DemoSeeder
 
         // Live register (FR-FND): findings for the engagements that have reached testing.
         FindingRecord F(Guid eng, string title, Severity sev, string cvss, string vector, string asset, string remediation, FindingStatus status)
-            => new() { Id = Guid.NewGuid(), EngagementId = eng, Title = title, Severity = sev, Cvss = cvss, CvssVector = vector, Asset = asset, Remediation = remediation, Status = status };
+            => new() { Id = Guid.NewGuid(), EngagementId = eng, Title = title, Severity = sev, Cvss = cvss,
+                       // Backfill the numeric score from the display string so analytics rank these seeded
+                       // findings numerically (the live add-path passes the resolved decimal directly).
+                       CvssScore = decimal.TryParse(cvss, System.Globalization.CultureInfo.InvariantCulture, out var sc) ? sc : null,
+                       CvssVector = vector, Asset = asset, Remediation = remediation, Status = status };
         // Retail Web is mid-test and has NOT been retested, so its findings are Open (not RetestPending,
         // which is only valid once a retest child is carrying them for re-verification).
         var fSqli = F(retail.Id, "SQLi in /claims search", Severity.High, "8.1", "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N", "Web", "Use parameterised queries; validate and allow-list input.", FindingStatus.Open);

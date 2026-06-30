@@ -181,8 +181,13 @@ else if (ShowEmpty)
             return;
         }
         _invalid = false;
+        // Persist the numeric base score alongside the display string: prefer the value the user
+        // entered/edited in the score field, falling back to the live-derived score from the vector.
+        decimal? score = decimal.TryParse(_cvss.Trim(), NumberStyles.Number, CultureInfo.InvariantCulture, out var s)
+            ? Math.Round(s, 1)
+            : _derived is double d ? Math.Round((decimal)d, 1) : null;
         await Store.AddFindingAsync(EngagementId, _title.Trim(), _severity, _cvss.Trim(),
-            _cvssVector.Trim(), _asset.Trim(), _remediation.Trim(), Session.Caller, _status);
+            _cvssVector.Trim(), _asset.Trim(), _remediation.Trim(), Session.Caller, _status, cvssScore: score);
         _title = _asset = _cvss = _cvssVector = _remediation = "";
         _severity = Severity.Medium; _status = FindingStatus.Open;
         _derived = null; _derivedSeverity = Severity.Info;

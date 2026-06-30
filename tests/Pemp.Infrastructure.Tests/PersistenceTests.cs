@@ -696,6 +696,53 @@ public sealed class PersistenceTests : IDisposable
         Assert.Empty(await _store.OpenFindingCountsAsync(Array.Empty<Guid>()));
     }
 
+    // ---- Numeric CVSS score (rank 26 / FR-FND-01) --------------------------
+
+    [Fact]
+    public async Task AddFinding_round_trips_the_numeric_cvss_score()  // rank 26 (real decimal, not just the string)
+    {
+        var id = IdOf("ENG-2026-0408"); // Retail Web, mid-test, assigned A. Khan
+        var fid = await _store.AddFindingAsync(
+            id, "Open redirect on /login", Severity.Medium, "7.5",
+            "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:N/I:L/A:N", "Web",
+            "Validate redirect targets.", Khan, cvssScore: 7.5m);
+
+        var added = (await _store.FindingsForAsync(id)).Single(f => f.Id == fid);
+        Assert.Equal(7.5m, added.CvssScore);   // persisted numerically, round-trips
+        Assert.Equal("7.5", added.Cvss);       // the display string is unchanged
+    }
+
+    [Fact]
+    public async Task WorstOpenCvss_ranks_numerically_not_alphabetically()  // rank 26 ("10.0" must outrank "9.1")
+    {
+        var id = IdOf("ENG-2026-0408");
+        await _store.AddFindingAsync(id, "Score nine-one", Severity.Critical, "9.1",
+            "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N", "API", "x", Khan, cvssScore: 9.1m);
+        await _store.AddFindingAsync(id, "Score ten", Severity.Critical, "10.0",
+            "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H", "API", "x", Khan, cvssScore: 10.0m);
+
+        var worst = await _store.WorstOpenCvssAsync(new[] { id });
+
+        // A lexicographic MAX would pick "9.1" (since "9" > "1"); the numeric max is 10.0.
+        Assert.Equal(10.0m, worst[id]);
+        Assert.Empty(await _store.WorstOpenCvssAsync(Array.Empty<Guid>()));
+    }
+
+    [Fact]
+    public async Task RequestRetest_carries_the_numeric_cvss_score_into_the_child()  // rank 26 / FR-RET-02
+    {
+        var parentId = IdOf("ENG-2026-0399"); // Broker Portal, closed
+        var src = (await _store.FindingsForAsync(parentId))
+            .First(f => f.Status != FindingStatus.Closed && f.Status != FindingStatus.AcceptedRisk);
+        Assert.NotNull(src.CvssScore);
+
+        var (result, childId) = await _store.RequestRetestAsync(parentId, Acme);
+        Assert.False(result.Failed);
+
+        var child = (await _store.FindingsForAsync(childId!.Value)).Single(f => f.Title == src.Title);
+        Assert.Equal(src.CvssScore, child.CvssScore);
+    }
+
     // ---- Guarded finding-status lifecycle (rank 36 / FR-FND-04) ------------
 
     [Fact]
