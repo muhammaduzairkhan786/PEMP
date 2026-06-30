@@ -1,0 +1,39 @@
+/* EngagementView — scoped styles for the progressive-disclosure layout. The cards, spine, banners
+   and chips all come from the global stylesheet (reused read-only); these rules only cover the new
+   tab-panel container and the Overview summary grid, theme-correct via tokens. */
+
+.tabpanel {
+    outline: none;
+}
+
+.tabpanel:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 4px;
+    border-radius: var(--radius-md);
+}
+
+/* Overview summary: responsive key/value grid. */
+.ovgrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: var(--space-3) var(--space-4);
+    margin: 0;
+}
+
+.ovgrid > div {
+    min-width: 0;
+}
+
+.ovgrid dt {
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--ink-muted);
+    margin-bottom: 2px;
+}
+
+.ovgrid dd {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--text-base);
+}

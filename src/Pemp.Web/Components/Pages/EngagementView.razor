@@ -1,15 +1,8 @@
 @page "/engagement/{Id:guid}"
 @attribute [Authorize]
-@using Microsoft.AspNetCore.Identity
-@using Microsoft.Extensions.DependencyInjection
 @inject EngagementStore Store
 @inject DemoSession Session
 @inject NavigationManager Nav
-@inject IConfiguration Configuration
-@inject IServiceProvider Services
-@inject IJSRuntime JS
-@inject ILogger<EngagementView> Logger
-@implements IAsyncDisposable
 <PageTitle>Engagement · PEMP</PageTitle>
 
 @if (!_loaded)
@@ -43,38 +36,9 @@ else
             · tester @(_rec.AssignedTesterName ?? "—")
         </p>
 
+        @* The spine + the current next-action card own the viewport; everything else is progressively
+           disclosed behind the drawer-rail tabs below (DESIGN_PLAN §1.4 / §4 / fleet ranks 23+28). *@
         <div class="card"><Spine Current="_rec.CurrentStage" /></div>
-
-        @if (_reauthFor != ActionKind.None)
-        {
-            <div class="scrim" @onclick="Cancel" @onkeydown="OnModalKey">
-                <div class="modal" @ref="_modalRef" tabindex="-1" role="dialog" aria-modal="true"
-                     aria-labelledby="gate-title" @onclick:stopPropagation="true">
-                    <h3 id="gate-title">@ModalTitle()</h3>
-                    <p class="muted" style="margin-bottom:12px">@ModalIntro()</p>
-                    <ul class="attest">@foreach (var l in ModalLines()){<li>@l</li>}</ul>
-                    <div class="chainline"><span class="tick">🔗</span> Creates an immutable, hash-chained record<Srs Sep>SEC-AUD-01</Srs></div>
-                    @if (EntraConfigured)
-                    {
-                        <div class="reauthnote">🔐 Re-authenticate via Entra MFA before it commits<Srs Sep>SEC-IAM-04</Srs></div>
-                    }
-                    else
-                    {
-                        <div class="reauthnote">🔐 Enter your current authenticator (TOTP) code to confirm this privileged action<Srs Sep>SEC-IAM-04</Srs></div>
-                        <input class="inp mono" style="max-width:200px;margin-top:8px" @bind="_totp" @bind:event="oninput"
-                               @onkeydown="OnTotpKey" inputmode="numeric" autocomplete="one-time-code" placeholder="123 456" aria-label="Authenticator code" />
-                    }
-                    @if (_modalError is not null)
-                    {
-                        <div class="banner err" style="margin-top:8px" role="alert">⛔ @_modalError</div>
-                    }
-                    <div class="actions">
-                        <button class="btn ghost" @onclick="Cancel">Cancel</button>
-                        <button class="btn primary" @onclick="ConfirmReauth">@(EntraConfigured ? "Confirm via Entra MFA ▶" : "Verify & confirm ▶")</button>
-                    </div>
-                </div>
-            </div>
-        }
 
         @if (_error is not null)
         {
@@ -87,133 +51,195 @@ else
             <div class="banner ok" role="status" aria-live="polite">✓ @_ok</div>
         }
 
-        @if (next.Kind == ActionKind.None)
-        {
-            <div class="card"><b>Engagement closed.</b> Final report released and stored immutable (FR-REP-04).
-                @if (_rec.RetestRequested){<span class="muted"> · ↻ a retest child engagement was created.</span>}
-            </div>
-            @if (_rec.CurrentStage == Stage.Closed && !_rec.RetestRequested && (Session.Role == PempRoles.AcmeOfficer || Session.Role == PempRoles.Stakeholder))
+        <PanelBoundary Label="The next action">
+            @if (next.Kind == ActionKind.None)
             {
-                <div style="margin-top:var(--space-2)"><button class="btn ghost" @onclick="Retest">↻ Request a retest (optional) · FR-RET-01</button></div>
+                <div class="card"><b>Engagement closed.</b> Final report released and stored immutable (FR-REP-04).
+                    @if (_rec.RetestRequested){<span class="muted"> · ↻ a retest child engagement was created.</span>}
+                </div>
+                @if (_rec.CurrentStage == Stage.Closed && !_rec.RetestRequested && (Session.Role == PempRoles.AcmeOfficer || Session.Role == PempRoles.Stakeholder))
+                {
+                    <div style="margin-top:var(--space-2)"><button class="btn ghost" @onclick="Retest">↻ Request a retest (optional) · FR-RET-01</button></div>
+                }
             }
-        }
-        else if (mine)
-        {
-            <div class="card nextaction">
-                <div style="font-size:26px">▸</div>
-                <div class="meta"><b>@next.Label</b><span class="muted">Owner: You (@Session.Role)@(Workflow.NeedsReauth(next.Kind) ? " · re-auth required (SEC-IAM-04)" : "")</span></div>
-                @if (next.Kind == ActionKind.AssignTester)
-                {
-                    <div class="picker">
-                        <label class="qlabel">Assign from the capacity board <Srs>FR-ASG-02/03</Srs></label>
-                        <select class="inp" style="max-width:300px" @bind="_assignTesterId">
-                            @foreach (var t in DemoSeeder.Testers)
-                            {
-                                <option value="@t.Id">@t.Name — @Capacity(t.Name) active</option>
-                            }
-                        </select>
-                        <button class="btn primary" style="margin-top:8px" @onclick="() => OnAct(ActionKind.AssignTester)">Assign tester ▶</button>
-                    </div>
-                }
-                else if (next.Kind == ActionKind.CompleteAssessment)
-                {
-                    <a class="btn primary" href="@($"engagement/{Id}/assessment")">Open assessment form ▶</a>
-                }
-                else if (next.Kind == ActionKind.PeerReview)
-                {
-                    @if (IsAuthor)
+            else if (mine)
+            {
+                <div class="card nextaction">
+                    <div style="font-size:26px">▸</div>
+                    <div class="meta"><b>@next.Label</b><span class="muted">Owner: You (@Session.Role)@(Workflow.NeedsReauth(next.Kind) ? " · re-auth required (SEC-IAM-04)" : "")</span></div>
+                    @if (next.Kind == ActionKind.AssignTester)
                     {
-                        <p class="muted">QA peer review needs an <b>independent reviewer</b> — the report's author can't pass their own QA (FR-REP-02). Another tester must sign in to review.</p>
+                        <div class="picker">
+                            <label class="qlabel">Assign from the capacity board <Srs>FR-ASG-02/03</Srs></label>
+                            <select class="inp" style="max-width:300px" @bind="_assignTesterId" disabled="@_busy">
+                                @foreach (var t in DemoSeeder.Testers)
+                                {
+                                    <option value="@t.Id">@t.Name — @Capacity(t.Name) active</option>
+                                }
+                            </select>
+                            <button class="btn primary" style="margin-top:8px" disabled="@_busy" @onclick="() => OnAct(ActionKind.AssignTester)">@(_busy ? "Working…" : "Assign tester ▶")</button>
+                        </div>
+                    }
+                    else if (next.Kind == ActionKind.CompleteAssessment)
+                    {
+                        <a class="btn primary" href="@($"engagement/{Id}/assessment")">Open assessment form ▶</a>
+                    }
+                    else if (next.Kind == ActionKind.PeerReview)
+                    {
+                        @if (IsAuthor)
+                        {
+                            <p class="muted">QA peer review needs an <b>independent reviewer</b> — the report's author can't pass their own QA (FR-REP-02). Another tester must sign in to review.</p>
+                        }
+                        else
+                        {
+                            <button class="btn" disabled="@_busy" @onclick="() => OnAct(ActionKind.PeerReviewReject)">Return to draft</button>
+                            <button class="btn primary" disabled="@_busy" @onclick="() => OnAct(ActionKind.PeerReview)">@(_busy ? "Working…" : "Pass QA ▶")</button>
+                        }
                     }
                     else
                     {
-                        <button class="btn" @onclick="() => OnAct(ActionKind.PeerReviewReject)">Return to draft</button>
-                        <button class="btn primary" @onclick="() => OnAct(ActionKind.PeerReview)">Pass QA ▶</button>
+                        <button class="btn primary" disabled="@_busy" @onclick="() => OnAct(next.Kind)">@(_busy ? "Working…" : next.Label + " ▶")</button>
                     }
-                }
-                else
-                {
-                    <button class="btn primary" @onclick="() => OnAct(next.Kind)">@next.Label ▶</button>
-                }
-            </div>
-        }
-        else
-        {
-            <div class="card">⏳ Waiting on <b>@next.OwnerRole</b> — "@next.Label". <span class="muted">You're viewing as @Session.Role.</span>
-                @if (next.Kind == ActionKind.CompleteAssessment && Session.Role == PempRoles.Stakeholder)
-                {
-                    <div style="margin-top:10px"><a class="btn ghost" href="@($"engagement/{Id}/assessment")">Open assessment form (provide input)</a></div>
-                }
-            </div>
-        }
-
-        <AccessRequirements EngagementId="Id" Reqs="_access"
-                            ShowEmpty="@((int)_rec.CurrentStage >= (int)Stage.Access)"
-                            Editable="@(_rec.CurrentStage == Stage.Access && Session.Role == PempRoles.Tester && _rec.AssignedTesterName == Session.Actor)"
-                            OnAdded="Load" />
-
-        <TestCredentialsPanel EngagementId="Id" Credentials="_credentials"
-                              CanView="@(Session.Role == PempRoles.Tester && _rec.AssignedTesterName == Session.Actor)"
-                              ShowEmpty="@(_rec.CurrentStage == Stage.Access || _rec.CurrentStage == Stage.Execution)" />
-
-        <FindingsRegister Findings="_findings" EngagementId="Id"
-                          ShowEmpty="@((int)_rec.CurrentStage >= (int)Stage.Execution)"
-                          CanAdd="@(Session.Role == PempRoles.Tester && _rec.AssignedTesterName == Session.Actor
-                                    && (_rec.CurrentStage == Stage.Execution || _rec.CurrentStage == Stage.Findings))"
-                          CanRetest="@(Session.Role == PempRoles.Tester && _rec.AssignedTesterName == Session.Actor
-                                       && _rec.CurrentStage == Stage.Retest)"
-                          OnAdded="Load" />
-
-        <EvidencePanel EngagementId="Id" Findings="_findings" Editable="@(Session.Role == PempRoles.Tester && _rec.CurrentStage != Stage.Closed)" />
-
-        @if ((int)_rec.CurrentStage >= (int)Stage.Access)
-        {
-            <ChecklistPanel EngagementId="Id" Done="_checklist"
-                            Editable="@(Session.Role == PempRoles.Tester && (int)_rec.CurrentStage >= (int)Stage.Access && _rec.CurrentStage != Stage.Closed)" />
-        }
-
-        <h2 class="sectionlabel">
-            Audit trail <Srs>SEC-AUD-01</Srs>
-            <button class="btn ghost" style="margin-left:8px" @onclick="Verify">Verify chain</button>
-            @if (_chainOk is not null)
-            {
-                <span class="pill @(_chainOk == true ? "ok" : "warn")" role="status" aria-live="polite">@(_chainOk == true ? "🔗 verified" : "⚠ broken")</span>
+                </div>
             }
-        </h2>
-        <div class="card tablecard">
-            <table class="t">
-                <thead><tr><th>#</th><th>Actor</th><th>Action</th><th>Before → After</th><th>When</th></tr></thead>
-                <tbody>
-                    @foreach (var a in _audit)
+            else
+            {
+                <div class="card">⏳ Waiting on <b>@next.OwnerRole</b> — "@next.Label". <span class="muted">You're viewing as @Session.Role.</span>
+                    @if (next.Kind == ActionKind.CompleteAssessment && Session.Role == PempRoles.Stakeholder)
                     {
-                        <tr>
-                            <td class="mono">@a.Sequence</td>
-                            <td>@a.Actor</td>
-                            <td class="mono">@a.Action</td>
-                            <td class="mono muted">@a.Before → @a.After</td>
-                            <td class="muted">@a.Timestamp.ToString("dd MMM HH:mm")</td>
-                        </tr>
+                        <div style="margin-top:10px"><a class="btn ghost" href="@($"engagement/{Id}/assessment")">Open assessment form (provide input)</a></div>
                     }
-                </tbody>
-            </table>
+                </div>
+            }
+        </PanelBoundary>
+
+        @* Drawer-rail: only the active section renders, so the secondary panels don't all stack into a
+           long scroll and the audit table is fetched lazily (behind its tab), not on every open. *@
+        <EngagementTabs Tabs="BuildTabs()" Active="@_activeTab" ActiveChanged="OnTabChanged" />
+
+        <div id="@($"panel-{_activeTab}")" role="tabpanel" aria-labelledby="@($"tab-{_activeTab}")" tabindex="0" class="tabpanel">
+            @if (_activeTab == "overview")
+            {
+                <PanelBoundary Label="Overview">
+                    <div class="card">
+                        <h2 class="sectionlabel" style="margin-top:0">Overview</h2>
+                        <dl class="ovgrid">
+                            <div><dt>Type</dt><dd>@_rec.Type</dd></div>
+                            <div><dt>Criticality</dt><dd>@_rec.Criticality</dd></div>
+                            <div><dt>Current stage</dt><dd>@Workflow.Label(_rec.CurrentStage)</dd></div>
+                            <div><dt>Assigned tester</dt><dd>@(_rec.AssignedTesterName ?? "—")</dd></div>
+                            <div><dt>Findings</dt><dd>@_findings.Count</dd></div>
+                            <div><dt>Access items</dt><dd>@_access.Count</dd></div>
+                            @if (_rec.ParentId is not null)
+                            {
+                                <div><dt>Retest of</dt><dd>linked parent engagement</dd></div>
+                            }
+                        </dl>
+                        <p class="muted" style="font-size:var(--text-xs);margin-top:var(--space-2)">
+                            Use the tabs above to open findings, access &amp; credentials, evidence, the tester checklist, and the tamper-evident audit trail.
+                        </p>
+                    </div>
+                </PanelBoundary>
+            }
+            else if (_activeTab == "findings")
+            {
+                <PanelBoundary Label="Findings">
+                    <FindingsRegister Findings="_findings" EngagementId="Id"
+                                      ShowEmpty="FindingsShowEmpty"
+                                      CanAdd="CanAddFinding"
+                                      CanRetest="CanRetestFindings"
+                                      OnAdded="OnFindingsChanged" />
+                </PanelBoundary>
+            }
+            else if (_activeTab == "access")
+            {
+                <PanelBoundary Label="Access &amp; credentials">
+                    <AccessRequirements EngagementId="Id" Reqs="_access"
+                                        ShowEmpty="AccessShowEmpty"
+                                        Editable="CanEditAccess"
+                                        OnAdded="OnAccessChanged" />
+
+                    <TestCredentialsPanel EngagementId="Id" Credentials="_credentials"
+                                          CanView="CanViewCredentials"
+                                          ShowEmpty="CredShowEmpty" />
+                </PanelBoundary>
+            }
+            else if (_activeTab == "evidence")
+            {
+                <PanelBoundary Label="Evidence">
+                    <EvidencePanel EngagementId="Id" Findings="_findings" Editable="CanEditEvidence" />
+                    @if (_findings.Count == 0)
+                    {
+                        <div class="card muted">Evidence attaches to findings — it appears here once findings are recorded.</div>
+                    }
+                </PanelBoundary>
+            }
+            else if (_activeTab == "checklist")
+            {
+                <PanelBoundary Label="Checklist">
+                    @if (ShowChecklist)
+                    {
+                        <ChecklistPanel EngagementId="Id" Done="_checklist" Editable="CanEditChecklist" />
+                    }
+                    else
+                    {
+                        <div class="card muted">The tester checklist becomes available once the engagement reaches access verification.</div>
+                    }
+                </PanelBoundary>
+            }
+            else if (_activeTab == "audit")
+            {
+                <PanelBoundary Label="Audit trail">
+                    <h2 class="sectionlabel">
+                        Audit trail <Srs>SEC-AUD-01</Srs>
+                        <button class="btn ghost" style="margin-left:8px" @onclick="Verify">Verify chain</button>
+                        @if (_chainOk is not null)
+                        {
+                            <span class="pill @(_chainOk == true ? "ok" : "warn")" role="status" aria-live="polite">@(_chainOk == true ? "🔗 verified" : "⚠ broken")</span>
+                        }
+                    </h2>
+                    @if (!_auditLoaded)
+                    {
+                        <div class="card" aria-busy="true"><Skeleton Rows="4" /></div>
+                    }
+                    else
+                    {
+                        <div class="card tablecard">
+                            <table class="t">
+                                <thead><tr><th>#</th><th>Actor</th><th>Action</th><th>Before → After</th><th>When</th></tr></thead>
+                                <tbody>
+                                    @foreach (var a in _audit)
+                                    {
+                                        <tr>
+                                            <td class="mono">@a.Sequence</td>
+                                            <td>@a.Actor</td>
+                                            <td class="mono">@a.Action</td>
+                                            <td class="mono muted">@a.Before → @a.After</td>
+                                            <td class="muted">@a.Timestamp.ToString("dd MMM HH:mm")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </PanelBoundary>
+            }
         </div>
+
+        @* The SEC-IAM-04 step-up ceremony (extracted into ReauthDialog). It owns the focus-trap and,
+           on the local path, server-side fresh-TOTP verification; OnConfirmed fires only after a valid
+           code, then the privileged action runs. *@
+        <ReauthDialog Open="@(_reauthFor != ActionKind.None)"
+                      Title="@ModalTitle()" Intro="@ModalIntro()" Lines="@ModalLines()"
+                      ShowChainNote="true"
+                      ConfirmLabel="Verify & confirm ▶"
+                      LogContext="@($"{_reauthFor} on {Id} by actor={Session.Actor}")"
+                      OnConfirmed="OnReauthConfirmed" OnCancelled="OnReauthCancelled" />
     </div>
 }
 
 @code {
     [Parameter] public Guid Id { get; set; }
-
-    // Re-auth gate (SEC-IAM-04). On the LOCAL Identity path the ceremony is REAL: the user must
-    // enter a fresh authenticator (TOTP) code, verified server-side before the privileged action
-    // runs (see ConfirmReauth/VerifyTotpAsync). On the Entra path real step-up is an acr concern
-    // handled by Conditional Access in prod, so that path keeps the existing confirm flag.
-    bool EntraConfigured => !string.IsNullOrWhiteSpace(Configuration["AzureAd:ClientId"]);
-
-    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
-
-    // Fresh-TOTP entry for the local re-auth gate, and any inline error from a bad/blank code.
-    string _totp = "";
-    string? _modalError;
 
     EngagementRecord? _rec;
     List<AuditEntryRow> _audit = new();
@@ -226,12 +252,31 @@ else
     Dictionary<string, int> _capacity = new();
     Guid _assignTesterId = DemoSeeder.TesterKhan;
     int Capacity(string name) => _capacity.TryGetValue(name, out var n) ? n : 0;
+
     string? _error, _ok;
     bool? _chainOk;
     ActionKind _reauthFor = ActionKind.None;
-    ElementReference _modalRef;
-    bool _focusModal;
-    IJSObjectReference? _focusTrap;
+    bool _busy;          // an action is in flight — disables the next-action control (anti double-submit)
+    bool _auditLoaded;   // lazy: the audit rows are fetched only when the Audit tab is opened
+    string _activeTab = "overview";
+
+    Guid _loadedId;
+    bool _loaded;
+
+    // ── Authorization predicates, defined once (decomposed from the inline ternaries — fleet rank 28).
+    // Object-level scope is still enforced server-side on every fetch/action; these only gate the UI.
+    bool IsAssignedTester => _rec is not null && Session.Role == PempRoles.Tester && _rec.AssignedTesterName == Session.Actor;
+    bool IsAuthor => _rec is not null && _rec.AssignedTesterName == Session.Actor;
+    bool CanViewCredentials => IsAssignedTester;
+    bool CanEditAccess => _rec is not null && _rec.CurrentStage == Stage.Access && IsAssignedTester;
+    bool CanAddFinding => _rec is not null && IsAssignedTester && (_rec.CurrentStage == Stage.Execution || _rec.CurrentStage == Stage.Findings);
+    bool CanRetestFindings => _rec is not null && IsAssignedTester && _rec.CurrentStage == Stage.Retest;
+    bool CanEditEvidence => _rec is not null && Session.Role == PempRoles.Tester && _rec.CurrentStage != Stage.Closed;
+    bool ShowChecklist => _rec is not null && (int)_rec.CurrentStage >= (int)Stage.Access;
+    bool CanEditChecklist => _rec is not null && Session.Role == PempRoles.Tester && (int)_rec.CurrentStage >= (int)Stage.Access && _rec.CurrentStage != Stage.Closed;
+    bool AccessShowEmpty => _rec is not null && (int)_rec.CurrentStage >= (int)Stage.Access;
+    bool CredShowEmpty => _rec is not null && (_rec.CurrentStage == Stage.Access || _rec.CurrentStage == Stage.Execution);
+    bool FindingsShowEmpty => _rec is not null && (int)_rec.CurrentStage >= (int)Stage.Execution;
 
     static string TesterName(Guid id) => Array.Find(DemoSeeder.Testers, t => t.Id == id)?.Name ?? "A. Khan";
 
@@ -239,19 +284,32 @@ else
     // display name to a tester id so the domain's no-self-review guard (FR-REP-02) compares the
     // actual reviewer against the author; if the author is the only tester present, it blocks.
     Guid ActingTesterId() => Array.Find(DemoSeeder.Testers, t => t.Name == Session.Actor)?.Id ?? Guid.Empty;
-    bool IsAuthor => _rec is not null && _rec.AssignedTesterName == Session.Actor;
 
-    Guid _loadedId;
-    bool _loaded;
+    List<EngagementTabs.TabItem> BuildTabs() => new()
+    {
+        new("overview", "Overview", "▦"),
+        new("findings", "Findings", "🐞", _findings.Count > 0 ? _findings.Count : null),
+        new("access", "Access & Creds", "🔑", _access.Count > 0 ? _access.Count : null),
+        new("evidence", "Evidence", "📎"),
+        new("checklist", "Checklist", "✓"),
+        new("audit", "Audit", "🔗"),
+    };
 
-    // Load on parameter set (guarded on Id change) so EngagementView→EngagementView
-    // navigation (e.g. opening a spawned retest child) refreshes instead of showing stale data.
+    async Task OnTabChanged(string id)
+    {
+        _activeTab = id;
+        if (id == "audit") await EnsureAuditAsync();   // lazy-load the audit rows on first open
+    }
+
+    // Load on parameter set (guarded on Id change) so EngagementView→EngagementView navigation
+    // (e.g. opening a spawned retest child) refreshes instead of showing stale data.
     protected override async Task OnParametersSetAsync()
     {
         await Session.EnsureInitializedAsync(); // resolve role/scope before any scoped fetch (SSR-safe)
         if (Id == _loadedId) return;
         _loadedId = Id;
         _loaded = false;
+        _activeTab = "overview";
         await Load();
     }
 
@@ -259,12 +317,12 @@ else
     {
         // anti-BOLA + fail-closed scope: a scoped role with no concrete scope reaches nothing (SEC-AZN/SEC-INS-01).
         _rec = await Store.GetScopedAsync(Id, Session.AppScope, Session.TesterScope, Session.Role);
+        InvalidateAudit();
         if (_rec is not null)
         {
-            // Tamper-evidence is checked on READ and surfaced automatically (SEC-AUD-01), not only on a button.
-            var (rows, intact) = await Store.AuditForVerifiedAsync(Id);
-            _audit = rows;
-            _chainOk = intact;
+            // Tamper-evidence is surfaced automatically on READ (SEC-AUD-01) — verify the chain WITHOUT
+            // fetching/rendering the per-engagement audit rows (those load lazily behind the Audit tab).
+            _chainOk = Store.VerifyChain();
             _findings = await Store.FindingsForAsync(Id);
             _access = await Store.AccessReqsForAsync(Id);
             _checklist = await Store.ChecklistDoneAsync(Id);
@@ -275,110 +333,155 @@ else
                 : new();
             if (_rec.CurrentStage == Stage.Assignment)
                 _capacity = await Store.ActiveAssignmentCountsAsync(); // capacity board for the picker
+            if (_activeTab == "audit") await EnsureAuditAsync();
         }
         else
         {
-            _audit = new(); _findings = new(); _access = new(); _checklist = new();
-            _credentials = new(); _capacity = new();
+            _findings = new(); _access = new(); _checklist = new();
+            _credentials = new(); _capacity = new(); _chainOk = null;
         }
         _loaded = true;
     }
 
-    async Task OnAct(ActionKind k)
+    void InvalidateAudit() { _auditLoaded = false; _audit = new(); }
+
+    // Lazy audit fetch: also re-verifies tamper-evidence for this engagement (SEC-AUD-01).
+    async Task EnsureAuditAsync()
     {
-        _error = _ok = null; _chainOk = null;
-        if (Workflow.NeedsReauth(k))
-        {
-            _reauthFor = k; _focusModal = true; _totp = ""; _modalError = null; // open the re-auth ceremony
-        }
-        else await Run(k, false);                          // await so the UI re-renders (async DB providers)
+        if (_auditLoaded || _rec is null) return;
+        var (rows, intact) = await Store.AuditForVerifiedAsync(Id);
+        _audit = rows; _chainOk = intact; _auditLoaded = true;
     }
 
-    // Confirm the privileged action from the re-auth modal. Local path: a fresh authenticator TOTP
-    // code is verified server-side BEFORE the action runs; a wrong/blank code blocks it and changes
-    // nothing. Entra path: keeps the existing confirm flag (real step-up is enforced in prod).
-    async Task ConfirmReauth()
+    async Task OnAct(ActionKind k)
     {
-        var action = _reauthFor;
-        if (EntraConfigured) { await ReleaseFocusTrapAsync(); await Run(action, true); return; }
-
-        _modalError = null;
-        if (await VerifyTotpAsync(_totp))
+        _error = _ok = null;
+        if (Workflow.NeedsReauth(k))
         {
-            _totp = "";
-            await ReleaseFocusTrapAsync();   // restore focus to the trigger before the modal unmounts
-            await Run(action, true);
+            _reauthFor = k;        // open the ReauthDialog ceremony; OnReauthConfirmed runs once verified
         }
         else
         {
-            // Re-auth failure for a privileged action (SEC-IAM-04). Log WHO/WHAT — never the code.
-            Logger.LogWarning("Re-auth (TOTP) failed for {Action} on {EngagementId} by actor={Actor}",
-                action, Id, Session.Actor);
-            _modalError = "That authenticator code wasn't valid. Re-enter the current 6-digit code from your app.";
+            await Run(k, false);   // await so the UI re-renders (async DB providers)
         }
     }
 
-    // Verify a fresh TOTP against the signed-in user's authenticator key (local Identity path only).
-    // The code is never logged. Returns false on any missing dependency so the action stays blocked.
-    async Task<bool> VerifyTotpAsync(string code)
+    async Task OnReauthConfirmed()
     {
-        if (string.IsNullOrWhiteSpace(code) || AuthState is null) return false;
-        var userManager = Services.GetService<UserManager<ApplicationUser>>();
-        if (userManager is null) return false;
-        var principal = (await AuthState).User;
-        var user = await userManager.GetUserAsync(principal);
-        if (user is null) return false;
-        var normalized = code.Replace(" ", string.Empty).Replace("-", string.Empty);
-        return await userManager.VerifyTwoFactorTokenAsync(
-            user, userManager.Options.Tokens.AuthenticatorTokenProvider, normalized);
+        var action = _reauthFor;
+        _reauthFor = ActionKind.None;
+        await Run(action, true);
     }
 
-    // Trap focus inside the gate-ceremony dialog and move focus to the right control on open
-    // (the TOTP input on the local path; the first focusable on the Entra path) — accessibility.
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    void OnReauthCancelled() => _reauthFor = ActionKind.None;
+
+    // Predict the resulting stage for the clear forward transitions so the spine advances instantly
+    // (optimistic UI — DESIGN_PLAN §10 / fleet rank 24). Actions that only flip a within-stage flag
+    // (SendIr, ReviewSow, PeerReview ±, re-draft) return null → no optimistic move. The server result
+    // stays authoritative: a successful action is reconciled by a targeted refetch; a failed one rolls
+    // the spine back. This NEVER weakens a guard — it only hides latency on the happy path.
+    static Stage? PredictStage(ActionKind k, Stage from) => k switch
     {
-        if (_focusModal && _reauthFor != ActionKind.None)
+        ActionKind.RouteToDm          when from == Stage.Intake     => Stage.Assignment,
+        ActionKind.AssignTester       when from == Stage.Assignment => Stage.Scoping,
+        ActionKind.CompleteAssessment when from == Stage.Scoping    => Stage.Sow,
+        ActionKind.SignSow            when from == Stage.Sow        => Stage.Access,
+        ActionKind.VerifyAccess       when from == Stage.Access     => Stage.Execution,
+        ActionKind.EndTest            when from == Stage.Execution  => Stage.Findings,
+        ActionKind.GenerateDraft      when from == Stage.Findings   => Stage.Report,
+        ActionKind.ReleaseFinal       when from == Stage.Report     => Stage.Closed,
+        ActionKind.CompleteRetest     when from == Stage.Retest     => Stage.Closed,
+        _ => null,
+    };
+
+    async Task Run(ActionKind k, bool reauth)
+    {
+        _reauthFor = ActionKind.None;
+        _error = _ok = null;
+        if (_rec is null) return;
+
+        var prevStage = _rec.CurrentStage;
+        var predicted = PredictStage(k, prevStage);
+
+        _busy = true;
+        if (predicted is Stage ps) _rec.CurrentStage = ps;   // optimistic spine advance
+        StateHasChanged();                                   // paint the new state before the round-trip
+
+        var actor = Session.Actor;
+        var caller = Session.Caller;
+        var result = k switch
         {
-            _focusModal = false;
-            _focusTrap ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/focus-trap.js");
-            var initial = EntraConfigured ? null : "input[autocomplete='one-time-code']";
-            await _focusTrap.InvokeVoidAsync("activate", _modalRef, initial);
-        }
-    }
+            ActionKind.RouteToDm        => await Store.ExecuteAsync(Id, caller, EngagementAction.RouteToDeliveryManager, e => e.RouteToDeliveryManager(actor)),
+            ActionKind.AssignTester     => await Store.AssignTesterAsync(Id, _assignTesterId, TesterName(_assignTesterId), caller),
+            ActionKind.CompleteAssessment => await Store.CompleteAssessmentAsync(Id, caller),
+            ActionKind.ReviewSow        => await Store.ExecuteAsync(Id, caller, EngagementAction.ReviewSow, e => e.ReviewSowAsDeliveryManager(actor)),
+            ActionKind.SignSow          => await Store.ExecuteAsync(Id, caller, EngagementAction.SignSow, e => e.SignSow(actor, reauth)),
+            ActionKind.VerifyAccess     => await Store.VerifyAccessAsync(Id, caller, reauth),
+            ActionKind.SendIr           => await Store.ExecuteAsync(Id, caller, EngagementAction.SendIrNotice, e => e.SendIrNotice(actor)),
+            ActionKind.EndTest          => await Store.ExecuteAsync(Id, caller, EngagementAction.EndTest, e => e.EndTest(actor)),
+            ActionKind.GenerateDraft    => await Store.ExecuteAsync(Id, caller, EngagementAction.GenerateDraft, e => e.GenerateDraft(actor)),
+            ActionKind.PeerReview       => await Store.ExecuteAsync(Id, caller, EngagementAction.PeerReview, e => e.PeerReview(ActingTesterId(), true, actor)),
+            ActionKind.PeerReviewReject => await Store.ExecuteAsync(Id, caller, EngagementAction.PeerReview, e => e.PeerReview(ActingTesterId(), false, actor)),
+            ActionKind.ReleaseFinal     => await Store.ExecuteAsync(Id, caller, EngagementAction.ReleaseFinal, e => e.ReleaseFinal(actor, reauth)),
+            ActionKind.CompleteRetest   => await Store.CompleteRetestAsync(Id, caller),
+            _ => Result.Fail("Unsupported action."),
+        };
 
-    // Release the trap and return focus to the trigger button. Called before the modal unmounts.
-    async Task ReleaseFocusTrapAsync()
-    {
-        if (_focusTrap is not null)
+        if (result.Failed)
         {
-            try { await _focusTrap.InvokeVoidAsync("release", _modalRef); } catch { /* circuit gone */ }
+            // Clean rollback: a blocked enforced transition changed nothing server-side, so restore the
+            // optimistic spine and surface the error in the existing live-region banner (no flicker).
+            _rec.CurrentStage = prevStage;
+            _error = result.Error;
+            _busy = false;
+            return;
         }
+
+        _ok = "Done — state advanced and the audit chain was appended atomically.";
+        await RefreshAfterTransitionAsync();   // reconcile only what changed, not the whole page
+        _busy = false;
     }
 
-    async Task OnModalKey(KeyboardEventArgs e)
+    // Authoritative reconcile after a successful transition: re-fetch ONLY the engagement record (the
+    // optimistic guess is replaced by truth), re-verify the tamper indicator, and invalidate the lazy
+    // audit rows. Findings / access / checklist / credentials are untouched (they didn't change).
+    async Task RefreshAfterTransitionAsync()
     {
-        if (e.Key == "Escape") await Cancel();
+        _rec = await Store.GetScopedAsync(Id, Session.AppScope, Session.TesterScope, Session.Role);
+        _chainOk = Store.VerifyChain();
+        InvalidateAudit();
+        if (_rec is not null && _rec.CurrentStage == Stage.Assignment)
+            _capacity = await Store.ActiveAssignmentCountsAsync();
+        if (_activeTab == "audit") await EnsureAuditAsync();
     }
 
-    // Enter on the TOTP field confirms the privileged action (keyboard parity with the primary
-    // button); Esc-to-close is handled by OnModalKey on the scrim. Entra path has no TOTP field.
-    async Task OnTotpKey(KeyboardEventArgs e)
+    // Targeted refresh after a finding is added / retest verdict recorded — only the findings collection
+    // (and the tamper indicator) changed; the audit grew, so invalidate its lazy rows.
+    async Task OnFindingsChanged()
     {
-        if (e.Key == "Enter") await ConfirmReauth();
+        _findings = await Store.FindingsForAsync(Id);
+        _chainOk = Store.VerifyChain();
+        InvalidateAudit();
+        if (_activeTab == "audit") await EnsureAuditAsync();
     }
 
-    async Task Cancel()
+    // Targeted refresh after an access requirement is added — only the access collection changed.
+    async Task OnAccessChanged()
     {
-        await ReleaseFocusTrapAsync();
-        _reauthFor = ActionKind.None; _totp = ""; _modalError = null;
+        _access = await Store.AccessReqsForAsync(Id);
+        _chainOk = Store.VerifyChain();
+        InvalidateAudit();
+        if (_activeTab == "audit") await EnsureAuditAsync();
     }
 
-    public async ValueTask DisposeAsync()
+    void Verify() => _chainOk = Store.VerifyChain();
+
+    async Task Retest()
     {
-        if (_focusTrap is not null)
-        {
-            try { await _focusTrap.DisposeAsync(); } catch { /* circuit already torn down */ }
-        }
+        _error = _ok = null;
+        var (result, childId) = await Store.RequestRetestAsync(Id, Session.Caller);
+        if (result.Failed || childId is null) { _error = result.Error; return; }
+        Nav.NavigateTo($"engagement/{childId}");
     }
 
     string ModalTitle() => _reauthFor switch
@@ -401,46 +504,6 @@ else
         ActionKind.VerifyAccess => new[] { "Access to the in-scope environments is provisioned and working", "Credentials are valid and time-boxed", "Access is verified — testing can then begin (IR notice next)" },
         _ => new[] { "Final report — peer QA passed", "Vulnerability register snapshot", "Stored immutable on release" },
     };
-
-    async Task Run(ActionKind k, bool reauth)
-    {
-        _reauthFor = ActionKind.None;
-        _error = _ok = null; _chainOk = null;
-        var actor = Session.Actor;
-
-        var caller = Session.Caller;
-        var result = k switch
-        {
-            ActionKind.RouteToDm        => await Store.ExecuteAsync(Id, caller, EngagementAction.RouteToDeliveryManager, e => e.RouteToDeliveryManager(actor)),
-            ActionKind.AssignTester     => await Store.AssignTesterAsync(Id, _assignTesterId, TesterName(_assignTesterId), caller),
-            ActionKind.CompleteAssessment => await Store.CompleteAssessmentAsync(Id, caller),
-            ActionKind.ReviewSow        => await Store.ExecuteAsync(Id, caller, EngagementAction.ReviewSow, e => e.ReviewSowAsDeliveryManager(actor)),
-            ActionKind.SignSow          => await Store.ExecuteAsync(Id, caller, EngagementAction.SignSow, e => e.SignSow(actor, reauth)),
-            ActionKind.VerifyAccess     => await Store.VerifyAccessAsync(Id, caller, reauth),
-            ActionKind.SendIr           => await Store.ExecuteAsync(Id, caller, EngagementAction.SendIrNotice, e => e.SendIrNotice(actor)),
-            ActionKind.EndTest          => await Store.ExecuteAsync(Id, caller, EngagementAction.EndTest, e => e.EndTest(actor)),
-            ActionKind.GenerateDraft    => await Store.ExecuteAsync(Id, caller, EngagementAction.GenerateDraft, e => e.GenerateDraft(actor)),
-            ActionKind.PeerReview       => await Store.ExecuteAsync(Id, caller, EngagementAction.PeerReview, e => e.PeerReview(ActingTesterId(), true, actor)),
-            ActionKind.PeerReviewReject => await Store.ExecuteAsync(Id, caller, EngagementAction.PeerReview, e => e.PeerReview(ActingTesterId(), false, actor)),
-            ActionKind.ReleaseFinal     => await Store.ExecuteAsync(Id, caller, EngagementAction.ReleaseFinal, e => e.ReleaseFinal(actor, reauth)),
-            ActionKind.CompleteRetest   => await Store.CompleteRetestAsync(Id, caller),
-            _ => Result.Fail("Unsupported action."),
-        };
-
-        if (result.Failed) _error = result.Error;
-        else _ok = "Done — state advanced and the audit chain was appended atomically.";
-        await Load();
-    }
-
-    void Verify() => _chainOk = Store.VerifyChain();
-
-    async Task Retest()
-    {
-        _error = _ok = null; _chainOk = null;
-        var (result, childId) = await Store.RequestRetestAsync(Id, Session.Caller);
-        if (result.Failed || childId is null) { _error = result.Error; await Load(); return; }
-        Nav.NavigateTo($"engagement/{childId}");
-    }
 
     static string TypeClass(EngagementType t) =>
         t == EngagementType.Project ? "project" : t == EngagementType.Bau ? "bau" : "retest";

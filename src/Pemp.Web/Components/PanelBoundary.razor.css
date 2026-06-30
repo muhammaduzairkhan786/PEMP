@@ -1,0 +1,36 @@
+/* PanelBoundary — themed, localized error fallback. Uses tokens so it reads correctly in both
+   the dark and light themes. Deliberately understated: it signals "contained, recoverable", not
+   "the app crashed". */
+
+.panelerr {
+    display: flex;
+    gap: var(--space-3);
+    align-items: flex-start;
+    background: var(--surface);
+    border: 1px solid var(--state-blocked, var(--border-strong));
+    border-left: 3px solid var(--state-blocked, var(--sev-high));
+    border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-4);
+    margin: var(--space-3) 0;
+    box-shadow: var(--elev-flat);
+}
+
+.panelerr-ic {
+    font-size: var(--text-xl);
+    line-height: 1;
+    color: var(--sev-high);
+}
+
+.panelerr-body {
+    min-width: 0;
+}
+
+.panelerr-body > b {
+    color: var(--ink);
+}
+
+.panelerr-sub {
+    color: var(--ink-muted);
+    font-size: var(--text-sm);
+    margin: 4px 0 var(--space-2);
+}
