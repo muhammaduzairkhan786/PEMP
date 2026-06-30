@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Pemp.Domain;
 using Pemp.Domain.Audit;
+using Pemp.Infrastructure.Assessment;
 
 namespace Pemp.Infrastructure.Persistence;
 
@@ -64,8 +65,9 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
             [EngagementAction.AddTestCredential]      = new(ActionAuth.Roles(PempRoles.Tester), MustBeAssignedTester: true),
             [EngagementAction.AddAccessRequirement]   = new(ActionAuth.Roles(PempRoles.Tester), MustBeAssignedTester: true),
             [EngagementAction.SetAccessStatus]        = new(ActionAuth.Roles(PempRoles.Tester), MustBeAssignedTester: true),
-            // Assessment input may also come from the application stakeholder (async).
-            [EngagementAction.SaveAssessmentAnswer]   = new(ActionAuth.Roles(PempRoles.Tester, PempRoles.Stakeholder)),
+            // Assessment input may also come from the application stakeholder (async) and from the Acme
+            // CA Officer, who uploads the business team's half-filled assessment document (FR-SCO-01).
+            [EngagementAction.SaveAssessmentAnswer]   = new(ActionAuth.Roles(PempRoles.Tester, PempRoles.Stakeholder, PempRoles.AcmeOfficer)),
             [EngagementAction.SetChecklist]           = new(ActionAuth.Roles(PempRoles.Tester), MustBeAssignedTester: true),
         };
 
@@ -388,6 +390,33 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
         // Log the question answered, not the answer value (assessment input may be sensitive).
         StageAudit(id, caller.Actor, caller.Role, "Assessment.AnswerSaved", "-", questionId);
         await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Auto-fill an assessment from an uploaded document's parsed matches (FR-SCO-01). EVERY matched
+    /// answer is persisted through <see cref="SaveAssessmentAnswerAsync"/>, so each one is individually
+    /// scope-checked, role-authorized (SEC-AZN), and hash-chain audited exactly like a manual edit; the
+    /// imported values then stay fully editable. One additional summary audit entry records WHO imported,
+    /// the file name and the counts — NEVER the document bytes or any answer value (assessment input may
+    /// be sensitive). Authorizes the caller up front so a denied import touches nothing. Returns the count
+    /// actually written.
+    /// </summary>
+    public async Task<int> ImportAssessmentAsync(
+        Guid id, IReadOnlyList<MatchedAnswer> matched, string fileName, CallerContext caller)
+    {
+        // Defense-in-depth: authorize once before any write (the UI already gates this).
+        await AuthorizeTrackedAsync(id, caller, EngagementAction.SaveAssessmentAnswer);
+
+        foreach (var m in matched)
+            await SaveAssessmentAnswerAsync(id, m.QuestionId, m.Value, caller); // each scoped + audited
+
+        // Summary import entry — file NAME + counts only (never bytes/values).
+        StageAudit(id, caller.Actor, caller.Role, "Assessment.Imported", "-", $"{fileName}: {matched.Count} answers");
+        await db.SaveChangesAsync();
+        _log.LogInformation(
+            "Assessment.Imported on {EngagementId} by actor={Actor} role={Role}: {Count} answers from a {FileLen}-char filename. CorrelationId={CorrelationId}",
+            id, caller.Actor, caller.Role, matched.Count, fileName.Length, Corr);
+        return matched.Count;
     }
 
     // ---- Access requirements (workbook Tab 3 / FR-ACC-01) ------------------
