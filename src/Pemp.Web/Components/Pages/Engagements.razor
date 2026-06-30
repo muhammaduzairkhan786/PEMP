@@ -93,7 +93,10 @@
                         </div>
                         <div class="ref">@r.Reference</div>
                         <MiniSpine Current="r.CurrentStage" />
-                        <div style="margin-top:10px" class="muted">▸ @(r.AssignedTesterName ?? "—") · @Workflow.Label(r.CurrentStage)</div>
+                        <div class="cardmeta">
+                            <span class="stage">@Workflow.Label(r.CurrentStage)</span>
+                            <span class="who">▸ @(r.AssignedTesterName ?? "Unassigned")</span>
+                        </div>
                     </a>
                 }
             </div>

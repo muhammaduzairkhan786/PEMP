@@ -7,8 +7,101 @@
 .kbdhint kbd {
     font-family: var(--font-mono);
     font-size: 10px;
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
-    padding: 1px 5px;
+    padding: 1px 6px;
+    color: var(--ink);
+    background: var(--surface);
+    box-shadow: 0 1px 0 var(--border-strong);
+}
+
+/* ============================================================================
+   My-Turn artistry — the flagship "what needs you / what's moving" composition.
+   ============================================================================ */
+
+/* Stat band — serif numerals, the "your turn" tile carries the one warm accent */
+.tiles.stats .tile .k {
+    letter-spacing: .02em;
+}
+.tiles.stats .tile .v {
+    font-optical-sizing: auto;
+    font-variant-numeric: tabular-nums lining-nums;
+    font-size: var(--text-3xl);
+    line-height: 1;
+}
+.tiles.stats .tile.accent {
+    background: linear-gradient(165deg, color-mix(in srgb, var(--brand) 9%, var(--surface)), var(--surface));
+    border-color: color-mix(in srgb, var(--brand) 32%, var(--border-strong));
+}
+.tiles.stats .tile.accent .v {
+    color: var(--brand-glow);
+}
+
+/* Section labels — a quiet clay tick anchors each band */
+.sectionlabel {
+    position: relative;
+    padding-left: 15px;
+}
+.sectionlabel::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: .18em;
+    height: .92em;
+    width: 3px;
+    border-radius: var(--radius-pill);
+    background: var(--brand);
+}
+
+/* "Your turn" rows — confident action cards with a clay rail and warm wash */
+.pile.yours .row {
+    position: relative;
+    overflow: hidden;
+    padding-left: 18px;
+    background: linear-gradient(100deg, color-mix(in srgb, var(--brand) 5%, var(--surface)), var(--surface));
+    border-color: color-mix(in srgb, var(--brand) 20%, var(--border));
+}
+.pile.yours .row::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: linear-gradient(var(--brand), var(--brand-glow));
+}
+.pile.yours .row .verb {
+    color: var(--ink);
+}
+
+/* "Waiting on others" rows — quieter, recede into the page */
+.pile.waiting .row {
+    background: transparent;
+}
+.pile.waiting .row .verb {
+    font-weight: 600;
     color: var(--ink-muted);
+}
+
+.row .dot {
+    color: var(--ink-muted);
+    margin: 0 1px;
+}
+
+/* Editorial empty states */
+.card.empty {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+.card.empty .empty-mark {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    flex: none;
+    border-radius: var(--radius-pill);
+    background: var(--surface-raised);
+    color: var(--state-done);
+    font-size: var(--text-base);
 }

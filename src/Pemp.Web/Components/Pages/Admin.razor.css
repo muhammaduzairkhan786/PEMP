@@ -1,0 +1,45 @@
+/* ============================================================================
+   Admin console — editorial system surface: refined tables, tidy status rows.
+   ============================================================================ */
+.sectionlabel {
+    position: relative;
+    padding-left: 15px;
+}
+.sectionlabel::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: .2em;
+    height: .88em;
+    width: 3px;
+    border-radius: var(--radius-pill);
+    background: var(--brand);
+}
+
+/* status / config rows: label left, value or pill aligned right */
+.card .q {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+}
+.card .q b {
+    color: var(--ink);
+}
+
+/* tables — tabular numerals, gentle hover, clean final row */
+table.t {
+    font-variant-numeric: tabular-nums lining-nums;
+}
+table.t th {
+    letter-spacing: .08em;
+}
+table.t tbody tr {
+    transition: background var(--dur-fast);
+}
+table.t tbody tr:hover {
+    background: color-mix(in srgb, var(--brand) 4%, transparent);
+}
+table.t tbody tr:last-child td {
+    border-bottom: none;
+}

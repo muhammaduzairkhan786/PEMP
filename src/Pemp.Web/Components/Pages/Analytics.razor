@@ -20,10 +20,10 @@
         var totalOpen = _counts.Sum(c => c.Count);
         var critOpen = _counts.Where(c => c.Severity == Severity.Critical).Sum(c => c.Count);
 
-        <div class="tiles">
+        <div class="tiles stats">
             <div class="tile"><div class="k">Active engagements</div><div class="v">@active</div></div>
             <div class="tile"><div class="k">Open findings</div><div class="v">@totalOpen</div></div>
-            <div class="tile"><div class="k">Critical open</div><div class="v">@critOpen</div></div>
+            <div class="tile @(critOpen > 0 ? "danger" : "")"><div class="k">Critical open</div><div class="v">@critOpen</div></div>
             <div class="tile"><div class="k">Closed</div><div class="v">@closed</div></div>
         </div>
 

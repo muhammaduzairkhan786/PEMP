@@ -1,0 +1,77 @@
+/* ============================================================================
+   Analytics artistry — a calm data-editorial page: restrained colour, serif
+   headings, tabular numerals. Tokens only; severity colours are AA as text.
+   ============================================================================ */
+
+/* Stat band — serif numerals; the critical tile carries the one alarm accent */
+.tiles.stats .tile .v {
+    font-optical-sizing: auto;
+    font-variant-numeric: tabular-nums lining-nums;
+    font-size: var(--text-3xl);
+    line-height: 1;
+}
+.tiles.stats .tile.danger {
+    background: linear-gradient(165deg, color-mix(in srgb, var(--sev-critical) 10%, var(--surface)), var(--surface));
+    border-color: color-mix(in srgb, var(--sev-critical) 34%, var(--border-strong));
+}
+.tiles.stats .tile.danger .v {
+    color: var(--sev-critical);
+}
+
+/* Section labels — a quiet clay tick, consistent with My-Turn */
+.sectionlabel {
+    position: relative;
+    padding-left: 15px;
+}
+.sectionlabel::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: .2em;
+    height: .88em;
+    width: 3px;
+    border-radius: var(--radius-pill);
+    background: var(--brand);
+}
+
+/* Severity distribution — a taller, framed bar that reads as a single object */
+.distbar {
+    height: 14px;
+    border-radius: var(--radius-pill);
+    box-shadow: inset 0 0 0 1px var(--border);
+    margin: 10px 0 var(--space-4);
+}
+.distbar span {
+    height: 100%;
+    box-shadow: inset -1px 0 0 color-mix(in srgb, var(--canvas) 55%, transparent);
+}
+.distbar span:last-child {
+    box-shadow: none;
+}
+
+/* Legend chips — a hair more presence */
+.fchips .sevchip {
+    font-size: var(--text-xs);
+    padding: 3px 10px;
+    border-radius: var(--radius-pill);
+}
+
+/* Per-application table — tabular numerals, gentle row hover, clean last row */
+table.t {
+    font-variant-numeric: tabular-nums lining-nums;
+}
+table.t th {
+    letter-spacing: .08em;
+}
+table.t tbody tr {
+    transition: background var(--dur-fast);
+}
+table.t tbody tr:hover {
+    background: color-mix(in srgb, var(--brand) 4%, transparent);
+}
+table.t tbody tr:last-child td {
+    border-bottom: none;
+}
+table.t td.mono {
+    font-size: var(--text-sm);
+}

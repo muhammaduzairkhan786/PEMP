@@ -19,16 +19,20 @@
     }
     else
     {
-        <div class="tiles">
+        var critHigh = _rows.Count(r => r.Finding.Severity <= Severity.High);
+        <div class="tiles stats">
             <div class="tile"><div class="k">Open findings</div><div class="v">@_rows.Count</div></div>
-            <div class="tile"><div class="k">Critical / High</div><div class="v">@_rows.Count(r => r.Finding.Severity <= Severity.High)</div></div>
+            <div class="tile @(critHigh > 0 ? "danger" : "")"><div class="k">Critical / High</div><div class="v">@critHigh</div></div>
             <div class="tile"><div class="k">Engagements</div><div class="v">@_rows.Select(r => r.EngagementId).Distinct().Count()</div></div>
         </div>
 
         <h2 class="sectionlabel">Open findings <Srs>FR-FND-01</Srs></h2>
         @if (_rows.Count == 0)
         {
-            <div class="card muted">No open findings across your engagements. Nicely clear.</div>
+            <div class="card empty">
+                <span class="empty-mark" aria-hidden="true">✓</span>
+                <div><b>No open findings</b><span class="muted"> across your engagements. Nicely clear.</span></div>
+            </div>
         }
         else
         {

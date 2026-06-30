@@ -20,27 +20,27 @@
     else
     {
         var max = _rows.Count == 0 ? 0 : _rows.Max(r => r.Count);
-        <div class="tiles">
+        <div class="tiles stats">
             <div class="tile"><div class="k">Testers</div><div class="v">@_rows.Count</div></div>
             <div class="tile"><div class="k">Active engagements</div><div class="v">@_rows.Sum(r => r.Count)</div></div>
             <div class="tile"><div class="k">Available now</div><div class="v">@_rows.Count(r => r.Count == 0)</div></div>
         </div>
 
         <h2 class="sectionlabel">Load by tester <Srs>FR-ASG-02</Srs></h2>
-        <div class="card tablecard">
+        <div class="card tablecard roster">
             <table class="t">
                 <thead><tr><th>Tester</th><th>Active load</th><th>Count</th></tr></thead>
                 <tbody>
                     @foreach (var r in _rows)
                     {
                         <tr>
-                            <td>@r.Name</td>
+                            <td class="name">@r.Name</td>
                             <td>
                                 <div class="meter" style="max-width:240px">
-                                    <span style="display:block;height:100%;border-radius:inherit;background:var(--brand);width:@(max == 0 ? 0 : 100 * r.Count / max)%"></span>
+                                    <span style="display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--brand),var(--brand-glow));width:@(max == 0 ? 0 : 100 * r.Count / max)%"></span>
                                 </div>
                             </td>
-                            <td class="mono">@(r.Count == 0 ? "free" : r.Count.ToString())</td>
+                            <td class="mono">@if (r.Count == 0){<span class="freepill">free</span>}else{@r.Count}</td>
                         </tr>
                     }
                 </tbody>
