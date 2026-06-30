@@ -134,6 +134,21 @@ public class EngagementLifecycleTests
     }
 
     [Fact]
+    public void Finding_status_lifecycle_allows_valid_moves_and_blocks_invalid_ones()  // FR-FND-04 (guarded register)
+    {
+        // Valid: open → remediated, and the retest verdicts (pending → closed / re-open).
+        Assert.True(FindingLifecycle.CanTransition(FindingStatus.Open, FindingStatus.Remediated));
+        Assert.True(FindingLifecycle.CanTransition(FindingStatus.Open, FindingStatus.AcceptedRisk));
+        Assert.True(FindingLifecycle.CanTransition(FindingStatus.RetestPending, FindingStatus.Closed));
+        Assert.True(FindingLifecycle.CanTransition(FindingStatus.RetestPending, FindingStatus.Open));
+
+        // Invalid: a closed finding is terminal; accepted-risk cannot jump straight to remediated.
+        Assert.False(FindingLifecycle.CanTransition(FindingStatus.Closed, FindingStatus.Open));
+        Assert.False(FindingLifecycle.CanTransition(FindingStatus.Closed, FindingStatus.RetestPending));
+        Assert.False(FindingLifecycle.CanTransition(FindingStatus.AcceptedRisk, FindingStatus.Remediated));
+    }
+
+    [Fact]
     public void Cannot_skip_stages()
     {
         var (e, _) = New();

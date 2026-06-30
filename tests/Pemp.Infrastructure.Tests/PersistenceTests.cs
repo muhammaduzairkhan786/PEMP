@@ -696,6 +696,29 @@ public sealed class PersistenceTests : IDisposable
         Assert.Empty(await _store.OpenFindingCountsAsync(Array.Empty<Guid>()));
     }
 
+    // ---- Guarded finding-status lifecycle (rank 36 / FR-FND-04) ------------
+
+    [Fact]
+    public async Task Finding_status_change_is_a_guarded_transition()
+    {
+        var broker = IdOf("ENG-2026-0399");
+        var closed = (await _store.FindingsForAsync(broker)).Single(f => f.Status == FindingStatus.Closed);
+        var auditBefore = _db.AuditEntries.Count();
+
+        // Illegal: a Closed finding is terminal — it cannot be revived. Nothing changes or is audited.
+        var bad = await _store.SetFindingStatusAsync(closed.Id, FindingStatus.Open, Khan);
+        Assert.True(bad.Failed);
+        Assert.Equal(FindingStatus.Closed, (await _store.FindingsForAsync(broker)).Single(f => f.Id == closed.Id).Status);
+        Assert.Equal(auditBefore, _db.AuditEntries.Count());
+
+        // Legal: a RetestPending finding may resolve to Closed (the retest pass verdict).
+        var pending = (await _store.FindingsForAsync(broker)).First(f => f.Status == FindingStatus.RetestPending);
+        var ok = await _store.SetFindingStatusAsync(pending.Id, FindingStatus.Closed, Khan);
+        Assert.False(ok.Failed);
+        Assert.Equal(auditBefore + 1, _db.AuditEntries.Count());
+        Assert.True(new EfAuditChain(_db, Key).Verify());
+    }
+
     // ---- Credential lifecycle (rank 20 / SEC-CRD) --------------------------
 
     [Fact]

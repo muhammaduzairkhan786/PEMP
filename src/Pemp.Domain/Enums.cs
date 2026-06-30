@@ -35,3 +35,27 @@ public enum FindingStatus
     RetestPending,
     Closed
 }
+
+/// <summary>
+/// The guarded finding-status lifecycle (FR-FND-04). A finding moves open → remediated / accepted-risk,
+/// is carried into a retest as retest-pending, and resolves to closed (or re-opens on a failed retest).
+/// Status changes route through <see cref="CanTransition"/> so the live register cannot be driven into a
+/// nonsensical state (e.g. reviving a closed finding) by the free-form setter — the same enforcement
+/// philosophy as the engagement spine, applied to findings.
+/// </summary>
+public static class FindingLifecycle
+{
+    private static readonly IReadOnlyDictionary<FindingStatus, FindingStatus[]> Allowed =
+        new Dictionary<FindingStatus, FindingStatus[]>
+        {
+            [FindingStatus.Open]          = [FindingStatus.Remediated, FindingStatus.AcceptedRisk, FindingStatus.RetestPending, FindingStatus.Closed],
+            [FindingStatus.Remediated]    = [FindingStatus.RetestPending, FindingStatus.Open, FindingStatus.Closed],
+            [FindingStatus.AcceptedRisk]  = [FindingStatus.Open, FindingStatus.Closed],
+            [FindingStatus.RetestPending] = [FindingStatus.Closed, FindingStatus.Open],
+            [FindingStatus.Closed]        = [],   // terminal — a retest spawns a NEW child finding, never revives this one
+        };
+
+    /// <summary>True if a finding may move directly from <paramref name="from"/> to <paramref name="to"/>.</summary>
+    public static bool CanTransition(FindingStatus from, FindingStatus to) =>
+        Allowed.TryGetValue(from, out var next) && Array.IndexOf(next, to) >= 0;
+}

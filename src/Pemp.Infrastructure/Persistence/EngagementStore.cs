@@ -475,17 +475,29 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
 
     /// <summary>
     /// Set a finding's status in the live register (FR-FND-04 / FR-RET-03): used by the retest
-    /// pass/fail flow (pass → Closed, fail → Open) and remediation tracking.
+    /// pass/fail flow (pass → Closed, fail → Open) and remediation tracking. The change is a GUARDED
+    /// transition (<see cref="FindingLifecycle.CanTransition"/>): an illegal jump (e.g. reviving a
+    /// Closed finding) is rejected and nothing is changed or audited — the register can't be driven
+    /// into a nonsensical state. A no-op (same status) is accepted silently.
     /// </summary>
-    public async Task SetFindingStatusAsync(Guid findingId, FindingStatus status, CallerContext caller)
+    public async Task<Result> SetFindingStatusAsync(Guid findingId, FindingStatus status, CallerContext caller)
     {
         var row = await db.Findings.FirstOrDefaultAsync(f => f.Id == findingId);
-        if (row is null) return;
+        if (row is null) return Result.Fail("Finding not found.");
         await AuthorizeTrackedAsync(row.EngagementId, caller, EngagementAction.SetFindingStatus);
+        if (row.Status == status) return Result.Success();   // idempotent no-op
+        if (!FindingLifecycle.CanTransition(row.Status, status))
+        {
+            _log.LogInformation(
+                "Guard rejected Finding.StatusChanged {From}->{To} on finding {FindingId} for actor={Actor}. CorrelationId={CorrelationId}",
+                row.Status, status, findingId, caller.Actor, Corr);
+            return Result.Fail($"A finding cannot move from {row.Status} to {status} (FR-FND-04).");
+        }
         var before = row.Status.ToString();
         row.Status = status;
         StageAudit(row.EngagementId, caller.Actor, caller.Role, "Finding.StatusChanged", before, status.ToString());
         await db.SaveChangesAsync();
+        return Result.Success();
     }
 
     /// <summary>
