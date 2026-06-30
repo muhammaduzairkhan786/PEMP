@@ -1,0 +1,155 @@
+/* ============================================================================
+   AuthLayout — high-trust security screens, "warm editorial" artistry pass.
+   Styles the shared paper card + (via ::deep) the page form content of every
+   auth page routed through this layout. Token-only, AA both themes, motion-safe.
+   ============================================================================ */
+
+.auth-shell {
+    position: relative;
+    isolation: isolate;
+}
+
+/* a calm, restrained warm glow behind the card — depth, not decoration */
+.auth-shell::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+        radial-gradient(520px 380px at 50% 18%, color-mix(in srgb, var(--brand) 7%, transparent), transparent 70%);
+}
+
+/* ---- the paper card ---- */
+.auth-card {
+    position: relative;
+    width: 432px;
+    padding: var(--space-12) var(--space-8) var(--space-8);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+/* a hairline clay seam across the top — a quiet mark of trust */
+.auth-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--brand), var(--brand-glow));
+    opacity: .9;
+}
+
+.auth-brand {
+    margin-bottom: var(--space-8);
+    width: fit-content;
+    transition: opacity var(--dur-fast);
+}
+
+.auth-brand:hover { opacity: .82; }
+
+.auth-brand .logo {
+    transition: transform var(--dur-base) var(--ease-emphasis);
+}
+
+.auth-brand:hover .logo {
+    transform: rotate(-4deg) scale(1.04);
+}
+
+.auth-foot {
+    margin-top: var(--space-2);
+    text-align: center;
+    letter-spacing: .01em;
+}
+
+/* gentle entrance for the card (motion only when welcomed) */
+@media (prefers-reduced-motion: no-preference) {
+    .auth-card {
+        animation: auth-rise var(--dur-ceremony) var(--ease-emphasis) both;
+    }
+}
+
+@keyframes auth-rise {
+    from { opacity: 0; transform: translateY(10px) scale(.99); }
+    to { opacity: 1; transform: none; }
+}
+
+/* ============================================================================
+   ::deep — the page form content rendered into @Body of this layout.
+   Applies uniformly to Login / 2fa / recovery / AccessDenied / EnableAuthenticator.
+   ============================================================================ */
+
+/* page title — serif display, refined optical leading */
+.auth-card ::deep .auth-head h1 {
+    font-size: var(--text-3xl);
+    line-height: 1.08;
+    letter-spacing: -.02em;
+    text-wrap: balance;
+    margin-bottom: var(--space-2);
+}
+
+.auth-card ::deep .auth-head p {
+    line-height: 1.55;
+    text-wrap: pretty;
+    margin-bottom: var(--space-8);
+}
+
+/* labels — calmer, more deliberate spacing */
+.auth-card ::deep .auth-label {
+    letter-spacing: -.005em;
+    color: var(--ink);
+    margin-top: var(--space-6);
+}
+
+/* inputs — taller, softer, with a clear warm focus payoff */
+.auth-card ::deep .inp {
+    padding: 11px 14px;
+    border-radius: var(--radius-md);
+    font-size: var(--text-base);
+    background: var(--surface-raised);
+    transition: border-color var(--dur-fast), box-shadow var(--dur-base), background var(--dur-fast);
+}
+
+.auth-card ::deep .inp:focus,
+.auth-card ::deep .inp:focus-visible {
+    background: var(--surface);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 16%, transparent);
+}
+
+/* the one-time-code / recovery-code fields breathe — generous tracking */
+.auth-card ::deep .inp.mono {
+    letter-spacing: .14em;
+    font-size: var(--text-lg);
+}
+
+.auth-card ::deep .auth-check {
+    margin: var(--space-6) 0 0;
+}
+
+/* primary submit — polished, full-width, confident with a warm hover payoff */
+.auth-card ::deep .btn.primary.auth-submit {
+    margin-top: var(--space-8);
+    padding: 12px;
+    font-size: var(--text-base);
+    letter-spacing: -.005em;
+    border-radius: var(--radius-md);
+}
+
+.auth-card ::deep .btn.primary.auth-submit:hover {
+    box-shadow: var(--brand-glow-sh);
+    transform: translateY(-1px);
+}
+
+/* dev-account hint / footer notes — quiet, well-seated */
+.auth-card ::deep .auth-hint {
+    margin-top: var(--space-8);
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-top: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+    line-height: 1.6;
+}
+
+.auth-card ::deep .auth-hint code {
+    color: var(--ink);
+}

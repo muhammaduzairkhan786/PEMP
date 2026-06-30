@@ -1,0 +1,168 @@
+/* ============================================================================
+   EnableAuthenticator — a genuinely lovely enrolment screen.
+   Component-scoped over pemp.css; token-only; AA both themes; motion-safe.
+   ============================================================================ */
+
+/* ---- the three steps, as an editorial numbered list ---- */
+.auth-steps {
+    counter-reset: step;
+    list-style: none;
+    padding-left: 0;
+    gap: var(--space-8);
+}
+
+.auth-steps > li {
+    counter-increment: step;
+    position: relative;
+    padding-left: calc(var(--space-12) + var(--space-1));
+    padding-top: 2px;
+    line-height: 1.55;
+}
+
+.auth-steps > li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0;
+    top: -2px;
+    width: 36px;
+    height: 36px;
+    display: grid;
+    place-items: center;
+    font-family: var(--font-serif);
+    font-size: var(--text-lg);
+    font-weight: 600;
+    color: var(--brand-glow);
+    background: var(--brand-soft);
+    border: 1px solid color-mix(in srgb, var(--brand) 28%, transparent);
+    border-radius: 50%;
+}
+
+/* ---- the QR, framed nicely ---- */
+.qr-figure {
+    margin-top: var(--space-4);
+}
+
+.qr-frame {
+    position: relative;
+    padding: var(--space-4);
+    border-radius: var(--radius-lg);
+    border-color: var(--border-strong);
+    box-shadow: var(--elev-raised);
+}
+
+/* quiet clay corner ticks framing the code, like crop marks */
+.qr-frame::before,
+.qr-frame::after {
+    content: "";
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border: 2px solid color-mix(in srgb, var(--brand) 55%, transparent);
+    border-radius: 3px;
+}
+
+.qr-frame::before {
+    top: 7px;
+    left: 7px;
+    border-right: none;
+    border-bottom: none;
+}
+
+.qr-frame::after {
+    bottom: 7px;
+    right: 7px;
+    border-left: none;
+    border-top: none;
+}
+
+.qr-figure figcaption {
+    letter-spacing: .01em;
+}
+
+/* ---- the manual setup key, presented as a tasteful well ---- */
+.auth-key {
+    background: var(--surface-raised);
+    border-color: var(--border-strong);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+}
+
+.auth-key .muted {
+    font-size: var(--text-xs);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    font-weight: 600;
+}
+
+.auth-key code {
+    font-size: var(--text-lg);
+    letter-spacing: .22em;
+    color: var(--ink);
+}
+
+/* ---- "open in app" — keep the warm glow card, refine it ---- */
+.auth-otp {
+    border-radius: var(--radius-md);
+    transition: transform var(--dur-fast) var(--ease-standard), box-shadow var(--dur-base);
+}
+
+.auth-otp:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--brand-glow-sh);
+}
+
+/* ---- the verify row ---- */
+.auth-codrow .btn.primary {
+    border-radius: var(--radius-md);
+    padding: 11px 18px;
+}
+
+/* ============================================================================
+   Recovery codes — shown once. A calm, premium, reassuring presentation.
+   ============================================================================ */
+.recovery-grid {
+    counter-reset: rc;
+    padding: var(--space-4);
+    background: var(--surface-raised);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-lg);
+    gap: var(--space-2);
+}
+
+.recovery-code {
+    counter-increment: rc;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface);
+    border-color: var(--border);
+    border-radius: var(--radius-md);
+    padding: 10px 12px 10px 30px;
+    font-size: var(--text-base);
+    letter-spacing: .12em;
+    color: var(--ink);
+}
+
+/* a quiet serif index before each code so the set reads as a deliberate list */
+.recovery-code::before {
+    content: counter(rc);
+    position: absolute;
+    left: 10px;
+    font-family: var(--font-serif);
+    font-size: var(--text-xs);
+    letter-spacing: 0;
+    color: var(--ink-muted);
+    opacity: .7;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .qr-figure {
+        animation: qr-settle var(--dur-ceremony) var(--ease-emphasis) both;
+    }
+}
+
+@keyframes qr-settle {
+    from { opacity: 0; transform: scale(.97); }
+    to { opacity: 1; transform: none; }
+}

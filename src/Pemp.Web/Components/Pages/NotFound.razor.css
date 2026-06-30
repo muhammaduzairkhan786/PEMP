@@ -1,0 +1,97 @@
+/* ============================================================================
+   NotFound — on-brand, warm, gracious. Component-scoped; token-only; AA both.
+   Uses .auth-shell/.auth-card markup but routes via EmptyLayout, so it carries
+   its own paper flourish + card polish (not inherited from AuthLayout).
+   ============================================================================ */
+
+.auth-shell {
+    position: relative;
+    isolation: isolate;
+}
+
+.auth-shell::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+        radial-gradient(520px 380px at 50% 18%, color-mix(in srgb, var(--brand) 7%, transparent), transparent 70%);
+}
+
+.auth-card {
+    position: relative;
+    width: 432px;
+    padding: var(--space-12) var(--space-8) var(--space-8);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    text-align: center;
+}
+
+.auth-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--brand), var(--brand-glow));
+    opacity: .9;
+}
+
+.auth-brand {
+    justify-content: center;
+    margin-bottom: var(--space-6);
+}
+
+/* the large, gracious serif numeral — the warm signature of the page */
+.err-mark {
+    font-family: var(--font-serif);
+    font-weight: 600;
+    font-size: clamp(3.5rem, 14vw, 5rem);
+    line-height: 1;
+    letter-spacing: -.03em;
+    color: var(--brand-glow);
+    opacity: .92;
+    margin-bottom: var(--space-4);
+}
+
+.auth-head h1 {
+    font-size: var(--text-3xl);
+    line-height: 1.08;
+    letter-spacing: -.02em;
+    text-wrap: balance;
+    margin-bottom: var(--space-2);
+}
+
+.auth-head p {
+    line-height: 1.55;
+    text-wrap: pretty;
+    margin-bottom: var(--space-8);
+}
+
+.btn.primary.auth-submit {
+    margin-top: var(--space-2);
+    padding: 12px;
+    font-size: var(--text-base);
+    border-radius: var(--radius-md);
+}
+
+.btn.primary.auth-submit:hover {
+    box-shadow: var(--brand-glow-sh);
+    transform: translateY(-1px);
+}
+
+.auth-foot {
+    text-align: center;
+    margin-top: var(--space-2);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .auth-card {
+        animation: nf-rise var(--dur-ceremony) var(--ease-emphasis) both;
+    }
+}
+
+@keyframes nf-rise {
+    from { opacity: 0; transform: translateY(10px) scale(.99); }
+    to { opacity: 1; transform: none; }
+}

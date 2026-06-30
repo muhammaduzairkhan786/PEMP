@@ -1,0 +1,17 @@
+/* ============================================================================
+   AccessDenied — calm and reassuring, not a scolding. Component-scoped over the
+   shared AuthLayout card; token-only; AA both themes.
+   ============================================================================ */
+
+.ad-mark {
+    width: 56px;
+    height: 56px;
+    margin-bottom: var(--space-4);
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    font-size: 1.5rem;
+    line-height: 1;
+    background: var(--brand-soft);
+    border: 1px solid color-mix(in srgb, var(--brand) 24%, transparent);
+}

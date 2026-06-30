@@ -1,0 +1,17 @@
+/* ============================================================================
+   LoginWithRecoveryCode — consistent with the 2FA ceremony: the single-use
+   code field reads as a deliberate, centered entry. Component-scoped; token-only.
+   ============================================================================ */
+
+#recovery-code.inp.mono {
+    text-align: center;
+    letter-spacing: .2em;
+    font-size: var(--text-xl);
+    padding-block: 12px;
+}
+
+#recovery-code.inp.mono::placeholder {
+    letter-spacing: .12em;
+    color: var(--ink-muted);
+    opacity: .7;
+}
