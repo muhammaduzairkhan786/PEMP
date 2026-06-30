@@ -20,9 +20,14 @@ public sealed record AuditEntry(
     string PrevHash,
     string Hash)
 {
-    /// <summary>Canonical, order-stable serialization used as the hashing input.</summary>
+    /// <summary>
+    /// Canonical, order-stable serialization used as the hashing input. The link is the
+    /// <see cref="PrevHash"/>, NOT the row's <see cref="Sequence"/> — so the position number can be
+    /// DB-generated (IDENTITY) without breaking the chain, and concurrent appends cannot collide on a
+    /// client-assigned primary key. Ordering is still by Sequence; integrity is the PrevHash walk.
+    /// </summary>
     public string Canonical() =>
-        $"{Sequence}|{EngagementId:N}|{Actor}|{Action}|{Before}|{After}|{Timestamp.UtcDateTime:O}|{Source}|{PrevHash}";
+        $"{EngagementId:N}|{Actor}|{Action}|{Before}|{After}|{Timestamp.UtcDateTime:O}|{Source}|{PrevHash}";
 }
 
 /// <summary>

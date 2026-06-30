@@ -1,5 +1,5 @@
 @page "/admin"
-@attribute [Authorize(Roles = "System Administrator")]
+@attribute [Authorize(Roles = PempRoles.Administrator)]
 @inject EngagementStore Store
 @inject DemoSession Session
 @inject IJSRuntime JS
@@ -10,7 +10,7 @@
     <h1 class="title">Admin console</h1>
     <p class="sub">Users &amp; roles, integrations, configuration, and the global audit log.</p>
 
-    @if (Session.Role != "System Administrator")
+    @if (Session.Role != PempRoles.Administrator)
     {
         <div class="banner err">⛔ Admin console is restricted to the System Administrator role.</div>
     }

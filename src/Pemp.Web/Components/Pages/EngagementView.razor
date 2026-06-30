@@ -8,6 +8,7 @@
 @inject IConfiguration Configuration
 @inject IServiceProvider Services
 @inject IJSRuntime JS
+@inject ILogger<EngagementView> Logger
 @implements IAsyncDisposable
 <PageTitle>Engagement · PEMP</PageTitle>
 
@@ -91,7 +92,7 @@ else
             <div class="card"><b>Engagement closed.</b> Final report released and stored immutable (FR-REP-04).
                 @if (_rec.RetestRequested){<span class="muted"> · ↻ a retest child engagement was created.</span>}
             </div>
-            @if (_rec.CurrentStage == Stage.Closed && !_rec.RetestRequested && (Session.Role is "Acme CA Officer" or "Stakeholder"))
+            @if (_rec.CurrentStage == Stage.Closed && !_rec.RetestRequested && (Session.Role == PempRoles.AcmeOfficer || Session.Role == PempRoles.Stakeholder))
             {
                 <div style="margin-top:var(--space-2)"><button class="btn ghost" @onclick="Retest">↻ Request a retest (optional) · FR-RET-01</button></div>
             }
@@ -139,7 +140,7 @@ else
         else
         {
             <div class="card">⏳ Waiting on <b>@next.OwnerRole</b> — "@next.Label". <span class="muted">You're viewing as @Session.Role.</span>
-                @if (next.Kind == ActionKind.CompleteAssessment && Session.Role == "Stakeholder")
+                @if (next.Kind == ActionKind.CompleteAssessment && Session.Role == PempRoles.Stakeholder)
                 {
                     <div style="margin-top:10px"><a class="btn ghost" href="@($"engagement/{Id}/assessment")">Open assessment form (provide input)</a></div>
                 }
@@ -148,27 +149,27 @@ else
 
         <AccessRequirements EngagementId="Id" Reqs="_access"
                             ShowEmpty="@((int)_rec.CurrentStage >= (int)Stage.Access)"
-                            Editable="@(_rec.CurrentStage == Stage.Access && Session.Role == "Tester" && _rec.AssignedTesterName == Session.Actor)"
+                            Editable="@(_rec.CurrentStage == Stage.Access && Session.Role == PempRoles.Tester && _rec.AssignedTesterName == Session.Actor)"
                             OnAdded="Load" />
 
         <TestCredentialsPanel EngagementId="Id" Credentials="_credentials"
-                              CanView="@(Session.Role == "Tester" && _rec.AssignedTesterName == Session.Actor)"
+                              CanView="@(Session.Role == PempRoles.Tester && _rec.AssignedTesterName == Session.Actor)"
                               ShowEmpty="@(_rec.CurrentStage == Stage.Access || _rec.CurrentStage == Stage.Execution)" />
 
         <FindingsRegister Findings="_findings" EngagementId="Id"
                           ShowEmpty="@((int)_rec.CurrentStage >= (int)Stage.Execution)"
-                          CanAdd="@(Session.Role == "Tester" && _rec.AssignedTesterName == Session.Actor
+                          CanAdd="@(Session.Role == PempRoles.Tester && _rec.AssignedTesterName == Session.Actor
                                     && (_rec.CurrentStage == Stage.Execution || _rec.CurrentStage == Stage.Findings))"
-                          CanRetest="@(Session.Role == "Tester" && _rec.AssignedTesterName == Session.Actor
+                          CanRetest="@(Session.Role == PempRoles.Tester && _rec.AssignedTesterName == Session.Actor
                                        && _rec.CurrentStage == Stage.Retest)"
                           OnAdded="Load" />
 
-        <EvidencePanel EngagementId="Id" Findings="_findings" Editable="@(Session.Role == "Tester" && _rec.CurrentStage != Stage.Closed)" />
+        <EvidencePanel EngagementId="Id" Findings="_findings" Editable="@(Session.Role == PempRoles.Tester && _rec.CurrentStage != Stage.Closed)" />
 
         @if ((int)_rec.CurrentStage >= (int)Stage.Access)
         {
             <ChecklistPanel EngagementId="Id" Done="_checklist"
-                            Editable="@(Session.Role == "Tester" && (int)_rec.CurrentStage >= (int)Stage.Access && _rec.CurrentStage != Stage.Closed)" />
+                            Editable="@(Session.Role == PempRoles.Tester && (int)_rec.CurrentStage >= (int)Stage.Access && _rec.CurrentStage != Stage.Closed)" />
         }
 
         <h2 class="sectionlabel">
@@ -267,8 +268,9 @@ else
             _findings = await Store.FindingsForAsync(Id);
             _access = await Store.AccessReqsForAsync(Id);
             _checklist = await Store.ChecklistDoneAsync(Id);
-            // Least exposure (SEC-CRD): only fetch test credentials for the assigned tester who may view them.
-            _credentials = (Session.Role == "Tester" && _rec.AssignedTesterName == Session.Actor)
+            // Least exposure (SEC-CRD): only fetch test credentials for the assigned tester who may view
+            // them — keyed on the stable AssignedTesterId, not the display name.
+            _credentials = (Session.Role == PempRoles.Tester && _rec.AssignedTesterId is Guid t && t == Session.TesterScope)
                 ? await Store.CredentialsForAsync(Id)
                 : new();
             if (_rec.CurrentStage == Stage.Assignment)
@@ -309,6 +311,9 @@ else
         }
         else
         {
+            // Re-auth failure for a privileged action (SEC-IAM-04). Log WHO/WHAT — never the code.
+            Logger.LogWarning("Re-auth (TOTP) failed for {Action} on {EngagementId} by actor={Actor}",
+                action, Id, Session.Actor);
             _modalError = "That authenticator code wasn't valid. Re-enter the current 6-digit code from your app.";
         }
     }
@@ -403,21 +408,22 @@ else
         _error = _ok = null; _chainOk = null;
         var actor = Session.Actor;
 
+        var caller = Session.Caller;
         var result = k switch
         {
-            ActionKind.RouteToDm        => await Store.ExecuteAsync(Id, e => e.RouteToDeliveryManager(actor)),
-            ActionKind.AssignTester     => await Store.AssignTesterAsync(Id, _assignTesterId, TesterName(_assignTesterId), actor),
-            ActionKind.CompleteAssessment => await Store.ExecuteAsync(Id, e => e.CompleteAssessment(actor)),
-            ActionKind.ReviewSow        => await Store.ExecuteAsync(Id, e => e.ReviewSowAsDeliveryManager(actor)),
-            ActionKind.SignSow          => await Store.ExecuteAsync(Id, e => e.SignSow(actor, reauth)),
-            ActionKind.VerifyAccess     => await Store.ExecuteAsync(Id, e => e.VerifyAccess(actor, reauth)),
-            ActionKind.SendIr           => await Store.ExecuteAsync(Id, e => e.SendIrNotice(actor)),
-            ActionKind.EndTest          => await Store.ExecuteAsync(Id, e => e.EndTest(actor)),
-            ActionKind.GenerateDraft    => await Store.ExecuteAsync(Id, e => e.GenerateDraft(actor)),
-            ActionKind.PeerReview       => await Store.ExecuteAsync(Id, e => e.PeerReview(ActingTesterId(), true, actor)),
-            ActionKind.PeerReviewReject => await Store.ExecuteAsync(Id, e => e.PeerReview(ActingTesterId(), false, actor)),
-            ActionKind.ReleaseFinal     => await Store.ExecuteAsync(Id, e => e.ReleaseFinal(actor, reauth)),
-            ActionKind.CompleteRetest   => await Store.CompleteRetestAsync(Id, actor),
+            ActionKind.RouteToDm        => await Store.ExecuteAsync(Id, caller, EngagementAction.RouteToDeliveryManager, e => e.RouteToDeliveryManager(actor)),
+            ActionKind.AssignTester     => await Store.AssignTesterAsync(Id, _assignTesterId, TesterName(_assignTesterId), caller),
+            ActionKind.CompleteAssessment => await Store.CompleteAssessmentAsync(Id, caller),
+            ActionKind.ReviewSow        => await Store.ExecuteAsync(Id, caller, EngagementAction.ReviewSow, e => e.ReviewSowAsDeliveryManager(actor)),
+            ActionKind.SignSow          => await Store.ExecuteAsync(Id, caller, EngagementAction.SignSow, e => e.SignSow(actor, reauth)),
+            ActionKind.VerifyAccess     => await Store.VerifyAccessAsync(Id, caller, reauth),
+            ActionKind.SendIr           => await Store.ExecuteAsync(Id, caller, EngagementAction.SendIrNotice, e => e.SendIrNotice(actor)),
+            ActionKind.EndTest          => await Store.ExecuteAsync(Id, caller, EngagementAction.EndTest, e => e.EndTest(actor)),
+            ActionKind.GenerateDraft    => await Store.ExecuteAsync(Id, caller, EngagementAction.GenerateDraft, e => e.GenerateDraft(actor)),
+            ActionKind.PeerReview       => await Store.ExecuteAsync(Id, caller, EngagementAction.PeerReview, e => e.PeerReview(ActingTesterId(), true, actor)),
+            ActionKind.PeerReviewReject => await Store.ExecuteAsync(Id, caller, EngagementAction.PeerReview, e => e.PeerReview(ActingTesterId(), false, actor)),
+            ActionKind.ReleaseFinal     => await Store.ExecuteAsync(Id, caller, EngagementAction.ReleaseFinal, e => e.ReleaseFinal(actor, reauth)),
+            ActionKind.CompleteRetest   => await Store.CompleteRetestAsync(Id, caller),
             _ => Result.Fail("Unsupported action."),
         };
 
@@ -431,7 +437,7 @@ else
     async Task Retest()
     {
         _error = _ok = null; _chainOk = null;
-        var (result, childId) = await Store.RequestRetestAsync(Id, Session.Actor);
+        var (result, childId) = await Store.RequestRetestAsync(Id, Session.Caller);
         if (result.Failed || childId is null) { _error = result.Error; await Load(); return; }
         Nav.NavigateTo($"engagement/{childId}");
     }

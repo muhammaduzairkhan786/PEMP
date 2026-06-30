@@ -95,8 +95,7 @@
             return;
         }
         _invalid = false;
-        await Store.AddEvidenceAsync(EngagementId, fid, _file.Trim(), _kind, _note.Trim(),
-            actor: Session.Actor, role: Session.Role);
+        await Store.AddEvidenceAsync(EngagementId, fid, _file.Trim(), _kind, _note.Trim(), Session.Caller);
         _file = ""; _note = ""; _msg = "Attached — encrypted at rest (SEC-EVD-01).";
         _evidence = await Store.EvidenceForAsync(EngagementId);
     }

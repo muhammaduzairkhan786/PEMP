@@ -19,7 +19,7 @@ else if (_rec is null)
 }
 else
 {
-    var canComplete = _rec.CurrentStage == Stage.Scoping && (Session.Role is "Tester" or "Stakeholder");
+    var canComplete = _rec.CurrentStage == Stage.Scoping && (Session.Role == PempRoles.Tester || Session.Role == PempRoles.Stakeholder);
     <div class="wrap">
         <div class="eyebrow"><a href="@($"engagement/{Id}")">← @_rec.AppName</a></div>
         <h1 class="title">Assessment &amp; prerequisites</h1>
@@ -31,7 +31,7 @@ else
         }
 
         <AssessmentForm EngagementId="Id" Answers="_answers"
-                        ReadOnly="@(_rec.CurrentStage != Stage.Scoping || !(Session.Role is "Stakeholder" or "Tester"))" />
+                        ReadOnly="@(_rec.CurrentStage != Stage.Scoping || !(Session.Role == PempRoles.Stakeholder || Session.Role == PempRoles.Tester))" />
 
         @if (canComplete)
         {
@@ -71,7 +71,7 @@ else
 
     async Task Complete()
     {
-        var result = await Store.ExecuteAsync(Id, e => e.CompleteAssessment(Session.Actor));
+        var result = await Store.CompleteAssessmentAsync(Id, Session.Caller);
         _done = result.Ok;
         _err = result.Error;
         _rec = await Store.GetScopedAsync(Id, Session.AppScope, Session.TesterScope, Session.Role);

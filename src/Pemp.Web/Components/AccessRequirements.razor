@@ -86,8 +86,7 @@ else if (ShowEmpty)
             return;
         }
         _invalid = false;
-        await Store.AddAccessRequirementAsync(EngagementId, _env.Trim(), _url.Trim(), _type,
-            actor: Session.Actor, role: Session.Role);
+        await Store.AddAccessRequirementAsync(EngagementId, _env.Trim(), _url.Trim(), _type, Session.Caller);
         _env = _url = ""; _type = "Read";
         _msg = "Added — app team to provision (FR-ACC-02).";
         if (OnAdded.HasDelegate) await OnAdded.InvokeAsync();
@@ -107,7 +106,7 @@ else if (ShowEmpty)
         if (Enum.TryParse<AccessStatus>(e.Value?.ToString(), out var s))
         {
             r.Status = s;
-            await Store.SetAccessStatusAsync(r.Id, s, actor: Session.Actor, role: Session.Role);
+            await Store.SetAccessStatusAsync(r.Id, s, Session.Caller);
         }
     }
 

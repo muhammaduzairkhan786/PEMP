@@ -101,6 +101,54 @@ public class EngagementLifecycleTests
     }
 
     [Fact]
+    public void CompleteAssessment_is_blocked_when_no_assessment_data_is_present()  // FR-SCO-03 (data-derived gate)
+    {
+        var (e, _) = New();
+        Ok(e.RouteToDeliveryManager("acme"));
+        Ok(e.AssignTester(TesterA, "dm"));
+        Assert.Equal(Stage.Scoping, e.CurrentStage);
+
+        // No recorded answers → the gate refuses to advance; the engagement stays at Scoping.
+        Assert.False(e.CompleteAssessment("tester", assessmentDataPresent: false).Ok);
+        Assert.Equal(Stage.Scoping, e.CurrentStage);
+
+        // With recorded answers it advances to SoW.
+        Ok(e.CompleteAssessment("tester", assessmentDataPresent: true));
+        Assert.Equal(Stage.Sow, e.CurrentStage);
+    }
+
+    [Fact]
+    public void VerifyAccess_is_blocked_until_access_is_provisioned()  // FR-ACC-04 (data-derived gate)
+    {
+        var e = DriveToSow(out _);
+        Ok(e.SignSow("acme", reAuthenticated: true));
+        Assert.Equal(Stage.Access, e.CurrentStage);
+
+        // Unprovisioned access → blocked, even with re-auth.
+        Assert.False(e.VerifyAccess("tester", reAuthenticated: true, accessProvisioned: false).Ok);
+        Assert.Equal(Stage.Access, e.CurrentStage);
+
+        // Provisioned access → advances to Execution.
+        Ok(e.VerifyAccess("tester", reAuthenticated: true, accessProvisioned: true));
+        Assert.Equal(Stage.Execution, e.CurrentStage);
+    }
+
+    [Fact]
+    public void Finding_status_lifecycle_allows_valid_moves_and_blocks_invalid_ones()  // FR-FND-04 (guarded register)
+    {
+        // Valid: open → remediated, and the retest verdicts (pending → closed / re-open).
+        Assert.True(FindingLifecycle.CanTransition(FindingStatus.Open, FindingStatus.Remediated));
+        Assert.True(FindingLifecycle.CanTransition(FindingStatus.Open, FindingStatus.AcceptedRisk));
+        Assert.True(FindingLifecycle.CanTransition(FindingStatus.RetestPending, FindingStatus.Closed));
+        Assert.True(FindingLifecycle.CanTransition(FindingStatus.RetestPending, FindingStatus.Open));
+
+        // Invalid: a closed finding is terminal; accepted-risk cannot jump straight to remediated.
+        Assert.False(FindingLifecycle.CanTransition(FindingStatus.Closed, FindingStatus.Open));
+        Assert.False(FindingLifecycle.CanTransition(FindingStatus.Closed, FindingStatus.RetestPending));
+        Assert.False(FindingLifecycle.CanTransition(FindingStatus.AcceptedRisk, FindingStatus.Remediated));
+    }
+
+    [Fact]
     public void Cannot_skip_stages()
     {
         var (e, _) = New();

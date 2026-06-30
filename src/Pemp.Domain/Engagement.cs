@@ -103,9 +103,17 @@ public sealed class Engagement
             },
             afterDetail: () => $"tester {(string.IsNullOrWhiteSpace(testerLabel) ? testerId.ToString() : testerLabel)}");
 
-    /// <summary>Scoping → SoW: assessment marked complete (FR-SCO-03).</summary>
-    public Result CompleteAssessment(string actor, string source = "api") =>
-        Guarded(Stage.Scoping, () => Result.Success(), "Assessment.Completed", actor, source, () =>
+    /// <summary>
+    /// Scoping → SoW: the assessment is complete (FR-SCO-03). This is a DATA-DERIVED gate, not a
+    /// click: <paramref name="assessmentDataPresent"/> is supplied by the application layer from the
+    /// actual recorded assessment answers, so completion is blocked unless the questionnaire was
+    /// filled. (Defaults true for non-UI callers — the seeder and domain tests that build state directly.)
+    /// </summary>
+    public Result CompleteAssessment(string actor, bool assessmentDataPresent = true, string source = "api") =>
+        Guarded(Stage.Scoping, () => assessmentDataPresent
+                ? Result.Success()
+                : Result.Fail("Assessment answers must be recorded before the assessment can be completed (FR-SCO-03)."),
+            "Assessment.Completed", actor, source, () =>
         {
             AssessmentComplete = true;
             CurrentStage = Stage.Sow;
@@ -139,11 +147,16 @@ public sealed class Engagement
     /// Access → Execution: access verified before the start date (FR-ACC-04). Re-auth-gated
     /// privileged action (SEC-IAM-04); the param defaults true for non-UI callers.
     /// </summary>
-    public Result VerifyAccess(string actor, bool reAuthenticated = true, string source = "api") =>
-        Guarded(Stage.Access, () => reAuthenticated
-                ? Result.Success()
-                : Result.Fail("Re-authentication required to verify access (SEC-IAM-04)."),
-            "Access.Verified", actor, source, () =>
+    public Result VerifyAccess(string actor, bool reAuthenticated = true, bool accessProvisioned = true, string source = "api") =>
+        Guarded(Stage.Access, () =>
+        {
+            if (!reAuthenticated) return Result.Fail("Re-authentication required to verify access (SEC-IAM-04).");
+            // Data-derived gate (not a click): the application layer supplies whether every recorded
+            // access requirement is actually provisioned — testing cannot begin on unverified access.
+            if (!accessProvisioned)
+                return Result.Fail("Every recorded access requirement must be provisioned before access can be verified (FR-ACC-04).");
+            return Result.Success();
+        }, "Access.Verified", actor, source, () =>
         {
             AccessVerified = true;
             CurrentStage = Stage.Execution;

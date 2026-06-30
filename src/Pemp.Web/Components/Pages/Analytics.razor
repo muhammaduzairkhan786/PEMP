@@ -17,37 +17,37 @@
     {
         var active = _engs.Count(e => e.CurrentStage != Stage.Closed);
         var closed = _engs.Count(e => e.CurrentStage == Stage.Closed);
-        var open = _findings.Where(f => f.Status is FindingStatus.Open or FindingStatus.RetestPending).ToList();
-        var critOpen = open.Count(f => f.Severity == Severity.Critical);
+        var totalOpen = _counts.Sum(c => c.Count);
+        var critOpen = _counts.Where(c => c.Severity == Severity.Critical).Sum(c => c.Count);
 
         <div class="tiles">
             <div class="tile"><div class="k">Active engagements</div><div class="v">@active</div></div>
-            <div class="tile"><div class="k">Open findings</div><div class="v">@open.Count</div></div>
+            <div class="tile"><div class="k">Open findings</div><div class="v">@totalOpen</div></div>
             <div class="tile"><div class="k">Critical open</div><div class="v">@critOpen</div></div>
             <div class="tile"><div class="k">Closed</div><div class="v">@closed</div></div>
         </div>
 
         <h2 class="sectionlabel">Severity distribution — open findings <Srs>FR-ANL-04</Srs></h2>
-        @if (open.Count == 0)
+        @if (totalOpen == 0)
         {
             <div class="card muted">No open findings.</div>
         }
         else
         {
-            <div class="distbar" role="img" aria-label="@DistLabel(open)">
+            <div class="distbar" role="img" aria-label="@DistLabel()">
                 @foreach (var s in SevOrder)
                 {
-                    var n = open.Count(f => f.Severity == s);
+                    var n = SevCount(s);
                     if (n > 0)
                     {
-                        <span title="@s @n" style="width:@(100 * n / open.Count)%;background:@SevVar(s)"></span>
+                        <span title="@s @n" style="width:@(100 * n / totalOpen)%;background:@SevVar(s)"></span>
                     }
                 }
             </div>
             <div class="fchips">
                 @foreach (var s in SevOrder)
                 {
-                    var n = open.Count(f => f.Severity == s);
+                    var n = SevCount(s);
                     if (n > 0)
                     {
                         <span class="sevchip @s.ToString().ToLowerInvariant()">@s @n</span>
@@ -67,12 +67,13 @@
                     }
                     @foreach (var e in _engs)
                     {
-                        var of = _findings.Where(f => f.EngagementId == e.Id && (f.Status is FindingStatus.Open or FindingStatus.RetestPending)).ToList();
-                        var worst = of.Count == 0 ? (Severity?)null : of.Min(f => f.Severity);
+                        var of = _counts.Where(c => c.EngagementId == e.Id).ToList();
+                        var openCount = of.Sum(c => c.Count);
+                        var worst = of.Count == 0 ? (Severity?)null : of.Min(c => c.Severity); // enum-min = worst
                         <tr>
                             <td>@e.AppName</td>
                             <td class="muted">@Workflow.Label(e.CurrentStage)</td>
-                            <td class="mono">@of.Count</td>
+                            <td class="mono">@openCount</td>
                             <td>@if (worst is not null){<span class="sevchip @worst.ToString()!.ToLowerInvariant()">@worst</span>}else{<span class="muted">—</span>}</td>
                         </tr>
                     }
@@ -84,7 +85,7 @@
 
 @code {
     List<EngagementRecord>? _engs;
-    List<FindingRecord> _findings = new();
+    List<OpenFindingCount> _counts = new();
 
     static readonly Severity[] SevOrder = { Severity.Critical, Severity.High, Severity.Medium, Severity.Low, Severity.Info };
 
@@ -92,9 +93,12 @@
     {
         await Session.EnsureInitializedAsync(); // resolve role/scope before any query (SSR-safe)
         _engs = await Store.ListScopedAsync(Session.AppScope, Session.TesterScope, Session.Role);
-        var ids = _engs.Select(e => e.Id).ToHashSet();
-        _findings = (await Store.AllFindingsAsync()).Where(f => ids.Contains(f.EngagementId)).ToList();
+        // Aggregate the open findings IN SQL for exactly the scoped engagements — no portfolio-wide
+        // client materialization (FR-ANL-04). The dashboard derives every number from this small set.
+        _counts = await Store.OpenFindingCountsAsync(_engs.Select(e => e.Id).ToList());
     }
+
+    int SevCount(Severity s) => _counts.Where(c => c.Severity == s).Sum(c => c.Count);
 
     static string SevVar(Severity s) => s switch
     {
@@ -105,6 +109,6 @@
         _ => "var(--sev-info)",
     };
 
-    static string DistLabel(List<FindingRecord> open) =>
-        string.Join(", ", SevOrder.Select(s => (s, n: open.Count(f => f.Severity == s))).Where(x => x.n > 0).Select(x => $"{x.s} {x.n}"));
+    string DistLabel() =>
+        string.Join(", ", SevOrder.Select(s => (s, n: SevCount(s))).Where(x => x.n > 0).Select(x => $"{x.s} {x.n}"));
 }

@@ -77,16 +77,16 @@
     Item MakeItem(EngagementRecord r)
     {
         var n = Workflow.Next(r);
-        if (Session.Role == "Tester" && r.CurrentStage == Stage.Report && !r.PeerReviewPassed)
+        if (Session.Role == PempRoles.Tester && r.CurrentStage == Stage.Report && !r.PeerReviewPassed)
         {
             var isAuthor = r.AssignedTesterName == Session.Actor;
             if (r.DraftGenerated)
                 return isAuthor
                     ? new Item(r, "Awaiting independent peer review", "Peer reviewer")  // author waits
-                    : new Item(r, "Awaiting your peer review", "Tester");               // reviewer acts (FR-REP-02)
+                    : new Item(r, "Awaiting your peer review", PempRoles.Tester);        // reviewer acts (FR-REP-02)
             // No draft yet (returned for rework): only the author re-drafts; others just wait.
             return isAuthor
-                ? new Item(r, "Re-draft report (address QA comments)", "Tester")
+                ? new Item(r, "Re-draft report (address QA comments)", PempRoles.Tester)
                 : new Item(r, "Awaiting re-draft by author", "Peer reviewer");
         }
         return new Item(r, n.Label, n.OwnerRole);

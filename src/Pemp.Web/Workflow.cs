@@ -48,24 +48,24 @@ public static class Workflow
 
     public static (ActionKind Kind, string Label, string OwnerRole) Next(EngagementRecord r) => r.CurrentStage switch
     {
-        Stage.Intake => (ActionKind.RouteToDm, "Send to Delivery Manager", "Delivery Manager"),
-        Stage.Assignment => (ActionKind.AssignTester, "Assign a tester", "Delivery Manager"),
+        Stage.Intake => (ActionKind.RouteToDm, "Send to Delivery Manager", PempRoles.DeliveryManager),
+        Stage.Assignment => (ActionKind.AssignTester, "Assign a tester", PempRoles.DeliveryManager),
         // The assigned Tester drives + confirms the assessment (FR-SCO-03); stakeholders supply input
         // async (offered as an "assist" on the page). Owner reflects who can actually advance it.
-        Stage.Scoping => (ActionKind.CompleteAssessment, "Complete the assessment", "Tester"),
+        Stage.Scoping => (ActionKind.CompleteAssessment, "Complete the assessment", PempRoles.Tester),
         Stage.Sow when r.Type == EngagementType.Project && !r.SowReviewedByDm
-            => (ActionKind.ReviewSow, "Review Project SoW", "Delivery Manager"),
-        Stage.Sow => (ActionKind.SignSow, "Review & Sign SoW", "Acme CA Officer"),
-        Stage.Access => (ActionKind.VerifyAccess, "Verify access", "Tester"),
-        Stage.Execution when !r.IrNoticeSent => (ActionKind.SendIr, "Send IR notice & start test", "Tester"),
-        Stage.Execution => (ActionKind.EndTest, "End test & send notice", "Tester"),
-        Stage.Findings => (ActionKind.GenerateDraft, "Generate draft report", "Tester"),
-        Stage.Report when !r.DraftGenerated => (ActionKind.GenerateDraft, "Re-draft report (address QA comments)", "Tester"),
-        Stage.Report when !r.PeerReviewPassed => (ActionKind.PeerReview, "Peer QA review", "Tester"),
-        Stage.Report => (ActionKind.ReleaseFinal, "Release final report", "Tester"),
+            => (ActionKind.ReviewSow, "Review Project SoW", PempRoles.DeliveryManager),
+        Stage.Sow => (ActionKind.SignSow, "Review & Sign SoW", PempRoles.AcmeOfficer),
+        Stage.Access => (ActionKind.VerifyAccess, "Verify access", PempRoles.Tester),
+        Stage.Execution when !r.IrNoticeSent => (ActionKind.SendIr, "Send IR notice & start test", PempRoles.Tester),
+        Stage.Execution => (ActionKind.EndTest, "End test & send notice", PempRoles.Tester),
+        Stage.Findings => (ActionKind.GenerateDraft, "Generate draft report", PempRoles.Tester),
+        Stage.Report when !r.DraftGenerated => (ActionKind.GenerateDraft, "Re-draft report (address QA comments)", PempRoles.Tester),
+        Stage.Report when !r.PeerReviewPassed => (ActionKind.PeerReview, "Peer QA review", PempRoles.Tester),
+        Stage.Report => (ActionKind.ReleaseFinal, "Release final report", PempRoles.Tester),
         // Closed is terminal/"done" — a retest is an OPTIONAL action offered on the page,
         // not a mandatory My-Turn item. Retest child has its own owned action.
-        Stage.Retest => (ActionKind.CompleteRetest, "Re-verify findings & complete retest", "Tester"),
+        Stage.Retest => (ActionKind.CompleteRetest, "Re-verify findings & complete retest", PempRoles.Tester),
         _ => (ActionKind.None, "—", ""),
     };
 }
