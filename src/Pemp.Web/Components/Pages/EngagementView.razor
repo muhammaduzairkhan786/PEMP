@@ -268,8 +268,9 @@ else
             _findings = await Store.FindingsForAsync(Id);
             _access = await Store.AccessReqsForAsync(Id);
             _checklist = await Store.ChecklistDoneAsync(Id);
-            // Least exposure (SEC-CRD): only fetch test credentials for the assigned tester who may view them.
-            _credentials = (Session.Role == PempRoles.Tester && _rec.AssignedTesterName == Session.Actor)
+            // Least exposure (SEC-CRD): only fetch test credentials for the assigned tester who may view
+            // them — keyed on the stable AssignedTesterId, not the display name.
+            _credentials = (Session.Role == PempRoles.Tester && _rec.AssignedTesterId is Guid t && t == Session.TesterScope)
                 ? await Store.CredentialsForAsync(Id)
                 : new();
             if (_rec.CurrentStage == Stage.Assignment)

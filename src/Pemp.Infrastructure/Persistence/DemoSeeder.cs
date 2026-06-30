@@ -27,6 +27,18 @@ public static class DemoSeeder
         new(TesterLee, "S. Lee"),
     };
 
+    /// <summary>
+    /// Deterministic stable application id from the app name (SEC-AZN-02). Object-level scope keys on
+    /// this id, not the mutable display name; the same name always yields the same id (SHA-256 derived),
+    /// so the seeder, the Raise path, and the stakeholder→app mapping all agree without a stored table.
+    /// </summary>
+    public static Guid AppIdFor(string appName)
+    {
+        var bytes = System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes("pemp-app:" + (appName ?? "")));
+        return new Guid(bytes.AsSpan(0, 16).ToArray());
+    }
+
     public static void Seed(PempDbContext db, Func<DateTimeOffset> clock, byte[]? auditKey = null)
     {
         if (db.Engagements.Any()) return;
@@ -39,7 +51,7 @@ public static class DemoSeeder
         claims.AssignTester(TesterKhan, dm);
         claims.CompleteAssessment("A. Khan");
         claims.ReviewSowAsDeliveryManager(dm);
-        db.Engagements.Add(EngagementRecord.FromDomain(claims, "Claims Portal", "High", "A. Khan"));
+        db.Engagements.Add(EngagementRecord.FromDomain(claims, AppIdFor("Claims Portal"), "Claims Portal", "High", "A. Khan"));
 
         // Payments API — BAU, signed, awaiting access verification.
         var pay = Engagement.Raise("ENG-2026-0419", EngagementType.Bau, "system", chain, clock);
@@ -47,7 +59,7 @@ public static class DemoSeeder
         pay.AssignTester(TesterKhan, dm);                 // A. Khan (default Tester persona) → real work at Access
         pay.CompleteAssessment("A. Khan");
         pay.SignSow(acme, reAuthenticated: true);
-        db.Engagements.Add(EngagementRecord.FromDomain(pay, "Payments API", "Medium", "A. Khan"));
+        db.Engagements.Add(EngagementRecord.FromDomain(pay, AppIdFor("Payments API"), "Payments API", "Medium", "A. Khan"));
 
         // Retail Web — Project, in the testing/findings window. Assigned to A. Khan (the only
         // seeded tester login) so the findings/evidence/checklist showcase is reachable as a
@@ -61,7 +73,7 @@ public static class DemoSeeder
         retail.VerifyAccess("A. Khan");
         retail.SendIrNotice("A. Khan");
         retail.EndTest("A. Khan");
-        db.Engagements.Add(EngagementRecord.FromDomain(retail, "Retail Web", "High", "A. Khan"));
+        db.Engagements.Add(EngagementRecord.FromDomain(retail, AppIdFor("Retail Web"), "Retail Web", "High", "A. Khan"));
 
         // Broker Portal — Project, fully closed (report released after peer QA).
         var broker = Engagement.Raise("ENG-2026-0399", EngagementType.Project, "system", chain, clock);
@@ -76,23 +88,23 @@ public static class DemoSeeder
         broker.GenerateDraft("A. Khan");
         broker.PeerReview(TesterPatel, passed: true, "R. Patel");
         broker.ReleaseFinal(acme, reAuthenticated: true);
-        db.Engagements.Add(EngagementRecord.FromDomain(broker, "Broker Portal", "Low", "A. Khan"));
+        db.Engagements.Add(EngagementRecord.FromDomain(broker, AppIdFor("Broker Portal"), "Broker Portal", "Low", "A. Khan"));
 
         // Mobile App — BAU, at Scoping (assessment questionnaire to be completed). Assigned to
         // A. Khan so the assessment showcase is reachable from the single tester login.
         var mobile = Engagement.Raise("ENG-2026-0421", EngagementType.Bau, "system", chain, clock);
         mobile.RouteToDeliveryManager(dm);
         mobile.AssignTester(TesterKhan, dm);
-        db.Engagements.Add(EngagementRecord.FromDomain(mobile, "Mobile App", "Medium", "A. Khan"));
+        db.Engagements.Add(EngagementRecord.FromDomain(mobile, AppIdFor("Mobile App"), "Mobile App", "Medium", "A. Khan"));
 
         // Partner Portal — freshly raised, at Intake (DM to route).
         var intake = Engagement.Raise("ENG-2026-0422", EngagementType.Bau, "system", chain, clock);
-        db.Engagements.Add(EngagementRecord.FromDomain(intake, "Partner Portal", "Medium", null));
+        db.Engagements.Add(EngagementRecord.FromDomain(intake, AppIdFor("Partner Portal"), "Partner Portal", "Medium", null));
 
         // Quote Engine — routed, awaiting tester assignment (DM's turn).
         var assign = Engagement.Raise("ENG-2026-0423", EngagementType.Project, "system", chain, clock);
         assign.RouteToDeliveryManager(dm);
-        db.Engagements.Add(EngagementRecord.FromDomain(assign, "Quote Engine", "High", null));
+        db.Engagements.Add(EngagementRecord.FromDomain(assign, AppIdFor("Quote Engine"), "Quote Engine", "High", null));
 
         // Live register (FR-FND): findings for the engagements that have reached testing.
         FindingRecord F(Guid eng, string title, Severity sev, string cvss, string vector, string asset, string remediation, FindingStatus status)

@@ -10,16 +10,26 @@ namespace Pemp.Infrastructure.Persistence;
 /// gates writes. Because the store re-derives scope from this context, the guarantee continues to hold
 /// when these methods become API endpoints rather than in-process calls.
 /// </summary>
-public sealed record CallerContext(string? Role, string Actor, string? AppScope, string? TesterScope)
+/// <param name="AppScope">Stable application id a Stakeholder is scoped to (null = not app-scoped).</param>
+/// <param name="TesterScope">Stable tester id a Tester is scoped to (null = not tester-scoped).</param>
+/// <param name="UserId">
+/// The acting principal's stable id, used for separation-of-duties checks (e.g. the SoW signer must
+/// differ from the assigned tester who drafted it). Object-level scope keys on stable ids — never the
+/// display <paramref name="Actor"/>, which is presentation-only and may collide.
+/// </param>
+public sealed record CallerContext(
+    string? Role, string Actor, Guid? AppScope, Guid? TesterScope, Guid? UserId = null)
 {
     /// <summary>A portfolio (Acme/DM/Admin) caller — no object filter, sees/acts on the whole estate.</summary>
-    public static CallerContext Portfolio(string role, string actor) => new(role, actor, null, null);
+    public static CallerContext Portfolio(string role, string actor, Guid? userId = null) =>
+        new(role, actor, null, null, userId);
 
-    /// <summary>A Tester caller scoped to their own assignments (TesterScope = their display name).</summary>
-    public static CallerContext ForTester(string actor) => new(PempRoles.Tester, actor, null, actor);
+    /// <summary>A Tester caller scoped to their own assignments by stable tester id.</summary>
+    public static CallerContext ForTester(Guid testerId, string actor) =>
+        new(PempRoles.Tester, actor, null, testerId, testerId);
 
-    /// <summary>A Stakeholder caller scoped to one application.</summary>
-    public static CallerContext ForStakeholder(string actor, string appScope) =>
+    /// <summary>A Stakeholder caller scoped to one application by stable app id.</summary>
+    public static CallerContext ForStakeholder(string actor, Guid appScope) =>
         new(PempRoles.Stakeholder, actor, appScope, null);
 }
 

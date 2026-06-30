@@ -76,18 +76,20 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
     /// and writes (<see cref="Authorize"/>), so a record reachable for read is reachable for an authorized
     /// write and nothing else. Fails CLOSED: a scoped role with no concrete filter matches nothing.
     /// </summary>
-    private static bool InScope(EngagementRecord rec, string? appName, string? assignedToName, string? role)
+    private static bool InScope(EngagementRecord rec, Guid? appScope, Guid? testerScope, string? role)
     {
         var scoped = !AllPortfolioRoles.Contains(role ?? "");
-        if (scoped && appName is null && assignedToName is null) return false;
-        if (appName is not null && rec.AppName != appName && rec.AppName != appName + " (retest)") return false;
-        if (assignedToName is not null)
+        if (scoped && appScope is null && testerScope is null) return false;
+        // App scope keys on the STABLE app id (retest children share their parent's AppId), so the old
+        // mutable-name + "(retest)" string hack is gone — a rename can't widen or break access.
+        if (appScope is Guid app && rec.AppId != app) return false;
+        if (testerScope is Guid tid)
         {
-            var isAssigned = rec.AssignedTesterName == assignedToName;
-            // Peer-QA review access: a Report-stage engagement authored by another tester is in scope.
-            var isPeerReviewable = role == PempRoles.Tester && !string.IsNullOrEmpty(assignedToName)
+            var isAssigned = rec.AssignedTesterId == tid;
+            // Peer-QA review access: a Report-stage engagement authored by ANOTHER tester is in scope.
+            var isPeerReviewable = role == PempRoles.Tester
                 && rec.CurrentStage == Stage.Report
-                && rec.AssignedTesterName != null && rec.AssignedTesterName != assignedToName;
+                && rec.AssignedTesterId != null && rec.AssignedTesterId != tid;
             if (!isAssigned && !isPeerReviewable) return false;
         }
         return true;
@@ -105,9 +107,10 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
             return Result.Fail("Not authorized for this engagement — outside your scope (SEC-AZN-02).");
         if (auth.AllowedRoles is not null && (c.Role is null || !auth.AllowedRoles.Contains(c.Role)))
             return Result.Fail($"This action is restricted to: {string.Join(" / ", auth.AllowedRoles)} (SEC-AZN-01).");
-        if (auth.MustBeAssignedTester && !string.Equals(rec.AssignedTesterName, c.Actor, StringComparison.Ordinal))
+        // SoD / ownership checks key on the STABLE assigned-tester id vs the caller's user id — never names.
+        if (auth.MustBeAssignedTester && (c.UserId is null || rec.AssignedTesterId != c.UserId))
             return Result.Fail("Only the assigned tester may perform this action (SEC-AZN-02).");
-        if (auth.MustDifferFromAssignedTester && string.Equals(rec.AssignedTesterName, c.Actor, StringComparison.Ordinal))
+        if (auth.MustDifferFromAssignedTester && c.UserId is Guid uid && rec.AssignedTesterId == uid)
             return Result.Fail("Separation of duties: the SoW signer must differ from the tester who drafted it (FR-SOW-05).");
         return Result.Success();
     }
@@ -158,29 +161,27 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
     /// elsewhere. Optional <paramref name="skip"/>/<paramref name="take"/> page the result.
     /// </summary>
     public Task<List<EngagementRecord>> ListScopedAsync(
-        string? appName, string? assignedToName, string? role = null, int? skip = null, int? take = null)
+        Guid? appScope, Guid? testerScope, string? role = null, int? skip = null, int? take = null)
     {
         var scoped = !AllPortfolioRoles.Contains(role ?? "");
         // Fail closed: a scoped role with no concrete filter at all sees nothing.
-        if (scoped && appName is null && assignedToName is null)
+        if (scoped && appScope is null && testerScope is null)
             return Task.FromResult(new List<EngagementRecord>());
 
         var q = db.Engagements.AsNoTracking().AsQueryable();
-        if (appName is not null) q = q.Where(e => e.AppName == appName || e.AppName == appName + " (retest)");
-        if (assignedToName is not null)
+        if (appScope is Guid app) q = q.Where(e => e.AppId == app);
+        if (testerScope is Guid tid)
         {
             // A Tester's scope = own assignments ∪ Report-stage engagements authored by another tester
-            // (the peer-QA queue, FR-REP-02). A blank name still matches nothing (fail-closed) because
-            // the union only opens for a concrete, non-empty tester name.
-            if (role == PempRoles.Tester && !string.IsNullOrEmpty(assignedToName))
+            // (the peer-QA queue, FR-REP-02), keyed on the stable AssignedTesterId.
+            if (role == PempRoles.Tester)
             {
-                var name = assignedToName;
-                q = q.Where(e => e.AssignedTesterName == name
-                    || (e.CurrentStage == Stage.Report && e.AssignedTesterName != null && e.AssignedTesterName != name));
+                q = q.Where(e => e.AssignedTesterId == tid
+                    || (e.CurrentStage == Stage.Report && e.AssignedTesterId != null && e.AssignedTesterId != tid));
             }
             else
             {
-                q = q.Where(e => e.AssignedTesterName == assignedToName);
+                q = q.Where(e => e.AssignedTesterId == tid);
             }
         }
         q = q.OrderBy(e => e.Reference);
@@ -204,11 +205,11 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
     /// engagement authored by a DIFFERENT tester (the peer-QA review path, FR-REP-02); they are
     /// STILL blocked from non-Report engagements they didn't author.
     /// </summary>
-    public async Task<EngagementRecord?> GetScopedAsync(Guid id, string? appName, string? assignedToName, string? role = null)
+    public async Task<EngagementRecord?> GetScopedAsync(Guid id, Guid? appScope, Guid? testerScope, string? role = null)
     {
         var rec = await db.Engagements.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id);
         if (rec is null) return null;
-        return InScope(rec, appName, assignedToName, role) ? rec : null;
+        return InScope(rec, appScope, testerScope, role) ? rec : null;
     }
 
     /// <summary>All findings across the portfolio (FR-ANL-04 analytics).</summary>
@@ -380,7 +381,9 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
             var reference = await NextReferenceAsync();
             var chain = NewChain();
             var engagement = Engagement.Raise(reference, type, caller.Actor, chain, clock);
-            db.Engagements.Add(EngagementRecord.FromDomain(engagement, appName, criticality, null));
+            // Engagements for the same application share one stable AppId (deterministic from the name),
+            // so stakeholder app-scope is consistent across an app's engagements.
+            db.Engagements.Add(EngagementRecord.FromDomain(engagement, DemoSeeder.AppIdFor(appName), appName, criticality, null));
             try
             {
                 await db.SaveChangesAsync();
@@ -551,7 +554,9 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
         if (result.Failed || child is null) return (result, null);
 
         parent.CopyFrom(aggregate);
-        var childRec = EngagementRecord.FromDomain(child, $"{parent.AppName} (retest)", parent.Criticality, parent.AssignedTesterName);
+        // The retest child shares the parent's STABLE AppId (so app-scope and tester-scope reach it
+        // without any string hack); the "(retest)" suffix is now display-only.
+        var childRec = EngagementRecord.FromDomain(child, parent.AppId, $"{parent.AppName} (retest)", parent.Criticality, parent.AssignedTesterName);
         db.Engagements.Add(childRec);
 
         // Carry the in-scope findings into the child to be re-verified (FR-RET-03): everything

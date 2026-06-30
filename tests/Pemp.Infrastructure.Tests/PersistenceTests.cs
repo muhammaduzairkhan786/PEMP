@@ -23,8 +23,8 @@ public sealed class PersistenceTests : IDisposable
     private static readonly byte[] Key = HashChain.DefaultKey;
 
     // Server-side caller contexts (SEC-AZN): the write-path authorization re-derives scope from these.
-    private static readonly CallerContext Khan = CallerContext.ForTester("A. Khan");
-    private static readonly CallerContext Patel = CallerContext.ForTester("R. Patel");
+    private static readonly CallerContext Khan = CallerContext.ForTester(DemoSeeder.TesterKhan, "A. Khan");
+    private static readonly CallerContext Patel = CallerContext.ForTester(DemoSeeder.TesterPatel, "R. Patel");
     private static readonly CallerContext Acme = CallerContext.Portfolio(PempRoles.AcmeOfficer, "J. Okafor");
     private static readonly CallerContext Dm = CallerContext.Portfolio(PempRoles.DeliveryManager, "M. Reyes");
 
@@ -132,13 +132,13 @@ public sealed class PersistenceTests : IDisposable
         var mobile = IdOf("ENG-2026-0421");  // Mobile App, assigned A. Khan, at Scoping
         var partner = IdOf("ENG-2026-0422"); // Partner Portal, unassigned, at Intake
 
-        // Tester scope (A. Khan): reaches own assignment, blocked from one not assigned to them.
-        Assert.NotNull(await _store.GetScopedAsync(claims, null, "A. Khan"));
-        Assert.Null(await _store.GetScopedAsync(partner, null, "A. Khan"));
+        // Tester scope (A. Khan, by stable id): reaches own assignment, blocked from one not assigned to them.
+        Assert.NotNull(await _store.GetScopedAsync(claims, null, DemoSeeder.TesterKhan));
+        Assert.Null(await _store.GetScopedAsync(partner, null, DemoSeeder.TesterKhan));
 
-        // Stakeholder app scope (Mobile App): reaches own app, blocked from others (anti-BOLA).
-        Assert.NotNull(await _store.GetScopedAsync(mobile, "Mobile App", null));
-        Assert.Null(await _store.GetScopedAsync(claims, "Mobile App", null));
+        // Stakeholder app scope (Mobile App, by stable id): reaches own app, blocked from others (anti-BOLA).
+        Assert.NotNull(await _store.GetScopedAsync(mobile, DemoSeeder.AppIdFor("Mobile App"), null));
+        Assert.Null(await _store.GetScopedAsync(claims, DemoSeeder.AppIdFor("Mobile App"), null));
 
         // Unrestricted (Acme/DM/Admin): reaches anything. A null role is now fail-closed (scoped),
         // so an all-portfolio role must be named explicitly to pass with no filter.
@@ -157,18 +157,14 @@ public sealed class PersistenceTests : IDisposable
         Assert.Empty(await _store.ListScopedAsync(null, null, role: "Tester"));
         Assert.Empty(await _store.ListScopedAsync(null, null, role: "Stakeholder"));
 
-        // A blank/unresolved filter value also yields zero rows (fail-closed).
-        Assert.Null(await _store.GetScopedAsync(claims, null, "", role: "Tester"));
-        Assert.Empty(await _store.ListScopedAsync(null, "", role: "Tester"));
-
         // An all-portfolio role with (null,null) still sees the whole portfolio.
         Assert.NotEmpty(await _store.ListScopedAsync(null, null, role: "Delivery Manager"));
         Assert.NotNull(await _store.GetScopedAsync(claims, null, null, role: "System Administrator"));
 
-        // A scoped role WITH a concrete, matching filter still reaches its own data, and anti-BOLA
-        // still blocks reaching another scope by id.
-        Assert.NotNull(await _store.GetScopedAsync(claims, null, "A. Khan", role: "Tester"));
-        Assert.Null(await _store.GetScopedAsync(claims, null, "S. Lee", role: "Tester"));
+        // A scoped role WITH a concrete, matching id still reaches its own data, and anti-BOLA
+        // still blocks reaching another scope by a DIFFERENT id.
+        Assert.NotNull(await _store.GetScopedAsync(claims, null, DemoSeeder.TesterKhan, role: "Tester"));
+        Assert.Null(await _store.GetScopedAsync(claims, null, DemoSeeder.TesterLee, role: "Tester"));
     }
 
     [Fact]
@@ -399,15 +395,15 @@ public sealed class PersistenceTests : IDisposable
         Assert.Equal(Stage.Report, (await _store.GetAsync(report))!.CurrentStage);
 
         // R. Patel (a DIFFERENT tester) CAN open it for review (Report-stage review access),
-        var asReviewer = await _store.GetScopedAsync(report, null, "R. Patel", role: "Tester");
+        var asReviewer = await _store.GetScopedAsync(report, null, DemoSeeder.TesterPatel, role: "Tester");
         Assert.NotNull(asReviewer);
         // and it surfaces in their scoped list (the QA queue), even though none are assigned to them.
-        Assert.Contains(await _store.ListScopedAsync(null, "R. Patel", role: "Tester"), e => e.Id == report);
+        Assert.Contains(await _store.ListScopedAsync(null, DemoSeeder.TesterPatel, role: "Tester"), e => e.Id == report);
 
         // ...but a NON-Report engagement they didn't author stays blocked (anti-BOLA preserved).
         var claimsAtSow = IdOf("ENG-2026-0412"); // at Sow, assigned A. Khan
-        Assert.Null(await _store.GetScopedAsync(claimsAtSow, null, "R. Patel", role: "Tester"));
-        Assert.DoesNotContain(await _store.ListScopedAsync(null, "R. Patel", role: "Tester"), e => e.Id == claimsAtSow);
+        Assert.Null(await _store.GetScopedAsync(claimsAtSow, null, DemoSeeder.TesterPatel, role: "Tester"));
+        Assert.DoesNotContain(await _store.ListScopedAsync(null, DemoSeeder.TesterPatel, role: "Tester"), e => e.Id == claimsAtSow);
     }
 
     [Fact]
@@ -473,7 +469,7 @@ public sealed class PersistenceTests : IDisposable
         // S. Lee is NOT assigned to Retail Web (A. Khan is). A direct-id transition by S. Lee must be
         // rejected on the WRITE path, exactly as GetScopedAsync rejects the read.
         var retail = IdOf("ENG-2026-0408"); // at Findings, assigned A. Khan
-        var lee = CallerContext.ForTester("S. Lee");
+        var lee = CallerContext.ForTester(DemoSeeder.TesterLee, "S. Lee");
 
         var result = await _store.ExecuteAsync(retail, lee, EngagementAction.GenerateDraft, e => e.GenerateDraft("S. Lee"));
 
@@ -487,7 +483,7 @@ public sealed class PersistenceTests : IDisposable
     {
         // S. Lee tries to add a finding to A. Khan's engagement by id — defense-in-depth throws, nothing written.
         var retail = IdOf("ENG-2026-0408");
-        var lee = CallerContext.ForTester("S. Lee");
+        var lee = CallerContext.ForTester(DemoSeeder.TesterLee, "S. Lee");
         var before = (await _store.FindingsForAsync(retail)).Count;
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() => _store.AddFindingAsync(
@@ -502,7 +498,7 @@ public sealed class PersistenceTests : IDisposable
         // An Acme CA Officer whose acting name matches the assigned tester (the drafter) is blocked by SoD.
         // ENG-0412's assigned tester is A. Khan; an officer acting as "A. Khan" must not be able to sign.
         var id = IdOf("ENG-2026-0412");
-        var officerWhoIsAlsoTheDrafter = CallerContext.Portfolio(PempRoles.AcmeOfficer, "A. Khan");
+        var officerWhoIsAlsoTheDrafter = CallerContext.Portfolio(PempRoles.AcmeOfficer, "A. Khan", userId: DemoSeeder.TesterKhan);
 
         var result = await _store.ExecuteAsync(id, officerWhoIsAlsoTheDrafter, EngagementAction.SignSow,
             e => e.SignSow("A. Khan", reAuthenticated: true));
@@ -583,6 +579,43 @@ public sealed class PersistenceTests : IDisposable
         public bool IsEnabled(LogLevel logLevel) => true;
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
             Func<TState, Exception?, string> formatter) => sink.Add((logLevel, formatter(state, exception)));
+    }
+
+    // ---- Stable-id object scope (rank 21, SEC-AZN-02) ----------------------
+
+    [Fact]
+    public async Task Object_scope_keys_on_stable_app_id_not_the_mutable_name()  // rank 21 (rename can't break/widen access)
+    {
+        var mobileId = IdOf("ENG-2026-0421");        // Mobile App
+        var appId = DemoSeeder.AppIdFor("Mobile App");
+        Assert.NotNull(await _store.GetScopedAsync(mobileId, appId, null, role: "Stakeholder"));
+
+        // Rename the application (display only). Scope keyed on the STABLE AppId must still reach it,
+        // and the AppId itself is untouched by the rename.
+        var rec = _db.Engagements.Single(e => e.Id == mobileId);
+        rec.AppName = "Mobile App (rebranded)";
+        await _db.SaveChangesAsync();
+
+        Assert.NotNull(await _store.GetScopedAsync(mobileId, appId, null, role: "Stakeholder"));
+        Assert.Equal(appId, (await _store.GetAsync(mobileId))!.AppId);
+    }
+
+    [Fact]
+    public async Task Retest_child_shares_parent_app_id_and_tester_for_scope()  // rank 21 (no "(retest)" string hack)
+    {
+        var parentId = IdOf("ENG-2026-0399"); // Broker Portal, closed, assigned A. Khan
+        var parent = (await _store.GetAsync(parentId))!;
+
+        var (result, childId) = await _store.RequestRetestAsync(parentId, Acme);
+        Assert.False(result.Failed);
+
+        var child = (await _store.GetAsync(childId!.Value))!;
+        Assert.Equal(parent.AppId, child.AppId);                       // same STABLE app id, not "X (retest)"
+        Assert.Equal(parent.AssignedTesterId, child.AssignedTesterId); // tester carried by stable id
+
+        // Both the app stakeholder (by AppId) and the assigned tester (by id) reach the child by scope.
+        Assert.NotNull(await _store.GetScopedAsync(childId.Value, parent.AppId, null, role: "Stakeholder"));
+        Assert.NotNull(await _store.GetScopedAsync(childId.Value, null, DemoSeeder.TesterKhan, role: "Tester"));
     }
 
     public void Dispose()

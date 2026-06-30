@@ -13,6 +13,13 @@ public sealed class EngagementRecord
 {
     public Guid Id { get; set; }
     public string Reference { get; set; } = "";
+    /// <summary>
+    /// Stable identifier for the application under test (SEC-AZN-02). Object-level scope keys on THIS,
+    /// not the mutable <see cref="AppName"/> display string — a stakeholder's app scope and a retest
+    /// child's link to its app are both expressed by id, so renaming an app can never widen or break
+    /// access. Engagements for the same application (incl. retest children) share one AppId.
+    /// </summary>
+    public Guid AppId { get; set; }
     public string AppName { get; set; } = "";
     public EngagementType Type { get; set; }
     public string Criticality { get; set; } = "Medium";
@@ -60,9 +67,9 @@ public sealed class EngagementRecord
         RetestRequested = e.RetestRequested;
     }
 
-    public static EngagementRecord FromDomain(Engagement e, string appName, string criticality, string? testerName) => new()
+    public static EngagementRecord FromDomain(Engagement e, Guid appId, string appName, string criticality, string? testerName) => new()
     {
-        Id = e.Id, Reference = e.Reference, AppName = appName, Type = e.Type, Criticality = criticality,
+        Id = e.Id, Reference = e.Reference, AppId = appId, AppName = appName, Type = e.Type, Criticality = criticality,
         CurrentStage = e.CurrentStage, ParentId = e.ParentId, AssignedTesterId = e.AssignedTesterId,
         AssignedTesterName = testerName, CreatedAt = DateTimeOffset.UtcNow,
         AssessmentComplete = e.AssessmentComplete, SowReviewedByDm = e.SowReviewedByDm, SowSigned = e.SowSigned,

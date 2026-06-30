@@ -49,14 +49,24 @@ public sealed class DemoSession(AuthenticationStateProvider authProvider)
     }
 
     // ---- Object-level scope (SEC-AZN / SEC-INS-01) ----
-    // A Stakeholder sees only their own application; a Tester only their assigned engagements.
+    // A Stakeholder sees only their own application; a Tester only their assigned engagements. Scope now
+    // keys on STABLE ids (app id / tester id), never display names. The authenticated principal is mapped
+    // to its stable id at this boundary (demo: by display name → seeded id; prod: the Entra object id).
     // Other roles (Acme, DM, Admin) see the whole portfolio.
-    public string? AppScope => Role == PempRoles.Stakeholder ? "Retail Web" : null;
-    public string? TesterScope => Role == PempRoles.Tester ? Actor : null;
+    public Guid? AppScope => Role == PempRoles.Stakeholder
+        ? Pemp.Infrastructure.Persistence.DemoSeeder.AppIdFor("Retail Web")  // P. Devlin owns Retail Web
+        : (Guid?)null;
+
+    private Guid? ResolvedTesterId =>
+        Array.Find(Pemp.Infrastructure.Persistence.DemoSeeder.Testers, t => t.Name == Actor)?.Id;
+
+    public Guid? TesterScope => Role == PempRoles.Tester ? ResolvedTesterId : null;
 
     /// <summary>
     /// The server-side authorization context for a WRITE (SEC-AZN). Carries the SAME role + scope used
-    /// for reads, so the store re-derives and enforces object-level scope + role/SoD on every mutation.
+    /// for reads (stable ids), so the store re-derives and enforces object-level scope + role/SoD on
+    /// every mutation. <see cref="ResolvedTesterId"/> doubles as the SoD user id for testers.
     /// </summary>
-    public Pemp.Infrastructure.Persistence.CallerContext Caller => new(Role, Actor, AppScope, TesterScope);
+    public Pemp.Infrastructure.Persistence.CallerContext Caller =>
+        new(Role, Actor, AppScope, TesterScope, ResolvedTesterId);
 }
