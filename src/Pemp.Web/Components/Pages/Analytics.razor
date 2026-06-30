@@ -91,7 +91,7 @@
     protected override async Task OnInitializedAsync()
     {
         await Session.EnsureInitializedAsync(); // resolve role/scope before any query (SSR-safe)
-        _engs = await Store.ListScopedAsync(Session.AppScope, Session.TesterScope);
+        _engs = await Store.ListScopedAsync(Session.AppScope, Session.TesterScope, Session.Role);
         var ids = _engs.Select(e => e.Id).ToHashSet();
         _findings = (await Store.AllFindingsAsync()).Where(f => ids.Contains(f.EngagementId)).ToList();
     }

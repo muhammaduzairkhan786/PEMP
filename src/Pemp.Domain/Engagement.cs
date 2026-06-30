@@ -86,13 +86,22 @@ public sealed class Engagement
         Guarded(Stage.Intake, () => Result.Success(), "Engagement.Routed", actor, source,
             () => CurrentStage = Stage.Assignment);
 
-    /// <summary>Assignment → Scoping: at least one tester assigned (FR-ASG-03).</summary>
-    public Result AssignTester(Guid testerId, string actor, string source = "api") =>
-        Guarded(Stage.Assignment, () => Result.Success(), "Tester.Assigned", actor, source, () =>
-        {
-            AssignedTesterId = testerId;
-            CurrentStage = Stage.Scoping;
-        });
+    /// <summary>
+    /// Assignment → Scoping: at least one tester assigned (FR-ASG-03). The audit "after"
+    /// records WHO was assigned (name if supplied, else id) alongside the stage move so the
+    /// trail is before/after complete (FR-AUD-02), not just a bare stage transition.
+    /// </summary>
+    public Result AssignTester(Guid testerId, string actor, string source = "api", string? testerLabel = null) =>
+        GuardedTransition(
+            () => CurrentStage != Stage.Assignment
+                ? Result.Fail($"Action 'Tester.Assigned' requires stage {Stage.Assignment} (currently {CurrentStage}).")
+                : Result.Success(),
+            "Tester.Assigned", actor, source, () =>
+            {
+                AssignedTesterId = testerId;
+                CurrentStage = Stage.Scoping;
+            },
+            afterDetail: () => $"tester {(string.IsNullOrWhiteSpace(testerLabel) ? testerId.ToString() : testerLabel)}");
 
     /// <summary>Scoping → SoW: assessment marked complete (FR-SCO-03).</summary>
     public Result CompleteAssessment(string actor, string source = "api") =>
@@ -248,14 +257,17 @@ public sealed class Engagement
 
     // Core transition: the guard fully decides legality (including any stage check),
     // the state change and the hash-chain append commit as one logical transaction.
-    private Result GuardedTransition(Func<Result> guard, string action, string actor, string source, Action apply)
+    // <paramref name="afterDetail"/> (evaluated post-apply) appends extra context to the
+    // audit "after" beyond the bare stage, for before/after completeness (FR-AUD-02).
+    private Result GuardedTransition(Func<Result> guard, string action, string actor, string source, Action apply,
+        Func<string>? afterDetail = null)
     {
         var g = guard();
         if (g.Failed) return g;
 
         var before = CurrentStage.ToString();
         apply();
-        var after = CurrentStage.ToString();
+        var after = afterDetail is null ? CurrentStage.ToString() : $"{CurrentStage} · {afterDetail()}";
         _chain.Append(Id, actor, action, before, after, source, _clock());
         return Result.Success();
     }

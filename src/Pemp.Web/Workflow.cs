@@ -50,7 +50,9 @@ public static class Workflow
     {
         Stage.Intake => (ActionKind.RouteToDm, "Send to Delivery Manager", "Delivery Manager"),
         Stage.Assignment => (ActionKind.AssignTester, "Assign a tester", "Delivery Manager"),
-        Stage.Scoping => (ActionKind.CompleteAssessment, "Complete the assessment", "Stakeholder"),
+        // The assigned Tester drives + confirms the assessment (FR-SCO-03); stakeholders supply input
+        // async (offered as an "assist" on the page). Owner reflects who can actually advance it.
+        Stage.Scoping => (ActionKind.CompleteAssessment, "Complete the assessment", "Tester"),
         Stage.Sow when r.Type == EngagementType.Project && !r.SowReviewedByDm
             => (ActionKind.ReviewSow, "Review Project SoW", "Delivery Manager"),
         Stage.Sow => (ActionKind.SignSow, "Review & Sign SoW", "Acme CA Officer"),
