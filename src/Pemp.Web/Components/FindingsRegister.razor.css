@@ -1,0 +1,31 @@
+/* Live CVSS readout under the vector field — the "score resolving live" moment.
+   Dark+light parity via design tokens; severity colour tracks the derived band. */
+.cvss-live{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-top:6px;
+    min-height:1.4em;
+    font-size:var(--text-xs);
+}
+
+.cvss-score{
+    font-weight:750;
+    font-size:var(--text-sm);
+    font-variant-numeric:tabular-nums;
+    padding:1px 9px;
+    border-radius:var(--radius-pill);
+    border:1px solid currentColor;
+    line-height:1.3;
+}
+
+.cvss-band{ font-weight:600; }
+
+.cvss-hint{ color:var(--ink-muted); }
+
+/* Severity bands → token colours (shared with .sevchip in the global sheet). */
+.cvss-score.critical,.cvss-band.critical{ color:var(--sev-critical); }
+.cvss-score.high,.cvss-band.high{ color:var(--sev-high); }
+.cvss-score.medium,.cvss-band.medium{ color:var(--sev-medium); }
+.cvss-score.low,.cvss-band.low{ color:var(--sev-low); }
+.cvss-score.info,.cvss-band.info{ color:var(--sev-info); }

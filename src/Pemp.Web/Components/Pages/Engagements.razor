@@ -19,31 +19,159 @@
     }
     else
     {
-        <div class="enggrid">
-            @foreach (var r in _recs)
+        <div class="portfolio-controls">
+            <div class="search-wrap">
+                <label class="sr-only" for="eng-search">Search engagements by app or reference</label>
+                <span class="search-icon" aria-hidden="true">⌕</span>
+                <input id="eng-search" class="inp search-inp" type="search" autocomplete="off"
+                       placeholder="Search app name or reference…"
+                       @bind="_search" @bind:event="oninput" />
+            </div>
+
+            <div class="control-group">
+                <label class="sr-only" for="eng-sort">Sort engagements</label>
+                <select id="eng-sort" class="inp sort-inp" @bind="_sort">
+                    <option value="@SortMode.Stage">Sort: by stage</option>
+                    <option value="@SortMode.Reference">Sort: by reference</option>
+                    <option value="@SortMode.AppName">Sort: by app name</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="fchips" role="group" aria-label="Filter engagements">
+            <button type="button" class="fchip @(_myTurn ? "on" : "")"
+                    aria-pressed="@_myTurn" @onclick="() => _myTurn = !_myTurn">★ My turn (@MyTurnCount)</button>
+        </div>
+
+        <div class="fchips" role="group" aria-label="Filter by stage">
+            <button type="button" class="fchip @(_stage is null ? "on" : "")"
+                    aria-pressed="@(_stage is null)" @onclick="() => _stage = null">All stages (@_recs.Count)</button>
+            @foreach (var s in StagesPresent)
             {
-                <a class="engcard" href="@($"engagement/{r.Id}")">
-                    <div class="top">
-                        <span class="nm">@r.AppName</span>
-                        <span class="chip @TypeClass(r.Type)">@r.Type.ToString().ToUpperInvariant()</span>
-                    </div>
-                    <div class="ref">@r.Reference</div>
-                    <MiniSpine Current="r.CurrentStage" />
-                    <div style="margin-top:10px" class="muted">▸ @(r.AssignedTesterName ?? "—") · @Workflow.Label(r.CurrentStage)</div>
-                </a>
+                var st = s;
+                <button type="button" class="fchip @(_stage == st ? "on" : "")"
+                        aria-pressed="@(_stage == st)" @onclick="() => _stage = st">@Workflow.Label(st) (@StageCount(st))</button>
             }
         </div>
+
+        <div class="fchips" role="group" aria-label="Filter by type">
+            <button type="button" class="fchip @(_type is null ? "on" : "")"
+                    aria-pressed="@(_type is null)" @onclick="() => _type = null">All types</button>
+            @foreach (var t in TypesPresent)
+            {
+                var ty = t;
+                <button type="button" class="fchip @(_type == ty ? "on" : "")"
+                        aria-pressed="@(_type == ty)" @onclick="() => _type = ty">@ty.ToString().ToUpperInvariant() (@TypeCount(ty))</button>
+            }
+        </div>
+
+        var shown = Visible().ToList();
+        <p class="muted resultcount" role="status" aria-live="polite">
+            Showing @shown.Count of @_recs.Count
+        </p>
+
+        @if (shown.Count == 0)
+        {
+            <div class="card muted emptyfilter">
+                No engagements match these filters.
+                <button type="button" class="btn ghost clearbtn" @onclick="ClearFilters">Clear filters</button>
+            </div>
+        }
+        else
+        {
+            <div class="enggrid">
+                @foreach (var r in shown)
+                {
+                    <a class="engcard" href="@($"engagement/{r.Id}")">
+                        <div class="top">
+                            <span class="nm">@r.AppName</span>
+                            <span class="chip @TypeClass(r.Type)">@r.Type.ToString().ToUpperInvariant()</span>
+                            @if (IsMyTurn(r))
+                            {
+                                <span class="myturn-badge" title="Your turn">★</span>
+                            }
+                        </div>
+                        <div class="ref">@r.Reference</div>
+                        <MiniSpine Current="r.CurrentStage" />
+                        <div style="margin-top:10px" class="muted">▸ @(r.AssignedTesterName ?? "—") · @Workflow.Label(r.CurrentStage)</div>
+                    </a>
+                }
+            </div>
+        }
     }
 </div>
 
 @code {
     List<EngagementRecord>? _recs;
+
+    // Filter / sort UI state — all client-side over the already-scoped list (scope is NOT widened).
+    string _search = "";
+    Stage? _stage;
+    EngagementType? _type;
+    bool _myTurn;
+    SortMode _sort = SortMode.Stage;
+
+    enum SortMode { Stage, Reference, AppName }
+
     protected override async Task OnInitializedAsync()
     {
         await Session.EnsureInitializedAsync(); // resolve role/scope before any query (SSR-safe)
         _recs = await Store.ListScopedAsync(Session.AppScope, Session.TesterScope, Session.Role);
     }
 
+    // Distinct stages/types actually present, in spine / declaration order (chips only for what exists).
+    IEnumerable<Stage> StagesPresent =>
+        _recs is null ? [] : Workflow.Spine.Where(s => _recs.Any(r => r.CurrentStage == s));
+    IEnumerable<EngagementType> TypesPresent =>
+        _recs is null ? [] : Enum.GetValues<EngagementType>().Where(t => _recs.Any(r => r.Type == t));
+
+    int StageCount(Stage s) => _recs?.Count(r => r.CurrentStage == s) ?? 0;
+    int TypeCount(EngagementType t) => _recs?.Count(r => r.Type == t) ?? 0;
+    int MyTurnCount => _recs?.Count(IsMyTurn) ?? 0;
+
+    // "My turn" mirrors My-Turn's ownership derivation (read-only): the engagement's next-action
+    // owner role is the current user's role. The Report-stage peer-review nuance is reflected so a
+    // tester sees QA-review items as theirs but not their own authored drafts (FR-REP-02).
+    bool IsMyTurn(EngagementRecord r)
+    {
+        if (Session.Role == PempRoles.Tester && r.CurrentStage == Stage.Report && !r.PeerReviewPassed)
+        {
+            var isAuthor = r.AssignedTesterName == Session.Actor;
+            return !isAuthor; // independent reviewer acts; author is waiting
+        }
+        return Workflow.Next(r).OwnerRole == Session.Role;
+    }
+
+    IEnumerable<EngagementRecord> Visible()
+    {
+        if (_recs is null) return [];
+        IEnumerable<EngagementRecord> q = _recs;
+
+        var term = _search.Trim();
+        if (term.Length > 0)
+            q = q.Where(r =>
+                r.AppName.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                r.Reference.Contains(term, StringComparison.OrdinalIgnoreCase));
+
+        if (_stage is { } st) q = q.Where(r => r.CurrentStage == st);
+        if (_type is { } ty) q = q.Where(r => r.Type == ty);
+        if (_myTurn) q = q.Where(IsMyTurn);
+
+        return _sort switch
+        {
+            SortMode.Reference => q.OrderBy(r => r.Reference, StringComparer.OrdinalIgnoreCase),
+            SortMode.AppName => q.OrderBy(r => r.AppName, StringComparer.OrdinalIgnoreCase)
+                                 .ThenBy(r => r.Reference, StringComparer.OrdinalIgnoreCase),
+            _ => q.OrderBy(r => Array.IndexOf(Workflow.Spine, r.CurrentStage))
+                  .ThenBy(r => r.Reference, StringComparer.OrdinalIgnoreCase),
+        };
+    }
+
+    void ClearFilters()
+    {
+        _search = ""; _stage = null; _type = null; _myTurn = false;
+    }
+
     static string TypeClass(EngagementType t) =>
-        t == EngagementType.Project ? "project" : t == EngagementType.Bau ? "bau" : "retest";
+        t == EngagementType.Project ? "project" : "bau";
 }
