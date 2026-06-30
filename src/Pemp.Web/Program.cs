@@ -294,4 +294,12 @@ app.MapGet("/assessment/template.docx", (Pemp.Infrastructure.Assessment.IAssessm
         "pemp-assessment-template.docx"))
     .RequireAuthorization();
 
+// The same blank assessment as an Excel .xlsx (FR-SCO-01). Mirrors template.docx — generated server-side
+// from the live question list so business teams fill the exact 2-column sheet the importer reads back.
+app.MapGet("/assessment/template.xlsx", (Pemp.Infrastructure.Assessment.IAssessmentXlsxImporter importer) =>
+    Results.File(importer.BuildBlankTemplate(),
+        Pemp.Infrastructure.Assessment.AssessmentUpload.XlsxContentType,
+        "pemp-assessment-template.xlsx"))
+    .RequireAuthorization();
+
 app.Run();

@@ -3,6 +3,7 @@
 @inject EngagementStore Store
 @inject DemoSession Session
 @inject IAssessmentDocImporter Importer
+@inject IAssessmentXlsxImporter XlsxImporter
 @inject ILogger<Assessment> Logger
 @inject NavigationManager Nav
 <PageTitle>Assessment · PEMP</PageTitle>
@@ -40,15 +41,18 @@ else
             <div class="asm-import card">
                 <div class="asm-import-head">
                     <div>
-                        <b>Start from a filled Word form</b>
-                        <span class="muted">Business teams provide a half-filled .docx — upload it to auto-fill answers, then review &amp; edit.<Srs Sep>FR-SCO-01</Srs></span>
+                        <b>Start from a filled Word or Excel form</b>
+                        <span class="muted">Business teams provide a half-filled .docx or .xlsx — upload it to auto-fill answers, then review &amp; edit.<Srs Sep>FR-SCO-01</Srs></span>
                     </div>
-                    <a class="btn ghost" href="assessment/template.docx" target="_blank" rel="noopener">⭳ Download template</a>
+                    <div class="asm-import-templates">
+                        <a class="btn ghost" href="assessment/template.docx" target="_blank" rel="noopener">⭳ Word template</a>
+                        <a class="btn ghost" href="assessment/template.xlsx" target="_blank" rel="noopener">⭳ Excel template</a>
+                    </div>
                 </div>
                 <label class="asm-drop">
-                    <InputFile OnChange="OnUpload" accept=".docx" />
-                    <span class="asm-drop-cta">⇧ Upload a filled assessment (.docx)</span>
-                    <span class="muted">Word .docx only · max 5 MB · parsed in-memory, not stored</span>
+                    <InputFile OnChange="OnUpload" accept=".docx,.xlsx" />
+                    <span class="asm-drop-cta">⇧ Upload a filled assessment (.docx or .xlsx)</span>
+                    <span class="muted">Word .docx or Excel .xlsx · max 5 MB · parsed in-memory, not stored</span>
                 </label>
                 @if (_importMsg is not null)
                 {
@@ -104,23 +108,25 @@ else
     }
 
     // Upload → validate (server-side) → parse (untrusted DATA) → persist each match via the scoped +
-    // audited store path. The bytes are parsed in-memory and discarded; we keep only the answers + an
-    // import audit entry. Any corrupt / non-docx upload is handled gracefully (no 500).
+    // audited store path. The reader is chosen by extension (.xlsx → Excel, .docx → Word); both feed the
+    // SAME mapping + the same ImportAssessmentAsync. The bytes are parsed in-memory and discarded; we keep
+    // only the answers + an import audit entry. Any corrupt / unreadable upload is handled gracefully (no 500).
     async Task OnUpload(InputFileChangeEventArgs e)
     {
         _importMsg = null; _importErr = null; _importedIds = null;
         var file = e.File;
         var err = AssessmentUpload.Validate(file.Name, file.ContentType, file.Size);
         if (err is not null) { _importErr = err; return; }
+        var isXlsx = AssessmentUpload.IsXlsx(file.Name);
         try
         {
             using var ms = new MemoryStream();
             await file.OpenReadStream(AssessmentUpload.MaxBytes).CopyToAsync(ms);
             ms.Position = 0;
-            var result = Importer.Parse(ms);
+            var result = isXlsx ? XlsxImporter.Parse(ms) : Importer.Parse(ms);
             if (result.Matched.Count == 0)
             {
-                _importErr = $"No assessment fields could be read from that file. Use Download template for the structured form.";
+                _importErr = $"No assessment fields could be read from that file. Use a template download for the structured form.";
                 return;
             }
             await Store.ImportAssessmentAsync(Id, result.Matched, file.Name, Session.Caller);
@@ -136,7 +142,9 @@ else
         {
             // Never surface internals; never log file bytes. WHO/WHAT only.
             Logger.LogWarning(ex, "Assessment import failed for engagement {EngagementId}", Id);
-            _importErr = "That file couldn't be read as a Word .docx. Re-export it from the template and try again.";
+            _importErr = isXlsx
+                ? "That file couldn't be read as an Excel .xlsx. Re-export it from the template and try again."
+                : "That file couldn't be read as a Word .docx. Re-export it from the template and try again.";
         }
     }
 
