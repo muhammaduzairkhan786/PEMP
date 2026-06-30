@@ -12,6 +12,7 @@ public sealed class PempDbContext(DbContextOptions<PempDbContext> options) : Ide
     public DbSet<AccessRequirementRecord> AccessRequirements => Set<AccessRequirementRecord>();
     public DbSet<ChecklistTickRecord> ChecklistTicks => Set<ChecklistTickRecord>();
     public DbSet<EvidenceRecord> Evidence => Set<EvidenceRecord>();
+    public DbSet<TestCredentialRecord> TestCredentials => Set<TestCredentialRecord>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -55,5 +56,9 @@ public sealed class PempDbContext(DbContextOptions<PempDbContext> options) : Ide
         ev.HasIndex(e => e.EngagementId);
         ev.HasIndex(e => e.FindingId);
         ev.Property(e => e.Kind).HasConversion<string>();
+
+        var cred = b.Entity<TestCredentialRecord>();
+        cred.HasKey(c => c.Id);
+        cred.HasIndex(c => c.EngagementId);
     }
 }

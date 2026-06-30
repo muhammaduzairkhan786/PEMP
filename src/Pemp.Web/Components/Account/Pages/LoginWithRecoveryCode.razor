@@ -1,0 +1,76 @@
+@page "/Account/LoginWithRecoveryCode"
+@layout AuthLayout
+@attribute [AllowAnonymous]
+
+@inject SignInManager<ApplicationUser> SignInManager
+@inject UserManager<ApplicationUser> UserManager
+@inject ILogger<LoginWithRecoveryCode> Logger
+@inject IdentityRedirectManager RedirectManager
+
+<PageTitle>Recovery code sign-in · PEMP</PageTitle>
+
+<div class="auth-head">
+    <h1>Use a recovery code</h1>
+    <p class="muted">Lost your authenticator? Enter one of the single-use recovery codes you saved when you enrolled.</p>
+</div>
+
+<StatusMessage Message="@errorMessage" />
+
+<EditForm Model="Input" method="post" OnValidSubmit="OnValidSubmitAsync" FormName="login-with-recovery-code">
+    <DataAnnotationsValidator />
+    <input type="hidden" name="ReturnUrl" value="@ReturnUrl" />
+
+    <label class="auth-label" for="recovery-code">Recovery code</label>
+    <InputText id="recovery-code" @bind-Value="Input.RecoveryCode" class="inp auth-inp mono"
+               autocomplete="off" placeholder="xxxxx-xxxxx" />
+    <ValidationMessage For="() => Input.RecoveryCode" class="auth-val" />
+
+    <button type="submit" class="btn primary auth-submit">Sign in</button>
+</EditForm>
+
+@code {
+    private string? errorMessage;
+
+#pragma warning disable CS8618 // bound from the form / initialised in OnInitializedAsync
+    [SupplyParameterFromForm] private InputModel Input { get; set; }
+#pragma warning restore CS8618
+
+    [SupplyParameterFromQuery] private string? ReturnUrl { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Input ??= new();
+        // Ensure the user has gone through the username & password screen first.
+        _ = await SignInManager.GetTwoFactorAuthenticationUserAsync()
+            ?? throw new InvalidOperationException("Unable to load two-factor authentication user.");
+    }
+
+    private async Task OnValidSubmitAsync()
+    {
+        var recoveryCode = Input.RecoveryCode.Replace(" ", string.Empty);
+        var result = await SignInManager.TwoFactorRecoveryCodeSignInAsync(recoveryCode);
+
+        if (result.Succeeded)
+        {
+            Logger.LogInformation("User logged in with a recovery code.");
+            RedirectManager.RedirectTo(ReturnUrl ?? "dashboard");
+        }
+        else if (result.IsLockedOut)
+        {
+            Logger.LogWarning("User account locked out.");
+            RedirectManager.RedirectTo("Account/Login");
+        }
+        else
+        {
+            errorMessage = "Error: Invalid recovery code.";
+        }
+    }
+
+    private sealed class InputModel
+    {
+        [Required]
+        [DataType(DataType.Text)]
+        [Display(Name = "Recovery code")]
+        public string RecoveryCode { get; set; } = "";
+    }
+}

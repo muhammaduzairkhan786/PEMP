@@ -13,6 +13,10 @@
     {
         <div aria-busy="true"><Skeleton Rows="4" /></div>
     }
+    else if (_recs.Count == 0)
+    {
+        <div class="card muted">No engagements in your scope yet.</div>
+    }
     else
     {
         <div class="enggrid">
@@ -34,8 +38,11 @@
 
 @code {
     List<EngagementRecord>? _recs;
-    protected override async Task OnInitializedAsync() =>
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureInitializedAsync(); // resolve role/scope before any query (SSR-safe)
         _recs = await Store.ListScopedAsync(Session.AppScope, Session.TesterScope);
+    }
 
     static string TypeClass(EngagementType t) =>
         t == EngagementType.Project ? "project" : t == EngagementType.Bau ? "bau" : "retest";

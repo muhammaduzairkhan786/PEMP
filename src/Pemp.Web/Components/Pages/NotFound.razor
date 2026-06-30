@@ -1,9 +1,21 @@
 @page "/not-found"
-@layout MainLayout
+@layout Pemp.Web.Components.Layout.EmptyLayout
+@attribute [AllowAnonymous]
 <PageTitle>Not found · PEMP</PageTitle>
 
-<div class="wrap">
-    <h1 class="title">Not found</h1>
-    <p class="sub">That page doesn't exist.</p>
-    <a class="btn primary" href="">⌂ Back to My Turn</a>
+<div class="auth-shell">
+    <button type="button" class="btn ghost themebtn theme-float" onclick="window.pempToggleTheme()"
+            title="Toggle light / dark" aria-label="Toggle light or dark theme">◐ Theme</button>
+    <div class="auth-card">
+        <a class="auth-brand" href="/">
+            <span class="logo">P</span>
+            <span class="auth-brand-name">PEMP</span>
+        </a>
+        <div class="auth-head">
+            <h1>Page not found</h1>
+            <p class="muted">That page doesn't exist, or it has moved.</p>
+        </div>
+        <a class="btn primary auth-submit" href="/">Back to home</a>
+    </div>
+    <p class="auth-foot muted">Pentest Engagement Management Platform · CloudKonsult for Acme Cyber Assurance</p>
 </div>

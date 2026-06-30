@@ -97,6 +97,37 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Server-side 2FA-enrollment gate (LOCAL Identity path only). An authenticated user whose
+// authenticator is not yet enrolled (no "tfa"=="true" claim) is hard-redirected (302) to the
+// enrolment page before any app content can be served — closing the hole where a direct GET of
+// an app page returned content instead of a redirect. Skipped entirely under Entra (production),
+// which enforces MFA via Conditional Access and carries no "tfa" claim. The /Account/* pages
+// (sign-in, enrolment, sign-out), the Blazor framework/SignalR endpoints, and static assets are
+// exempt so there is no redirect loop and the enrolment UI itself stays reachable.
+if (!entraConfigured)
+{
+    app.Use(async (context, next) =>
+    {
+        var user = context.User;
+        var path = context.Request.Path;
+        var exempt = path.StartsWithSegments("/Account")
+                     || path.StartsWithSegments("/_framework")
+                     || path.StartsWithSegments("/_blazor")
+                     || path.StartsWithSegments("/_content")
+                     || Path.HasExtension(path.Value); // static assets (css/js/png…)
+
+        if (!exempt
+            && user.Identity?.IsAuthenticated == true
+            && user.FindFirst("tfa")?.Value != "true")
+        {
+            context.Response.Redirect("/Account/EnableAuthenticator");
+            return;
+        }
+
+        await next();
+    });
+}
+
 app.UseAntiforgery();
 
 app.MapStaticAssets();

@@ -57,7 +57,7 @@
         }
 
         <div class="sectionlabel">By application</div>
-        <div class="card" style="padding:0;overflow:hidden">
+        <div class="card tablecard">
             <table class="t">
                 <thead><tr><th>Application</th><th>Stage</th><th>Open findings</th><th>Worst severity</th></tr></thead>
                 <tbody>
@@ -86,6 +86,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        await Session.EnsureInitializedAsync(); // resolve role/scope before any query (SSR-safe)
         _engs = await Store.ListScopedAsync(Session.AppScope, Session.TesterScope);
         var ids = _engs.Select(e => e.Id).ToHashSet();
         _findings = (await Store.AllFindingsAsync()).Where(f => ids.Contains(f.EngagementId)).ToList();

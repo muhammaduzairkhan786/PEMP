@@ -34,6 +34,10 @@
     <button type="submit" class="btn primary auth-submit">Verify</button>
 </EditForm>
 
+<p class="auth-foot muted" style="margin-top:var(--space-4)">
+    Lost your authenticator? <a href="@RecoveryUrl">Use a recovery code</a>.
+</p>
+
 @code {
     private string? errorMessage;
 
@@ -44,6 +48,9 @@
     [SupplyParameterFromQuery] private string? ReturnUrl { get; set; }
 
     [SupplyParameterFromQuery] private bool RememberMe { get; set; }
+
+    private string RecoveryUrl =>
+        $"Account/LoginWithRecoveryCode{(string.IsNullOrEmpty(ReturnUrl) ? "" : $"?ReturnUrl={Uri.EscapeDataString(ReturnUrl)}")}";
 
     protected override async Task OnInitializedAsync()
     {

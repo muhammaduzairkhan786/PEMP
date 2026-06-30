@@ -14,6 +14,15 @@
             h.setAttribute('data-theme', t);
             try { localStorage.setItem('pemp-theme', t); } catch (e) { }
         };
+        // Client-side file download (used by the admin audit CSV export).
+        window.pempDownload = function (filename, text) {
+            var blob = new Blob([text], { type: 'text/csv;charset=utf-8;' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url; a.download = filename;
+            document.body.appendChild(a); a.click();
+            document.body.removeChild(a); URL.revokeObjectURL(url);
+        };
     </script>
     <ResourcePreloader />
     <link rel="stylesheet" href="tokens.css" />

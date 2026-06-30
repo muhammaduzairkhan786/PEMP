@@ -50,6 +50,8 @@
     string _crit = "Medium";
     string? _err;
 
+    protected override Task OnInitializedAsync() => Session.EnsureInitializedAsync();
+
     async Task Raise()
     {
         if (string.IsNullOrWhiteSpace(_app)) { _err = "Enter an application name."; return; }
