@@ -20,4 +20,11 @@ public sealed class FindingRecord
     public string Asset { get; set; } = "";
     public string Remediation { get; set; } = "";
     public FindingStatus Status { get; set; }
+
+    /// <summary>
+    /// When a retest child copies a parent finding to re-verify it, this links back to the original
+    /// (FR-RET-02): the finding is entered ONCE and the child only carries provenance, driving the
+    /// retest report's before/after diff. Null on originally-entered findings.
+    /// </summary>
+    public Guid? OriginalFindingId { get; set; }
 }

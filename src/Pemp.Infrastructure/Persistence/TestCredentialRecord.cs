@@ -13,4 +13,15 @@ public sealed class TestCredentialRecord
     public string Label { get; set; } = "";       // e.g. "QA admin", "API service account"
     public string Username { get; set; } = "";
     public string Secret { get; set; } = "";       // demo only; prod = Key Vault / envelope-encrypted
+
+    // ---- Credential lifecycle (SEC-CRD-01/02/03) ----
+    public DateTimeOffset CreatedAt { get; set; }
+    public string AddedBy { get; set; } = "";
+    /// <summary>Time-box: after this instant the secret is never returned on read (auto-expiry).</summary>
+    public DateTimeOffset? ExpiresAt { get; set; }
+    /// <summary>Revoked credentials (and auto-revoked on engagement Close) never return their secret.</summary>
+    public bool Revoked { get; set; }
+    public DateTimeOffset? RevokedAt { get; set; }
+    /// <summary>Production reference to the Key Vault secret / envelope-wrapped key (placeholder for prod).</summary>
+    public string? KeyVaultSecretUri { get; set; }
 }

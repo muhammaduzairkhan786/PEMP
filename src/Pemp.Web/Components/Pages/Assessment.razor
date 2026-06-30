@@ -71,7 +71,7 @@ else
 
     async Task Complete()
     {
-        var result = await Store.ExecuteAsync(Id, e => e.CompleteAssessment(Session.Actor));
+        var result = await Store.ExecuteAsync(Id, Session.Caller, EngagementAction.CompleteAssessment, e => e.CompleteAssessment(Session.Actor));
         _done = result.Ok;
         _err = result.Error;
         _rec = await Store.GetScopedAsync(Id, Session.AppScope, Session.TesterScope, Session.Role);

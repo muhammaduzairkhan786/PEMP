@@ -65,7 +65,7 @@
     async Task Raise()
     {
         if (string.IsNullOrWhiteSpace(_app)) { _err = "Enter an application name."; _focusError = true; return; }
-        var id = await Store.RaiseAsync(_type, _app.Trim(), _crit, Session.Actor);
+        var id = await Store.RaiseAsync(_type, _app.Trim(), _crit, Session.Caller);
         Nav.NavigateTo($"engagement/{id}");
     }
 

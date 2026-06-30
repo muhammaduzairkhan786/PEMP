@@ -21,6 +21,12 @@ public sealed class PersistenceTests : IDisposable
     // One key used everywhere in a test DB so seeding, the store, and verification agree (SEC-AUD-01).
     private static readonly byte[] Key = HashChain.DefaultKey;
 
+    // Server-side caller contexts (SEC-AZN): the write-path authorization re-derives scope from these.
+    private static readonly CallerContext Khan = CallerContext.ForTester("A. Khan");
+    private static readonly CallerContext Patel = CallerContext.ForTester("R. Patel");
+    private static readonly CallerContext Acme = CallerContext.Portfolio(PempRoles.AcmeOfficer, "J. Okafor");
+    private static readonly CallerContext Dm = CallerContext.Portfolio(PempRoles.DeliveryManager, "M. Reyes");
+
     public PersistenceTests()
     {
         _conn = new SqliteConnection("DataSource=:memory:");
@@ -82,7 +88,7 @@ public sealed class PersistenceTests : IDisposable
         var before = await _store.GetAsync(id);
         var auditBefore = _db.AuditEntries.Count();
 
-        var result = await _store.ExecuteAsync(id, e => e.CompleteAssessment("tester"));
+        var result = await _store.ExecuteAsync(id, Khan, EngagementAction.CompleteAssessment, e => e.CompleteAssessment("A. Khan"));
 
         Assert.True(result.Failed);
         var after = await _store.GetAsync(id);
@@ -98,7 +104,7 @@ public sealed class PersistenceTests : IDisposable
         var id = IdOf("ENG-2026-0412");
         var auditBefore = _db.AuditEntries.Count();
 
-        var result = await _store.ExecuteAsync(id, e => e.SignSow("acme", reAuthenticated: true));
+        var result = await _store.ExecuteAsync(id, Acme, EngagementAction.SignSow, e => e.SignSow("J. Okafor", reAuthenticated: true));
 
         Assert.False(result.Failed);
         var after = await _store.GetAsync(id);
@@ -112,7 +118,7 @@ public sealed class PersistenceTests : IDisposable
     public async Task Signing_without_reauth_is_rejected()
     {
         var id = IdOf("ENG-2026-0412");
-        var result = await _store.ExecuteAsync(id, e => e.SignSow("acme", reAuthenticated: false));
+        var result = await _store.ExecuteAsync(id, Acme, EngagementAction.SignSow, e => e.SignSow("J. Okafor", reAuthenticated: false));
         Assert.True(result.Failed);
         Assert.Equal(Stage.Sow, (await _store.GetAsync(id))!.CurrentStage);
     }
@@ -174,7 +180,7 @@ public sealed class PersistenceTests : IDisposable
         var findingId = await _store.AddFindingAsync(
             id, "Open redirect on /login", Severity.Medium, "4.7",
             "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:N/I:L/A:N", "Web",
-            "Validate redirect targets against an allow-list.");
+            "Validate redirect targets against an allow-list.", Khan);
 
         var after = await _store.FindingsForAsync(id);
         Assert.Equal(before + 1, after.Count);
@@ -197,7 +203,7 @@ public sealed class PersistenceTests : IDisposable
         // Broker Portal is closed → retest spawns a child engagement.
         var parentId = IdOf("ENG-2026-0399");
 
-        var (result, childId) = await _store.RequestRetestAsync(parentId, "stakeholder");
+        var (result, childId) = await _store.RequestRetestAsync(parentId, Acme);
 
         Assert.False(result.Failed);
         Assert.NotNull(childId);
@@ -213,11 +219,11 @@ public sealed class PersistenceTests : IDisposable
         Assert.All(childFindings, f => Assert.Equal(FindingStatus.RetestPending, f.Status));
 
         // double retest is rejected by the domain
-        var second = await _store.RequestRetestAsync(parentId, "stakeholder");
+        var second = await _store.RequestRetestAsync(parentId, Acme);
         Assert.True(second.Result.Failed);
 
         // the child re-verifies and closes
-        var done = await _store.ExecuteAsync(childId.Value, e => e.CompleteRetest("tester"));
+        var done = await _store.ExecuteAsync(childId.Value, Khan, EngagementAction.CompleteRetest, e => e.CompleteRetest("A. Khan"));
         Assert.False(done.Failed);
         Assert.Equal(Stage.Closed, (await _store.GetAsync(childId.Value))!.CurrentStage);
         Assert.True(new EfAuditChain(_db, Key).Verify());
@@ -230,7 +236,7 @@ public sealed class PersistenceTests : IDisposable
         var id = IdOf("ENG-2026-0419");
         var before = (await _store.CredentialsForAsync(id)).Count;
 
-        var credId = await _store.AddTestCredentialAsync(id, "Staging admin", "admin.stg@test", "S3cr3t!-stg");
+        var credId = await _store.AddTestCredentialAsync(id, "Staging admin", "admin.stg@test", "S3cr3t!-stg", Khan);
 
         var after = await _store.CredentialsForAsync(id);
         Assert.Equal(before + 1, after.Count);
@@ -247,9 +253,9 @@ public sealed class PersistenceTests : IDisposable
         var parentId = IdOf("ENG-2026-0399");
         // Ensure at least two carry over (so we can test both verdicts): seed an extra open finding.
         await _store.AddFindingAsync(parentId, "Open redirect", Severity.Low, "3.5",
-            "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:N/I:L/A:N", "Web", "Allow-list redirects.", FindingStatus.Open);
+            "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:N/I:L/A:N", "Web", "Allow-list redirects.", Khan, FindingStatus.Open);
 
-        var (result, childId) = await _store.RequestRetestAsync(parentId, "stakeholder");
+        var (result, childId) = await _store.RequestRetestAsync(parentId, Acme);
         Assert.False(result.Failed);
 
         var carried = await _store.FindingsForAsync(childId!.Value);
@@ -257,8 +263,8 @@ public sealed class PersistenceTests : IDisposable
         Assert.All(carried, f => Assert.Equal(FindingStatus.RetestPending, f.Status));
 
         // Pass = fix verified → Closed; fail = still present → re-Open.
-        await _store.SetFindingStatusAsync(carried[0].Id, FindingStatus.Closed);
-        await _store.SetFindingStatusAsync(carried[1].Id, FindingStatus.Open);
+        await _store.SetFindingStatusAsync(carried[0].Id, FindingStatus.Closed, Khan);
+        await _store.SetFindingStatusAsync(carried[1].Id, FindingStatus.Open, Khan);
 
         var after = await _store.FindingsForAsync(childId.Value);
         Assert.Equal(FindingStatus.Closed, after.Single(f => f.Id == carried[0].Id).Status);
@@ -271,7 +277,7 @@ public sealed class PersistenceTests : IDisposable
         var id = IdOf("ENG-2026-0419"); // Payments API at Access
         var before = (await _store.AccessReqsForAsync(id)).Count;
 
-        var row = await _store.AddAccessRequirementAsync(id, "Sandbox", "https://sbx.test", "Read");
+        var row = await _store.AddAccessRequirementAsync(id, "Sandbox", "https://sbx.test", "Read", Khan);
 
         var after = await _store.AccessReqsForAsync(id);
         Assert.Equal(before + 1, after.Count);
@@ -285,8 +291,7 @@ public sealed class PersistenceTests : IDisposable
         var auditBefore = _db.AuditEntries.Count();
 
         await _store.AddFindingAsync(id, "Open redirect on /login", Severity.Medium, "4.7",
-            "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:N/I:L/A:N", "Web", "Allow-list redirects.",
-            actor: "A. Khan", role: "Tester");
+            "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:N/I:L/A:N", "Web", "Allow-list redirects.", Khan);
 
         Assert.Equal(auditBefore + 1, _db.AuditEntries.Count());
         var last = _db.AuditEntries.OrderByDescending(a => a.Sequence).First();
@@ -302,7 +307,7 @@ public sealed class PersistenceTests : IDisposable
         var finding = (await _store.FindingsForAsync(id)).First();
         var auditBefore = _db.AuditEntries.Count();
 
-        await _store.SetFindingStatusAsync(finding.Id, FindingStatus.Remediated, actor: "A. Khan", role: "Tester");
+        await _store.SetFindingStatusAsync(finding.Id, FindingStatus.Remediated, Khan);
 
         Assert.Equal(auditBefore + 1, _db.AuditEntries.Count());
         Assert.Equal("Finding.StatusChanged", _db.AuditEntries.OrderByDescending(a => a.Sequence).First().Action);
@@ -316,8 +321,7 @@ public sealed class PersistenceTests : IDisposable
         var auditBefore = _db.AuditEntries.Count();
         const string secret = "S3cr3t!-stg";
 
-        await _store.AddTestCredentialAsync(id, "Staging admin", "admin.stg@test", secret,
-            actor: "A. Khan", role: "Tester");
+        await _store.AddTestCredentialAsync(id, "Staging admin", "admin.stg@test", secret, Khan);
 
         Assert.Equal(auditBefore + 1, _db.AuditEntries.Count());
         var last = _db.AuditEntries.OrderByDescending(a => a.Sequence).First();
@@ -332,22 +336,22 @@ public sealed class PersistenceTests : IDisposable
     public async Task CompleteRetest_is_blocked_while_a_finding_is_still_retest_pending()  // FR-RET-03
     {
         var parentId = IdOf("ENG-2026-0399"); // closed Broker Portal
-        var (result, childId) = await _store.RequestRetestAsync(parentId, "stakeholder");
+        var (result, childId) = await _store.RequestRetestAsync(parentId, Acme);
         Assert.False(result.Failed);
 
         var carried = await _store.FindingsForAsync(childId!.Value);
         Assert.All(carried, f => Assert.Equal(FindingStatus.RetestPending, f.Status));
 
         // While any in-scope finding is still RetestPending, completion is rejected and nothing changes.
-        var blocked = await _store.CompleteRetestAsync(childId.Value, "A. Khan");
+        var blocked = await _store.CompleteRetestAsync(childId.Value, Khan);
         Assert.True(blocked.Failed);
         Assert.Equal(Stage.Retest, (await _store.GetAsync(childId.Value))!.CurrentStage);
 
         // Give every carried finding a verdict, then completion succeeds.
         foreach (var f in carried)
-            await _store.SetFindingStatusAsync(f.Id, FindingStatus.Closed, actor: "A. Khan", role: "Tester");
+            await _store.SetFindingStatusAsync(f.Id, FindingStatus.Closed, Khan);
 
-        var ok = await _store.CompleteRetestAsync(childId.Value, "A. Khan");
+        var ok = await _store.CompleteRetestAsync(childId.Value, Khan);
         Assert.False(ok.Failed);
         Assert.Equal(Stage.Closed, (await _store.GetAsync(childId.Value))!.CurrentStage);
         Assert.True(new EfAuditChain(_db, Key).Verify());
@@ -362,7 +366,7 @@ public sealed class PersistenceTests : IDisposable
         Assert.False(string.IsNullOrEmpty(src.CvssVector));
         Assert.False(string.IsNullOrEmpty(src.Remediation));
 
-        var (result, childId) = await _store.RequestRetestAsync(parentId, "stakeholder");
+        var (result, childId) = await _store.RequestRetestAsync(parentId, Acme);
         Assert.False(result.Failed);
 
         var child = (await _store.FindingsForAsync(childId!.Value)).Single(f => f.Title == src.Title);
@@ -390,7 +394,7 @@ public sealed class PersistenceTests : IDisposable
     {
         // Drive Retail Web (assigned A. Khan) from Findings to Report so it enters the peer-QA queue.
         var report = IdOf("ENG-2026-0408");
-        Assert.False((await _store.ExecuteAsync(report, e => e.GenerateDraft("A. Khan"))).Failed);
+        Assert.False((await _store.ExecuteAsync(report, Khan, EngagementAction.GenerateDraft, e => e.GenerateDraft("A. Khan"))).Failed);
         Assert.Equal(Stage.Report, (await _store.GetAsync(report))!.CurrentStage);
 
         // R. Patel (a DIFFERENT tester) CAN open it for review (Report-stage review access),
@@ -413,17 +417,17 @@ public sealed class PersistenceTests : IDisposable
         var id = IdOf("ENG-2026-0408"); // Retail Web, assigned A. Khan, at Findings
 
         // Author generates the draft → Report.
-        Assert.False((await _store.ExecuteAsync(id, e => e.GenerateDraft("A. Khan"))).Failed);
+        Assert.False((await _store.ExecuteAsync(id, Khan, EngagementAction.GenerateDraft, e => e.GenerateDraft("A. Khan"))).Failed);
 
         // The author CANNOT pass their own QA (no self-review backstop, FR-REP-02).
-        var selfReview = await _store.ExecuteAsync(id, e => e.PeerReview(DemoSeeder.TesterKhan, true, "A. Khan"));
+        var selfReview = await _store.ExecuteAsync(id, Khan, EngagementAction.PeerReview, e => e.PeerReview(DemoSeeder.TesterKhan, true, "A. Khan"));
         Assert.True(selfReview.Failed);
         Assert.False((await _store.GetAsync(id))!.PeerReviewPassed);
 
         // An INDEPENDENT tester (R. Patel) passes QA, then Acme releases (re-auth) → Closed.
-        Assert.False((await _store.ExecuteAsync(id, e => e.PeerReview(DemoSeeder.TesterPatel, true, "R. Patel"))).Failed);
+        Assert.False((await _store.ExecuteAsync(id, Patel, EngagementAction.PeerReview, e => e.PeerReview(DemoSeeder.TesterPatel, true, "R. Patel"))).Failed);
         Assert.True((await _store.GetAsync(id))!.PeerReviewPassed);
-        Assert.False((await _store.ExecuteAsync(id, e => e.ReleaseFinal("J. Okafor", reAuthenticated: true))).Failed);
+        Assert.False((await _store.ExecuteAsync(id, Acme, EngagementAction.ReleaseFinal, e => e.ReleaseFinal("J. Okafor", reAuthenticated: true))).Failed);
 
         Assert.Equal(Stage.Closed, (await _store.GetAsync(id))!.CurrentStage);
         Assert.True(new EfAuditChain(_db, Key).Verify());
@@ -433,7 +437,7 @@ public sealed class PersistenceTests : IDisposable
     public async Task AssignTester_records_the_assigned_tester_in_the_audit_after()  // FR-AUD-02 (before/after completeness)
     {
         var id = IdOf("ENG-2026-0423"); // Quote Engine, routed, awaiting assignment
-        var result = await _store.AssignTesterAsync(id, DemoSeeder.TesterLee, "S. Lee", "M. Reyes");
+        var result = await _store.AssignTesterAsync(id, DemoSeeder.TesterLee, "S. Lee", Dm);
         Assert.False(result.Failed);
 
         var last = _db.AuditEntries.OrderByDescending(a => a.Sequence).First();
@@ -442,6 +446,84 @@ public sealed class PersistenceTests : IDisposable
         Assert.Contains("S. Lee", last.After);          // WHO was assigned is now captured, not just the stage
         Assert.Contains("Scoping", last.After);         // ...alongside the stage move
         Assert.True(new EfAuditChain(_db, Key).Verify());
+    }
+
+    // ---- Write-path authorization (rank 1, SEC-AZN-01/02) ------------------
+
+    [Fact]
+    public async Task Write_path_rejects_a_wrong_role_caller()  // SEC-AZN-01 (role on the write path)
+    {
+        // ENG-0412 is at SoW. SignSow is an Acme CA Officer action — a Tester (even one in scope) is rejected
+        // server-side, not just hidden in the UI; nothing changes.
+        var id = IdOf("ENG-2026-0412");
+        var before = (await _store.GetAsync(id))!.CurrentStage;
+
+        var result = await _store.ExecuteAsync(id, Khan, EngagementAction.SignSow, e => e.SignSow("A. Khan", reAuthenticated: true));
+
+        Assert.True(result.Failed);
+        Assert.Contains("Acme CA Officer", result.Error);
+        Assert.Equal(before, (await _store.GetAsync(id))!.CurrentStage);   // unchanged
+        Assert.True(new EfAuditChain(_db, Key).Verify());
+    }
+
+    [Fact]
+    public async Task Write_path_rejects_a_cross_scope_id_on_a_transition()  // SEC-AZN-02 (anti-BOLA on write, not just read)
+    {
+        // S. Lee is NOT assigned to Retail Web (A. Khan is). A direct-id transition by S. Lee must be
+        // rejected on the WRITE path, exactly as GetScopedAsync rejects the read.
+        var retail = IdOf("ENG-2026-0408"); // at Findings, assigned A. Khan
+        var lee = CallerContext.ForTester("S. Lee");
+
+        var result = await _store.ExecuteAsync(retail, lee, EngagementAction.GenerateDraft, e => e.GenerateDraft("S. Lee"));
+
+        Assert.True(result.Failed);
+        Assert.Contains("scope", result.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(Stage.Findings, (await _store.GetAsync(retail))!.CurrentStage); // unchanged
+    }
+
+    [Fact]
+    public async Task Write_path_rejects_a_cross_scope_data_mutation()  // SEC-AZN-02 (anti-BOLA on a data write)
+    {
+        // S. Lee tries to add a finding to A. Khan's engagement by id — defense-in-depth throws, nothing written.
+        var retail = IdOf("ENG-2026-0408");
+        var lee = CallerContext.ForTester("S. Lee");
+        var before = (await _store.FindingsForAsync(retail)).Count;
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => _store.AddFindingAsync(
+            retail, "Forged finding", Severity.High, "9.0", "v", "Web", "x", lee));
+
+        Assert.Equal(before, (await _store.FindingsForAsync(retail)).Count);
+    }
+
+    [Fact]
+    public async Task SoW_sign_off_enforces_separation_of_duties()  // FR-SOW-05 (drafter != signer)
+    {
+        // An Acme CA Officer whose acting name matches the assigned tester (the drafter) is blocked by SoD.
+        // ENG-0412's assigned tester is A. Khan; an officer acting as "A. Khan" must not be able to sign.
+        var id = IdOf("ENG-2026-0412");
+        var officerWhoIsAlsoTheDrafter = CallerContext.Portfolio(PempRoles.AcmeOfficer, "A. Khan");
+
+        var result = await _store.ExecuteAsync(id, officerWhoIsAlsoTheDrafter, EngagementAction.SignSow,
+            e => e.SignSow("A. Khan", reAuthenticated: true));
+
+        Assert.True(result.Failed);
+        Assert.Contains("Separation of duties", result.Error);
+        Assert.Equal(Stage.Sow, (await _store.GetAsync(id))!.CurrentStage);
+
+        // A different officer (J. Okafor) CAN sign — SoD satisfied.
+        Assert.False((await _store.ExecuteAsync(id, Acme, EngagementAction.SignSow,
+            e => e.SignSow("J. Okafor", reAuthenticated: true))).Failed);
+        Assert.Equal(Stage.Access, (await _store.GetAsync(id))!.CurrentStage);
+    }
+
+    [Fact]
+    public async Task Raise_is_restricted_to_the_acme_officer()  // FR-REQ-01 (role on create)
+    {
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            _store.RaiseAsync(EngagementType.Bau, "Rogue App", "Low", Khan));
+
+        var id = await _store.RaiseAsync(EngagementType.Bau, "New App", "Low", Acme);
+        Assert.NotNull(await _store.GetAsync(id));
     }
 
     public void Dispose()

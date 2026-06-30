@@ -9,6 +9,12 @@ namespace Pemp.Infrastructure.Persistence;
 /// bound to a DB-backed audit chain, runs the requested guarded transition, and — only
 /// on success — persists the new state and the appended audit entries together.
 /// A failed guard changes and saves nothing (the enforcement guarantee).
+///
+/// EVERY mutation first re-derives the caller's object-level scope (the SAME predicate as
+/// <see cref="GetScopedAsync"/>) and applies the action's role / separation-of-duties policy
+/// server-side (SEC-AZN-01/02). A cross-scope id, a wrong role, or an SoD violation is rejected
+/// before any record is touched — so anti-BOLA / anti-priv-esc holds even when these become API
+/// endpoints, not only behind the UI gates.
 /// </summary>
 public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock, AuditHmacKey auditKey)
 {
@@ -19,7 +25,94 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
     /// </summary>
     private static readonly IReadOnlySet<string> AllPortfolioRoles = PempRoles.Portfolio;
 
+    // ---- Write-path authorization policy (SEC-AZN-01) -----------------------
+    // The single source of truth for which role(s) may perform each mutation and the separation-of-duties
+    // rules the lifecycle requires. Co-located with the store so it is authoritative server-side.
+    private static readonly IReadOnlyDictionary<EngagementAction, ActionAuth> Policy =
+        new Dictionary<EngagementAction, ActionAuth>
+        {
+            [EngagementAction.RouteToDeliveryManager] = new(ActionAuth.Roles(PempRoles.DeliveryManager, PempRoles.AcmeOfficer)),
+            [EngagementAction.AssignTester]           = new(ActionAuth.Roles(PempRoles.DeliveryManager)),
+            [EngagementAction.CompleteAssessment]     = new(ActionAuth.Roles(PempRoles.Tester, PempRoles.Stakeholder)),
+            [EngagementAction.ReviewSow]              = new(ActionAuth.Roles(PempRoles.DeliveryManager)),
+            // SoW sign-off is an Acme CA Officer action AND the signer must differ from the tester who
+            // drafted it (separation of duties, FR-SOW-05).
+            [EngagementAction.SignSow]                = new(ActionAuth.Roles(PempRoles.AcmeOfficer), MustDifferFromAssignedTester: true),
+            [EngagementAction.VerifyAccess]           = new(ActionAuth.Roles(PempRoles.Tester), MustBeAssignedTester: true),
+            [EngagementAction.SendIrNotice]           = new(ActionAuth.Roles(PempRoles.Tester), MustBeAssignedTester: true),
+            [EngagementAction.EndTest]                = new(ActionAuth.Roles(PempRoles.Tester), MustBeAssignedTester: true),
+            [EngagementAction.GenerateDraft]          = new(ActionAuth.Roles(PempRoles.Tester), MustBeAssignedTester: true),
+            // Peer review's no-self-review SoD is enforced inside the domain (reviewer != author, FR-REP-02);
+            // here we only require the actor be a tester in scope (the peer-QA review queue).
+            [EngagementAction.PeerReview]             = new(ActionAuth.Roles(PempRoles.Tester)),
+            [EngagementAction.ReleaseFinal]           = new(ActionAuth.Roles(PempRoles.AcmeOfficer, PempRoles.Tester)),
+            [EngagementAction.RequestRetest]          = new(ActionAuth.Roles(PempRoles.AcmeOfficer, PempRoles.Stakeholder)),
+            [EngagementAction.CompleteRetest]         = new(ActionAuth.Roles(PempRoles.Tester), MustBeAssignedTester: true),
+            // Crown-jewel data mutations — only the assigned tester may write tester-owned data.
+            [EngagementAction.AddFinding]             = new(ActionAuth.Roles(PempRoles.Tester), MustBeAssignedTester: true),
+            [EngagementAction.SetFindingStatus]       = new(ActionAuth.Roles(PempRoles.Tester), MustBeAssignedTester: true),
+            [EngagementAction.AddEvidence]            = new(ActionAuth.Roles(PempRoles.Tester), MustBeAssignedTester: true),
+            [EngagementAction.AddTestCredential]      = new(ActionAuth.Roles(PempRoles.Tester), MustBeAssignedTester: true),
+            [EngagementAction.AddAccessRequirement]   = new(ActionAuth.Roles(PempRoles.Tester), MustBeAssignedTester: true),
+            [EngagementAction.SetAccessStatus]        = new(ActionAuth.Roles(PempRoles.Tester), MustBeAssignedTester: true),
+            // Assessment input may also come from the application stakeholder (async).
+            [EngagementAction.SaveAssessmentAnswer]   = new(ActionAuth.Roles(PempRoles.Tester, PempRoles.Stakeholder)),
+            [EngagementAction.SetChecklist]           = new(ActionAuth.Roles(PempRoles.Tester), MustBeAssignedTester: true),
+        };
+
     private EfAuditChain NewChain() => new(db, auditKey.Value);
+
+    /// <summary>
+    /// The object-level scope predicate (SEC-AZN-02). Used identically for reads (<see cref="GetScopedAsync"/>)
+    /// and writes (<see cref="Authorize"/>), so a record reachable for read is reachable for an authorized
+    /// write and nothing else. Fails CLOSED: a scoped role with no concrete filter matches nothing.
+    /// </summary>
+    private static bool InScope(EngagementRecord rec, string? appName, string? assignedToName, string? role)
+    {
+        var scoped = !AllPortfolioRoles.Contains(role ?? "");
+        if (scoped && appName is null && assignedToName is null) return false;
+        if (appName is not null && rec.AppName != appName && rec.AppName != appName + " (retest)") return false;
+        if (assignedToName is not null)
+        {
+            var isAssigned = rec.AssignedTesterName == assignedToName;
+            // Peer-QA review access: a Report-stage engagement authored by another tester is in scope.
+            var isPeerReviewable = role == PempRoles.Tester && !string.IsNullOrEmpty(assignedToName)
+                && rec.CurrentStage == Stage.Report
+                && rec.AssignedTesterName != null && rec.AssignedTesterName != assignedToName;
+            if (!isAssigned && !isPeerReviewable) return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// The full write-path authorization decision (SEC-AZN-01/02): object-level scope + the action's
+    /// role allow-list + separation of duties. Returns a friendly <see cref="Result.Fail"/> on denial so
+    /// the UI can surface it; nothing is mutated.
+    /// </summary>
+    private static Result Authorize(EngagementRecord rec, CallerContext c, EngagementAction action)
+    {
+        var auth = Policy[action];
+        if (!InScope(rec, c.AppScope, c.TesterScope, c.Role))
+            return Result.Fail("Not authorized for this engagement — outside your scope (SEC-AZN-02).");
+        if (auth.AllowedRoles is not null && (c.Role is null || !auth.AllowedRoles.Contains(c.Role)))
+            return Result.Fail($"This action is restricted to: {string.Join(" / ", auth.AllowedRoles)} (SEC-AZN-01).");
+        if (auth.MustBeAssignedTester && !string.Equals(rec.AssignedTesterName, c.Actor, StringComparison.Ordinal))
+            return Result.Fail("Only the assigned tester may perform this action (SEC-AZN-02).");
+        if (auth.MustDifferFromAssignedTester && string.Equals(rec.AssignedTesterName, c.Actor, StringComparison.Ordinal))
+            return Result.Fail("Separation of duties: the SoW signer must differ from the tester who drafted it (FR-SOW-05).");
+        return Result.Success();
+    }
+
+    // Load + authorize a tracked engagement for a data mutation. Throws on denial (defense-in-depth: the
+    // UI already gates these, so a denial here is a forged/BOLA attempt). Returns the tracked record.
+    private async Task<EngagementRecord> AuthorizeTrackedAsync(Guid engagementId, CallerContext c, EngagementAction action)
+    {
+        var rec = await db.Engagements.FirstOrDefaultAsync(e => e.Id == engagementId)
+                  ?? throw new InvalidOperationException("Engagement not found.");
+        var result = Authorize(rec, c, action);
+        if (result.Failed) throw new UnauthorizedAccessException(result.Error);
+        return rec;
+    }
 
     /// <summary>
     /// Stage the chained audit entry for a crown-jewel DATA mutation onto the current unit of work
@@ -32,7 +125,11 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
         NewChain().Append(engagementId, actor, action, before, after,
             string.IsNullOrEmpty(role) ? "ui" : $"ui:{role}", clock());
 
-    public Task<List<EngagementRecord>> ListAsync() =>
+    /// <summary>
+    /// Unscoped full listing — INTERNAL only. Crosses every scope boundary, so it must never be reachable
+    /// from a request path; callers use <see cref="ListScopedAsync"/>. Kept internal for the seeder/tests.
+    /// </summary>
+    internal Task<List<EngagementRecord>> ListAsync() =>
         db.Engagements.AsNoTracking().OrderBy(e => e.Reference).ToListAsync();
 
     /// <summary>
@@ -43,9 +140,10 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
     /// (Null role is treated as fail-closed too: an authenticated-but-unmapped principal sees nothing,
     /// not the whole estate.) A Tester additionally sees Report-stage engagements authored by a
     /// DIFFERENT tester — the independent peer-QA review queue (FR-REP-02) — without losing anti-BOLA
-    /// elsewhere.
+    /// elsewhere. Optional <paramref name="skip"/>/<paramref name="take"/> page the result.
     /// </summary>
-    public Task<List<EngagementRecord>> ListScopedAsync(string? appName, string? assignedToName, string? role = null)
+    public Task<List<EngagementRecord>> ListScopedAsync(
+        string? appName, string? assignedToName, string? role = null, int? skip = null, int? take = null)
     {
         var scoped = !AllPortfolioRoles.Contains(role ?? "");
         // Fail closed: a scoped role with no concrete filter at all sees nothing.
@@ -70,10 +168,16 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
                 q = q.Where(e => e.AssignedTesterName == assignedToName);
             }
         }
-        return q.OrderBy(e => e.Reference).ToListAsync();
+        q = q.OrderBy(e => e.Reference);
+        if (skip is int s) q = q.Skip(s);
+        if (take is int t) q = q.Take(t);
+        return q.ToListAsync();
     }
 
-    public Task<EngagementRecord?> GetAsync(Guid id) =>
+    /// <summary>
+    /// Unscoped fetch by id — INTERNAL only (crosses scope). Request paths use <see cref="GetScopedAsync"/>.
+    /// </summary>
+    internal Task<EngagementRecord?> GetAsync(Guid id) =>
         db.Engagements.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id);
 
     /// <summary>
@@ -87,28 +191,25 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
     /// </summary>
     public async Task<EngagementRecord?> GetScopedAsync(Guid id, string? appName, string? assignedToName, string? role = null)
     {
-        var scoped = !AllPortfolioRoles.Contains(role ?? "");
-        // Fail closed: a scoped role that supplied no concrete filter at all reaches nothing.
-        if (scoped && appName is null && assignedToName is null) return null;
-
         var rec = await db.Engagements.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id);
         if (rec is null) return null;
-        if (appName is not null && rec.AppName != appName && rec.AppName != appName + " (retest)") return null;
-        if (assignedToName is not null)
-        {
-            var isAssigned = rec.AssignedTesterName == assignedToName;
-            // Peer-QA review access: a Report-stage engagement authored by another tester is in scope.
-            var isPeerReviewable = role == PempRoles.Tester && !string.IsNullOrEmpty(assignedToName)
-                && rec.CurrentStage == Stage.Report
-                && rec.AssignedTesterName != null && rec.AssignedTesterName != assignedToName;
-            if (!isAssigned && !isPeerReviewable) return null;
-        }
-        return rec;
+        return InScope(rec, appName, assignedToName, role) ? rec : null;
     }
 
     /// <summary>All findings across the portfolio (FR-ANL-04 analytics).</summary>
     public Task<List<FindingRecord>> AllFindingsAsync() =>
         db.Findings.AsNoTracking().ToListAsync();
+
+    /// <summary>
+    /// DB-side scoped findings aggregate feed (FR-ANL-04): only findings for the supplied (already
+    /// scope-filtered) engagement ids, filtered in SQL — no portfolio-wide client materialization.
+    /// </summary>
+    public Task<List<FindingRecord>> ScopedFindingsAsync(IReadOnlyCollection<Guid> engagementIds)
+    {
+        if (engagementIds.Count == 0) return Task.FromResult(new List<FindingRecord>());
+        var ids = engagementIds.ToList();
+        return db.Findings.AsNoTracking().Where(f => ids.Contains(f.EngagementId)).ToListAsync();
+    }
 
     public Task<List<AuditEntryRow>> AuditForAsync(Guid id) =>
         db.AuditEntries.AsNoTracking().Where(a => a.EngagementId == id).OrderBy(a => a.Sequence).ToListAsync();
@@ -124,9 +225,10 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
     /// </summary>
     public async Task<Guid> AddFindingAsync(
         Guid engagementId, string title, Severity severity, string cvss, string cvssVector,
-        string asset, string remediation, FindingStatus status = FindingStatus.Open,
-        string actor = "system", string? role = null)
+        string asset, string remediation, CallerContext caller,
+        FindingStatus status = FindingStatus.Open, Guid? originalFindingId = null)
     {
+        await AuthorizeTrackedAsync(engagementId, caller, EngagementAction.AddFinding);
         var finding = new FindingRecord
         {
             Id = Guid.NewGuid(),
@@ -138,9 +240,10 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
             Asset = asset,
             Remediation = remediation,
             Status = status,
+            OriginalFindingId = originalFindingId,
         };
         db.Findings.Add(finding);
-        StageAudit(engagementId, actor, role, "Finding.Added", "-", $"{severity}: {title}");
+        StageAudit(engagementId, caller.Actor, caller.Role, "Finding.Added", "-", $"{severity}: {title}");
         await db.SaveChangesAsync();
         return finding.Id;
     }
@@ -150,22 +253,28 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
         db.Evidence.AsNoTracking().Where(e => e.EngagementId == id).ToListAsync();
 
     public async Task AddEvidenceAsync(Guid engagementId, Guid findingId, string fileName, EvidenceKind kind, string note,
-        string actor = "system", string? role = null)
+        CallerContext caller)
     {
+        await AuthorizeTrackedAsync(engagementId, caller, EngagementAction.AddEvidence);
         db.Evidence.Add(new EvidenceRecord
         {
             Id = Guid.NewGuid(), EngagementId = engagementId, FindingId = findingId,
             FileName = fileName, Kind = kind, Note = note, EncryptedAtRest = true,
         });
-        StageAudit(engagementId, actor, role, "Evidence.Added", "-", fileName);
+        StageAudit(engagementId, caller.Actor, caller.Role, "Evidence.Added", "-", fileName);
         await db.SaveChangesAsync();
     }
 
     public bool VerifyChain() => NewChain().Verify();
 
-    /// <summary>Global audit log for the admin console (FR-AUD-03), newest first.</summary>
-    public Task<List<AuditEntryRow>> AllAuditAsync() =>
-        db.AuditEntries.AsNoTracking().OrderByDescending(a => a.Sequence).ToListAsync();
+    /// <summary>Global audit log for the admin console (FR-AUD-03), newest first; optional paging.</summary>
+    public Task<List<AuditEntryRow>> AllAuditAsync(int? skip = null, int? take = null)
+    {
+        var q = db.AuditEntries.AsNoTracking().OrderByDescending(a => a.Sequence).AsQueryable();
+        if (skip is int s) q = q.Skip(s);
+        if (take is int t) q = q.Take(t);
+        return q.ToListAsync();
+    }
 
     /// <summary>
     /// Engagement audit trail with the tamper-evidence check performed on READ (SEC-AUD-01) — so a
@@ -178,9 +287,9 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
     }
 
     /// <summary>Global audit log + automatic chain verification on read (FR-AUD-03 / SEC-AUD-01).</summary>
-    public async Task<(List<AuditEntryRow> Rows, bool ChainIntact)> AllAuditVerifiedAsync()
+    public async Task<(List<AuditEntryRow> Rows, bool ChainIntact)> AllAuditVerifiedAsync(int? skip = null, int? take = null)
     {
-        var rows = await AllAuditAsync();
+        var rows = await AllAuditAsync(skip, take);
         return (rows, VerifyChain());
     }
 
@@ -189,16 +298,16 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
         db.AssessmentAnswers.AsNoTracking().Where(a => a.EngagementId == id)
           .ToDictionaryAsync(a => a.QuestionId, a => a.Value);
 
-    public async Task SaveAssessmentAnswerAsync(Guid id, string questionId, string value,
-        string actor = "system", string? role = null)
+    public async Task SaveAssessmentAnswerAsync(Guid id, string questionId, string value, CallerContext caller)
     {
+        await AuthorizeTrackedAsync(id, caller, EngagementAction.SaveAssessmentAnswer);
         var row = await db.AssessmentAnswers.FirstOrDefaultAsync(a => a.EngagementId == id && a.QuestionId == questionId);
         if (row is null)
             db.AssessmentAnswers.Add(new AssessmentAnswerRecord { Id = Guid.NewGuid(), EngagementId = id, QuestionId = questionId, Value = value });
         else
             row.Value = value;
         // Log the question answered, not the answer value (assessment input may be sensitive).
-        StageAudit(id, actor, role, "Assessment.AnswerSaved", "-", questionId);
+        StageAudit(id, caller.Actor, caller.Role, "Assessment.AnswerSaved", "-", questionId);
         await db.SaveChangesAsync();
     }
 
@@ -206,14 +315,14 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
     public Task<List<AccessRequirementRecord>> AccessReqsForAsync(Guid id) =>
         db.AccessRequirements.AsNoTracking().Where(a => a.EngagementId == id).OrderBy(a => a.Environment).ToListAsync();
 
-    public async Task SetAccessStatusAsync(Guid reqId, AccessStatus status,
-        string actor = "system", string? role = null)
+    public async Task SetAccessStatusAsync(Guid reqId, AccessStatus status, CallerContext caller)
     {
         var row = await db.AccessRequirements.FirstOrDefaultAsync(a => a.Id == reqId);
         if (row is null) return;
+        await AuthorizeTrackedAsync(row.EngagementId, caller, EngagementAction.SetAccessStatus);
         var before = $"{row.Environment}: {row.Status}";
         row.Status = status;
-        StageAudit(row.EngagementId, actor, role, "Access.StatusChanged", before, $"{row.Environment}: {status}");
+        StageAudit(row.EngagementId, caller.Actor, caller.Role, "Access.StatusChanged", before, $"{row.Environment}: {status}");
         await db.SaveChangesAsync();
     }
 
@@ -221,35 +330,60 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
     public async Task<HashSet<string>> ChecklistDoneAsync(Guid id) =>
         (await db.ChecklistTicks.AsNoTracking().Where(c => c.EngagementId == id && c.Done).Select(c => c.Code).ToListAsync()).ToHashSet();
 
-    public async Task SetChecklistAsync(Guid id, string code, bool done,
-        string actor = "system", string? role = null)
+    public async Task SetChecklistAsync(Guid id, string code, bool done, CallerContext caller)
     {
+        await AuthorizeTrackedAsync(id, caller, EngagementAction.SetChecklist);
         var row = await db.ChecklistTicks.FirstOrDefaultAsync(c => c.EngagementId == id && c.Code == code);
         if (row is null)
             db.ChecklistTicks.Add(new ChecklistTickRecord { Id = Guid.NewGuid(), EngagementId = id, Code = code, Done = done });
         else
             row.Done = done;
-        StageAudit(id, actor, role, "Checklist.Updated", code, $"{code}={(done ? "done" : "cleared")}");
+        StageAudit(id, caller.Actor, caller.Role, "Checklist.Updated", code, $"{code}={(done ? "done" : "cleared")}");
         await db.SaveChangesAsync();
     }
 
     /// <summary>
     /// Raise a new engagement request (FR-REQ-01/04): mints a reference, enters Intake,
-    /// and writes the first audit entry. Returns the new engagement id.
+    /// and writes the first audit entry. Returns the new engagement id. The reference is minted
+    /// inside the same transaction and backstopped by the unique index, so a duplicate cannot be
+    /// committed under concurrency.
     /// </summary>
-    public async Task<Guid> RaiseAsync(EngagementType type, string appName, string criticality, string actor)
+    public async Task<Guid> RaiseAsync(EngagementType type, string appName, string criticality, CallerContext caller)
+    {
+        if (caller.Role != PempRoles.AcmeOfficer)
+            throw new UnauthorizedAccessException("Raising requests is the Acme CA Officer's action (FR-REQ-01).");
+
+        // Retry on the unique-index backstop: two concurrent raises can compute the same next number;
+        // the loser's SaveChanges violates the unique Reference index and we recompute + retry.
+        for (var attempt = 0; ; attempt++)
+        {
+            var reference = await NextReferenceAsync();
+            var chain = NewChain();
+            var engagement = Engagement.Raise(reference, type, caller.Actor, chain, clock);
+            db.Engagements.Add(EngagementRecord.FromDomain(engagement, appName, criticality, null));
+            try
+            {
+                await db.SaveChangesAsync();
+                return engagement.Id;
+            }
+            catch (DbUpdateException) when (attempt < 5)
+            {
+                // Drop the failed tracked entities and retry with a freshly minted reference.
+                foreach (var entry in db.ChangeTracker.Entries().Where(e => e.State == EntityState.Added).ToList())
+                    entry.State = EntityState.Detached;
+            }
+        }
+    }
+
+    // Compute the next ENG-2026-NNNN reference in the DB (max numeric suffix + 1). Computed at mint
+    // time and protected by the unique index; the racy "load all references into memory" path is gone.
+    private async Task<string> NextReferenceAsync()
     {
         var refs = await db.Engagements.AsNoTracking().Select(e => e.Reference).ToListAsync();
         var maxNum = refs
             .Select(r => int.TryParse(r.Split('-').Last(), out var n) ? n : 0)
             .DefaultIfEmpty(420).Max();
-        var reference = $"ENG-2026-{maxNum + 1:D4}";
-
-        var chain = NewChain();
-        var engagement = Engagement.Raise(reference, type, actor, chain, clock);
-        db.Engagements.Add(EngagementRecord.FromDomain(engagement, appName, criticality, null));
-        await db.SaveChangesAsync();
-        return engagement.Id;
+        return $"ENG-2026-{maxNum + 1:D4}";
     }
 
     /// <summary>
@@ -267,24 +401,41 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
     }
 
     // ---- Test credentials (SEC-CRD) ----------------------------------------
-    public Task<List<TestCredentialRecord>> CredentialsForAsync(Guid id) =>
-        db.TestCredentials.AsNoTracking().Where(c => c.EngagementId == id).OrderBy(c => c.Label).ToListAsync();
+    /// <summary>
+    /// Credentials for an engagement, filtered for the caller (SEC-CRD): revoked or expired secrets
+    /// are never returned. The lifecycle metadata stays so the UI can show "revoked"/"expired" rows
+    /// without the secret value.
+    /// </summary>
+    public async Task<List<TestCredentialRecord>> CredentialsForAsync(Guid id)
+    {
+        var now = clock();
+        var rows = await db.TestCredentials.AsNoTracking().Where(c => c.EngagementId == id).OrderBy(c => c.Label).ToListAsync();
+        foreach (var c in rows)
+        {
+            if (c.Revoked || (c.ExpiresAt is DateTimeOffset exp && exp <= now))
+                c.Secret = ""; // crypto-shred from the read projection (don't surface revoked/expired secrets)
+        }
+        return rows;
+    }
 
     /// <summary>
     /// Attach a test-account credential to an engagement (SEC-CRD). The secret is persisted for the
-    /// demo; production stores it in Key Vault / envelope-encrypted. Returns the new credential id.
+    /// demo; production stores it in Key Vault / envelope-encrypted. Records the credential lifecycle
+    /// (created/added-by, optional expiry). Returns the new credential id.
     /// </summary>
     public async Task<Guid> AddTestCredentialAsync(Guid engagementId, string label, string username, string secret,
-        string actor = "system", string? role = null)
+        CallerContext caller, DateTimeOffset? expiresAt = null)
     {
+        await AuthorizeTrackedAsync(engagementId, caller, EngagementAction.AddTestCredential);
         var cred = new TestCredentialRecord
         {
             Id = Guid.NewGuid(), EngagementId = engagementId,
             Label = label, Username = username, Secret = secret,
+            CreatedAt = clock(), AddedBy = caller.Actor, ExpiresAt = expiresAt,
         };
         db.TestCredentials.Add(cred);
         // Log the credential's LABEL only — never the secret (SEC-CRD: secrets are never logged).
-        StageAudit(engagementId, actor, role, "Credential.Added", "-", label);
+        StageAudit(engagementId, caller.Actor, caller.Role, "Credential.Added", "-", label);
         await db.SaveChangesAsync();
         return cred.Id;
     }
@@ -293,14 +444,14 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
     /// Set a finding's status in the live register (FR-FND-04 / FR-RET-03): used by the retest
     /// pass/fail flow (pass → Closed, fail → Open) and remediation tracking.
     /// </summary>
-    public async Task SetFindingStatusAsync(Guid findingId, FindingStatus status,
-        string actor = "system", string? role = null)
+    public async Task SetFindingStatusAsync(Guid findingId, FindingStatus status, CallerContext caller)
     {
         var row = await db.Findings.FirstOrDefaultAsync(f => f.Id == findingId);
         if (row is null) return;
+        await AuthorizeTrackedAsync(row.EngagementId, caller, EngagementAction.SetFindingStatus);
         var before = row.Status.ToString();
         row.Status = status;
-        StageAudit(row.EngagementId, actor, role, "Finding.StatusChanged", before, status.ToString());
+        StageAudit(row.EngagementId, caller.Actor, caller.Role, "Finding.StatusChanged", before, status.ToString());
         await db.SaveChangesAsync();
     }
 
@@ -309,9 +460,9 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
     /// environment/asset they need at the Access stage. Returns the new record.
     /// </summary>
     public async Task<AccessRequirementRecord> AddAccessRequirementAsync(
-        Guid engagementId, string environment, string url, string accessType,
-        string actor = "system", string? role = null)
+        Guid engagementId, string environment, string url, string accessType, CallerContext caller)
     {
+        await AuthorizeTrackedAsync(engagementId, caller, EngagementAction.AddAccessRequirement);
         var row = new AccessRequirementRecord
         {
             Id = Guid.NewGuid(), EngagementId = engagementId,
@@ -319,7 +470,7 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
             Status = AccessStatus.AppTeamToProvision,
         };
         db.AccessRequirements.Add(row);
-        StageAudit(engagementId, actor, role, "Access.RequirementAdded", "-", environment);
+        StageAudit(engagementId, caller.Actor, caller.Role, "Access.RequirementAdded", "-", environment);
         await db.SaveChangesAsync();
         return row;
     }
@@ -328,13 +479,15 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
     /// Assign a tester (FR-ASG-03) and record the display name together, so the card/header
     /// don't show a stale "—" after assignment.
     /// </summary>
-    public async Task<Result> AssignTesterAsync(Guid id, Guid testerId, string testerName, string actor)
+    public async Task<Result> AssignTesterAsync(Guid id, Guid testerId, string testerName, CallerContext caller)
     {
         var rec = await db.Engagements.FirstOrDefaultAsync(e => e.Id == id);
         if (rec is null) return Result.Fail("Engagement not found.");
+        var authz = Authorize(rec, caller, EngagementAction.AssignTester);
+        if (authz.Failed) return authz;
         var chain = NewChain();
         var aggregate = rec.ToDomain(chain, clock);
-        var result = aggregate.AssignTester(testerId, actor, testerLabel: testerName);
+        var result = aggregate.AssignTester(testerId, caller.Actor, testerLabel: testerName);
         if (result.Failed) return result;
         rec.CopyFrom(aggregate);
         rec.AssignedTesterName = testerName;
@@ -345,18 +498,21 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
     /// <summary>
     /// Request a retest on a closed engagement (FR-RET-01/02): spawns a linked child that
     /// re-verifies remediated findings. Persists the parent (RetestRequested) + the new
-    /// child record + the audit entries together. Returns the child id on success.
+    /// child record + the audit entries together. Returns the child id on success. Each carried
+    /// finding records its <see cref="FindingRecord.OriginalFindingId"/> for before/after provenance.
     /// </summary>
-    public async Task<(Result Result, Guid? ChildId)> RequestRetestAsync(Guid parentId, string actor)
+    public async Task<(Result Result, Guid? ChildId)> RequestRetestAsync(Guid parentId, CallerContext caller)
     {
         var parent = await db.Engagements.FirstOrDefaultAsync(e => e.Id == parentId);
         if (parent is null) return (Result.Fail("Engagement not found."), null);
+        var authz = Authorize(parent, caller, EngagementAction.RequestRetest);
+        if (authz.Failed) return (authz, null);
 
         var chain = NewChain();
         var aggregate = parent.ToDomain(chain, clock);
         var childRef = $"{parent.Reference}-RT";
 
-        var result = aggregate.RequestRetest(childRef, actor, out var child);
+        var result = aggregate.RequestRetest(childRef, caller.Actor, out var child);
         if (result.Failed || child is null) return (result, null);
 
         parent.CopyFrom(aggregate);
@@ -364,7 +520,8 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
         db.Engagements.Add(childRec);
 
         // Carry the in-scope findings into the child to be re-verified (FR-RET-03): everything
-        // not terminal — Open, RetestPending, AND Remediated (a retest verifies the fixes).
+        // not terminal — Open, RetestPending, AND Remediated (a retest verifies the fixes). Each child
+        // finding links back to its origin (OriginalFindingId) so the report can show before/after.
         var inScope = await db.Findings.AsNoTracking()
             .Where(f => f.EngagementId == parentId
                         && f.Status != FindingStatus.Closed && f.Status != FindingStatus.AcceptedRisk)
@@ -375,6 +532,7 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
                 Id = Guid.NewGuid(), EngagementId = child.Id, Title = f.Title,
                 Severity = f.Severity, Cvss = f.Cvss, CvssVector = f.CvssVector, Asset = f.Asset,
                 Remediation = f.Remediation, Status = FindingStatus.RetestPending,
+                OriginalFindingId = f.Id,
             });
 
         await db.SaveChangesAsync();
@@ -382,22 +540,36 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
     }
 
     /// <summary>
-    /// Run a guarded transition on the aggregate. The action invokes a domain method
-    /// (e.g. <c>e =&gt; e.SignSow(actor, reAuth: true)</c>). State + audit persist only if it succeeds.
+    /// Run a guarded transition on the aggregate (the lifecycle write path). Authorizes the caller for
+    /// THIS engagement and action first (object-level scope + role + SoD, SEC-AZN), then invokes the
+    /// domain method. State + audit persist only if both the authorization and the guard succeed; an
+    /// optimistic-concurrency conflict surfaces as a friendly "reload and retry" failure, never a throw.
     /// </summary>
-    public async Task<Result> ExecuteAsync(Guid id, Func<Engagement, Result> action)
+    public async Task<Result> ExecuteAsync(Guid id, CallerContext caller, EngagementAction action, Func<Engagement, Result> act)
     {
         var rec = await db.Engagements.FirstOrDefaultAsync(e => e.Id == id);
         if (rec is null) return Result.Fail("Engagement not found.");
 
+        var authz = Authorize(rec, caller, action);
+        if (authz.Failed) return authz; // not authorized — nothing appended, nothing saved
+
         var chain = NewChain();
         var aggregate = rec.ToDomain(chain, clock);
 
-        var result = action(aggregate);
+        var result = act(aggregate);
         if (result.Failed) return result; // guard rejected — nothing appended, nothing saved
 
         rec.CopyFrom(aggregate);
-        await db.SaveChangesAsync();
+        try
+        {
+            await db.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // TOCTOU: another transition committed between our read and write. Don't corrupt or
+            // last-write-win — ask the caller to reload and retry against fresh state.
+            return Result.Fail("This engagement changed in another session. Reload and try again.");
+        }
         return result;
     }
 
@@ -407,12 +579,12 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
     /// The verdict-recording happens via <see cref="SetFindingStatusAsync"/> (pass → Closed,
     /// fail → Open); only then may the child close, with its transition + audit appended atomically.
     /// </summary>
-    public async Task<Result> CompleteRetestAsync(Guid id, string actor)
+    public async Task<Result> CompleteRetestAsync(Guid id, CallerContext caller)
     {
         var pending = await db.Findings.AsNoTracking()
             .AnyAsync(f => f.EngagementId == id && f.Status == FindingStatus.RetestPending);
         if (pending)
             return Result.Fail("Every in-scope finding must be re-verified (pass/fail) before completing the retest (FR-RET-03).");
-        return await ExecuteAsync(id, e => e.CompleteRetest(actor));
+        return await ExecuteAsync(id, caller, EngagementAction.CompleteRetest, e => e.CompleteRetest(caller.Actor));
     }
 }

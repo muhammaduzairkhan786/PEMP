@@ -403,21 +403,22 @@ else
         _error = _ok = null; _chainOk = null;
         var actor = Session.Actor;
 
+        var caller = Session.Caller;
         var result = k switch
         {
-            ActionKind.RouteToDm        => await Store.ExecuteAsync(Id, e => e.RouteToDeliveryManager(actor)),
-            ActionKind.AssignTester     => await Store.AssignTesterAsync(Id, _assignTesterId, TesterName(_assignTesterId), actor),
-            ActionKind.CompleteAssessment => await Store.ExecuteAsync(Id, e => e.CompleteAssessment(actor)),
-            ActionKind.ReviewSow        => await Store.ExecuteAsync(Id, e => e.ReviewSowAsDeliveryManager(actor)),
-            ActionKind.SignSow          => await Store.ExecuteAsync(Id, e => e.SignSow(actor, reauth)),
-            ActionKind.VerifyAccess     => await Store.ExecuteAsync(Id, e => e.VerifyAccess(actor, reauth)),
-            ActionKind.SendIr           => await Store.ExecuteAsync(Id, e => e.SendIrNotice(actor)),
-            ActionKind.EndTest          => await Store.ExecuteAsync(Id, e => e.EndTest(actor)),
-            ActionKind.GenerateDraft    => await Store.ExecuteAsync(Id, e => e.GenerateDraft(actor)),
-            ActionKind.PeerReview       => await Store.ExecuteAsync(Id, e => e.PeerReview(ActingTesterId(), true, actor)),
-            ActionKind.PeerReviewReject => await Store.ExecuteAsync(Id, e => e.PeerReview(ActingTesterId(), false, actor)),
-            ActionKind.ReleaseFinal     => await Store.ExecuteAsync(Id, e => e.ReleaseFinal(actor, reauth)),
-            ActionKind.CompleteRetest   => await Store.CompleteRetestAsync(Id, actor),
+            ActionKind.RouteToDm        => await Store.ExecuteAsync(Id, caller, EngagementAction.RouteToDeliveryManager, e => e.RouteToDeliveryManager(actor)),
+            ActionKind.AssignTester     => await Store.AssignTesterAsync(Id, _assignTesterId, TesterName(_assignTesterId), caller),
+            ActionKind.CompleteAssessment => await Store.ExecuteAsync(Id, caller, EngagementAction.CompleteAssessment, e => e.CompleteAssessment(actor)),
+            ActionKind.ReviewSow        => await Store.ExecuteAsync(Id, caller, EngagementAction.ReviewSow, e => e.ReviewSowAsDeliveryManager(actor)),
+            ActionKind.SignSow          => await Store.ExecuteAsync(Id, caller, EngagementAction.SignSow, e => e.SignSow(actor, reauth)),
+            ActionKind.VerifyAccess     => await Store.ExecuteAsync(Id, caller, EngagementAction.VerifyAccess, e => e.VerifyAccess(actor, reauth)),
+            ActionKind.SendIr           => await Store.ExecuteAsync(Id, caller, EngagementAction.SendIrNotice, e => e.SendIrNotice(actor)),
+            ActionKind.EndTest          => await Store.ExecuteAsync(Id, caller, EngagementAction.EndTest, e => e.EndTest(actor)),
+            ActionKind.GenerateDraft    => await Store.ExecuteAsync(Id, caller, EngagementAction.GenerateDraft, e => e.GenerateDraft(actor)),
+            ActionKind.PeerReview       => await Store.ExecuteAsync(Id, caller, EngagementAction.PeerReview, e => e.PeerReview(ActingTesterId(), true, actor)),
+            ActionKind.PeerReviewReject => await Store.ExecuteAsync(Id, caller, EngagementAction.PeerReview, e => e.PeerReview(ActingTesterId(), false, actor)),
+            ActionKind.ReleaseFinal     => await Store.ExecuteAsync(Id, caller, EngagementAction.ReleaseFinal, e => e.ReleaseFinal(actor, reauth)),
+            ActionKind.CompleteRetest   => await Store.CompleteRetestAsync(Id, caller),
             _ => Result.Fail("Unsupported action."),
         };
 
@@ -431,7 +432,7 @@ else
     async Task Retest()
     {
         _error = _ok = null; _chainOk = null;
-        var (result, childId) = await Store.RequestRetestAsync(Id, Session.Actor);
+        var (result, childId) = await Store.RequestRetestAsync(Id, Session.Caller);
         if (result.Failed || childId is null) { _error = result.Error; await Load(); return; }
         Nav.NavigateTo($"engagement/{childId}");
     }

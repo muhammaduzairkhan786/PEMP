@@ -53,4 +53,10 @@ public sealed class DemoSession(AuthenticationStateProvider authProvider)
     // Other roles (Acme, DM, Admin) see the whole portfolio.
     public string? AppScope => Role == PempRoles.Stakeholder ? "Retail Web" : null;
     public string? TesterScope => Role == PempRoles.Tester ? Actor : null;
+
+    /// <summary>
+    /// The server-side authorization context for a WRITE (SEC-AZN). Carries the SAME role + scope used
+    /// for reads, so the store re-derives and enforces object-level scope + role/SoD on every mutation.
+    /// </summary>
+    public Pemp.Infrastructure.Persistence.CallerContext Caller => new(Role, Actor, AppScope, TesterScope);
 }
