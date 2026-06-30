@@ -621,7 +621,7 @@ Deliberately **not** used: points, badges, streaks, confetti — they'd undermin
 ## 16. Resolved Decisions & Phase-2 Wireframe Checklist
 
 **Resolved decisions (carry into Phase 2):**
-- **Front end → recommend SPA.** The optimistic-UI + ⌘K + drawer-heavy model points to a **SPA** (React or Blazor-WASM) for the one open stack item (`ASM-01`). This is the design's **recommendation to Phase 2**, which formally ratifies the front-end stack — not a decision this document owns.
+- **Front end → ratified: Blazor Web App (interactive Server).** This design recommended a SPA posture for the optimistic-UI + ⌘K + drawer-heavy model (`ASM-01`); Phase 3 **ratified and shipped a Blazor Web App running interactive Server components** instead — one language end-to-end, server-side render keeps secrets and authorization server-side, and no separate API is needed yet. Rationale and trade-offs (circuit/scale-out, round-trip latency) are in `design/architecture.md §2`.
 - **Snooze (§9) and ⌘K (§13) → in v1**, shipped behind **admin feature flags** (§6.2 Configuration) so scope stays reversible without code change (`FR-ADM-04`). Both remain tagged **[new — not in SRS]** with their justifications.
 - **ITSM integration → webhook-preferred, polling-fallback** for live ticket status on the Access screen (`CON-05`, §6.3); exact system + auth named in Phase 2.
 - **B2B guest first-run → kid-easy onboarding.** **[new — not in SRS]** Entra guest invite → one-tap consent → lands the stakeholder directly on their single assessment/finding (`FR-AUTH-07`), never on an empty console. *Justification:* protects the "simplest surface" promise (§3) for the least-technical, external user.

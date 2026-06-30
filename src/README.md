@@ -6,20 +6,22 @@ slice over the domain state machine; run it with `dotnet run --project src/Pemp.
 | Project | Layer | Status |
 |---------|-------|--------|
 | `Pemp.Domain` | Domain core — `Engagement` aggregate, `Stage` state machine + guards, hash-chained audit (`Audit/`) | ✅ built · 15 tests |
-| `Pemp.Infrastructure` | EF Core (SQLite local / Azure SQL), `EfAuditChain`, `EngagementStore`, assessment/access/checklist/evidence stores, `DemoSeeder` | ✅ built · 6 tests |
-| `Pemp.Web` | Blazor Web App (interactive server) — My-Turn, engagements, spine, gated actions, gate-ceremony modal, findings/evidence/checklist/access/analytics, Entra wiring (config-guarded) | ✅ built |
-| `Pemp.Application` | Dedicated use-case layer (handlers, object-level authz) — currently folded into `EngagementStore` | ⬜ optional refactor |
+| `Pemp.Infrastructure` | EF Core (SQLite local / Azure SQL), `EfAuditChain`, `EngagementStore`, assessment/access/checklist/evidence stores, `DemoSeeder` | ✅ built · 23 tests |
+| `Pemp.Web` | Blazor Web App (interactive server) — My-Turn, engagements, spine, gated actions, gate-ceremony modal, findings/evidence/checklist/access/analytics, masked credentials, Entra wiring (config-guarded) | ✅ built |
+| `Pemp.Application` | Dedicated use-case layer (handlers, object-level authz) — currently folded into `EngagementStore` | ⬜ planned-only refactor |
+| `Pemp.Api` | Standalone ASP.NET Core API surface | ⬜ planned-only (not built) |
 
 The Application/API split from the architecture doc was collapsed for the demo:
 `Pemp.Web` calls `EngagementStore` (Infrastructure) directly. Extracting a clean
-`Pemp.Application` layer is the next architectural refactor (not demo-blocking).
+`Pemp.Application` layer (and an optional `Pemp.Api`) is the next architectural
+refactor (not demo-blocking).
 
 ## Build & test (.NET 10 SDK)
 
 ```bash
 dotnet build PEMP.sln          # strict: code warnings are errors
-dotnet test                    # 21 tests — 15 domain + 6 persistence
-dotnet run --project src/Pemp.Web   # the demo app (SQLite, seeded, role switcher)
+dotnet test                    # 38 tests — 15 domain + 23 infrastructure persistence
+dotnet run --project src/Pemp.Web   # the demo app (SQLite, seeded; sign in via local Identity + TOTP)
 ```
 
 ## What the domain enforces

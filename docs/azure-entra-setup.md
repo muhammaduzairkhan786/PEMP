@@ -6,7 +6,8 @@ How to stand up the **real** Azure (UK) + Entra backing for PEMP. The app code a
 (they create billable resources and require admin consent).
 
 > Local demo needs none of this: `dotnet run --project src/Pemp.Web` uses SQLite +
-> the in-app role switcher. This guide is for the cloud deployment.
+> local ASP.NET Core Identity (email/password + authenticator TOTP — see `docs/DEMO.md`).
+> This guide is for the cloud deployment, where Entra SSO replaces local Identity.
 
 Prerequisites: `az` CLI logged in (`az login`), rights to create resources in the
 subscription, and an Entra tenant admin for app registration + consent.
