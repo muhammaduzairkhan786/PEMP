@@ -71,7 +71,7 @@ else
         @if (canComplete)
         {
             <div class="card nextaction" style="margin-top:var(--space-4)">
-                <div style="font-size:26px">▸</div>
+                <div class="na-mark" aria-hidden="true">▸</div>
                 <div class="meta"><b>Complete &amp; confirm assessment</b><span class="muted">Owner: You (@Session.Role) · FR-SCO-03</span></div>
                 <button class="btn primary" @onclick="Complete">Complete &amp; confirm ▶</button>
             </div>

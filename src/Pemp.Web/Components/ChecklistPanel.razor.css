@@ -1,0 +1,53 @@
+/* ChecklistPanel — the tester SOP checklist as a tidy, satisfying progress surface. The meter,
+   cards and rows come from the global sheet; these scoped rules refine the meter, group headings,
+   the per-item rows and the completed state. Tokens only; dark/light parity. */
+
+.meter {
+    height: 10px;
+    border: 1px solid var(--border);
+    box-shadow: inset 0 1px 2px color-mix(in srgb, var(--ink) 8%, transparent);
+}
+
+.chkrow {
+    align-items: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-2);
+    border-radius: var(--radius-sm);
+    margin: 0 calc(-1 * var(--space-2));
+    transition: background var(--dur-fast) var(--ease-standard);
+}
+
+.chkrow:hover {
+    background: var(--surface-raised);
+}
+
+/* Brand-tinted checkboxes tie the checklist into the warm palette. */
+.chkrow input[type="checkbox"] {
+    accent-color: var(--brand);
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.chkrow input[type="checkbox"]:disabled {
+    cursor: default;
+}
+
+/* The SOP code reads as a quiet mono chip. */
+.chkrow .ref {
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 1px 7px;
+    color: var(--ink-muted);
+}
+
+.chkdone {
+    color: var(--ink-muted);
+    text-decoration: line-through;
+    text-decoration-color: color-mix(in srgb, var(--state-done) 55%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .chkrow { transition: none; }
+}

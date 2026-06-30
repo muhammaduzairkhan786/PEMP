@@ -25,21 +25,26 @@ else
 
     <div class="wrap">
         <a class="backlink" href="engagements">← Back to engagements</a>
-        <div class="eyebrow">Engagement</div>
-        <h1 class="title">@_rec.AppName <span class="ref">@_rec.Reference</span></h1>
-        <p class="sub">
-            <span class="chip @TypeClass(_rec.Type)">@_rec.Type.ToString().ToUpperInvariant()</span>
-            <span class="chip crit-@_rec.Criticality.ToLowerInvariant()">@_rec.Criticality criticality</span>
-            @if (_rec.ParentId is not null)
-            {
-                <span class="chip retest">RETEST CHILD</span>
-            }
-            · tester @(_rec.AssignedTesterName ?? "—")
-        </p>
+        <header class="eng-head">
+            <div class="eyebrow">Engagement</div>
+            <h1 class="title">@_rec.AppName <span class="ref">@_rec.Reference</span></h1>
+            <p class="sub">
+                <span class="chip @TypeClass(_rec.Type)">@_rec.Type.ToString().ToUpperInvariant()</span>
+                <span class="chip crit-@_rec.Criticality.ToLowerInvariant()">@_rec.Criticality criticality</span>
+                @if (_rec.ParentId is not null)
+                {
+                    <span class="chip retest">RETEST CHILD</span>
+                }
+                <span class="eng-tester">tester @(_rec.AssignedTesterName ?? "—")</span>
+            </p>
+        </header>
 
         @* The spine + the current next-action card own the viewport; everything else is progressively
            disclosed behind the drawer-rail tabs below (DESIGN_PLAN §1.4 / §4 / fleet ranks 23+28). *@
-        <div class="card"><Spine Current="_rec.CurrentStage" /></div>
+        <div class="card eng-spine">
+            <div class="eng-spine-eyebrow">Engagement lifecycle</div>
+            <Spine Current="_rec.CurrentStage" />
+        </div>
 
         @if (_error is not null)
         {
@@ -66,7 +71,7 @@ else
             else if (mine)
             {
                 <div class="card nextaction">
-                    <div style="font-size:26px">▸</div>
+                    <div class="na-mark" aria-hidden="true">▸</div>
                     <div class="meta"><b>@next.Label</b><span class="muted">Owner: You (@Session.Role)@(Workflow.NeedsReauth(next.Kind) ? " · re-auth required (SEC-IAM-04)" : "")</span></div>
                     @if (next.Kind == ActionKind.AssignTester)
                     {

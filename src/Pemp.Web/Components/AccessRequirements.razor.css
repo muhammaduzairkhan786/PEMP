@@ -1,0 +1,30 @@
+/* AccessRequirements — the access matrix as an editorial card. The table, pills, form and section
+   labels come from the global sheet; these scoped rules refine spacing, the status read, and the
+   empty state. Tokens only; full dark/light parity. */
+
+table.t td {
+    padding: var(--space-3) 10px;
+    vertical-align: middle;
+}
+
+table.t tbody tr {
+    transition: background var(--dur-fast) var(--ease-standard);
+}
+
+table.t tbody tr:hover {
+    background: color-mix(in srgb, var(--brand) 4%, transparent);
+}
+
+/* Inline status select stays calm and well-sized within the cell. */
+table.t td .inp {
+    background: var(--surface);
+}
+
+/* A gracious empty state: airy, dashed, quietly inviting rather than a flat blank card. */
+.card.muted {
+    text-align: center;
+    padding: var(--space-8) var(--space-6);
+    border-style: dashed;
+    color: var(--ink-muted);
+    box-shadow: none;
+}
