@@ -42,11 +42,40 @@ else if (ShowEmpty)
     <div class="card muted">No access requirements defined yet.</div>
 }
 
+@if (Editable)
+{
+    <div class="card">
+        <div class="sectionlabel" style="margin-top:0">Add an access requirement <span class="srs">FR-ACC-01</span></div>
+        <div class="q"><input class="inp" placeholder="environment / asset (e.g. Pre-production)" @bind="_env" /></div>
+        <div class="q"><input class="inp" placeholder="URL / detail" @bind="_url" /></div>
+        <div class="q" style="border:none">
+            <select class="inp" style="max-width:210px" @bind="_type">
+                @foreach (var t in new[] { "Read", "Read-Write", "Admin", "Other" }){<option value="@t">@t</option>}
+            </select>
+            <button class="btn primary" style="margin-top:8px" @onclick="AddRow">Add requirement ▶</button>
+            @if (_msg is not null){<span class="muted" style="margin-left:10px">@_msg</span>}
+        </div>
+    </div>
+}
+
 @code {
     [Parameter] public Guid EngagementId { get; set; }
     [Parameter] public List<AccessRequirementRecord> Reqs { get; set; } = new();
     [Parameter] public bool Editable { get; set; }
     [Parameter] public bool ShowEmpty { get; set; }
+    [Parameter] public EventCallback OnAdded { get; set; }
+
+    string _env = "", _url = "", _type = "Read";
+    string? _msg;
+
+    async Task AddRow()
+    {
+        if (string.IsNullOrWhiteSpace(_env)) { _msg = "Enter an environment / asset."; return; }
+        await Store.AddAccessRequirementAsync(EngagementId, _env.Trim(), _url.Trim(), _type);
+        _env = _url = ""; _type = "Read";
+        _msg = "Added — app team to provision (FR-ACC-02).";
+        if (OnAdded.HasDelegate) await OnAdded.InvokeAsync();
+    }
 
     async Task SetStatus(AccessRequirementRecord r, ChangeEventArgs e)
     {

@@ -169,6 +169,61 @@ public sealed class PersistenceTests : IDisposable
         Assert.True(new EfAuditChain(_db).Verify());
     }
 
+    [Fact]
+    public async Task TestCredential_round_trips_through_the_store()  // SEC-CRD
+    {
+        // Payments API is at the Access stage — attach a test credential and read it back.
+        var id = IdOf("ENG-2026-0419");
+        var before = (await _store.CredentialsForAsync(id)).Count;
+
+        var credId = await _store.AddTestCredentialAsync(id, "Staging admin", "admin.stg@test", "S3cr3t!-stg");
+
+        var after = await _store.CredentialsForAsync(id);
+        Assert.Equal(before + 1, after.Count);
+        var added = after.Single(c => c.Id == credId);
+        Assert.Equal("Staging admin", added.Label);
+        Assert.Equal("admin.stg@test", added.Username);
+        Assert.Equal("S3cr3t!-stg", added.Secret);  // round-trips (prod = Key Vault / envelope-encrypted)
+    }
+
+    [Fact]
+    public async Task Retest_pass_and_fail_update_finding_status()  // FR-RET-03
+    {
+        // Closed Broker Portal → retest spawns a child carrying RetestPending findings.
+        var parentId = IdOf("ENG-2026-0399");
+        // Ensure at least two carry over (so we can test both verdicts): seed an extra open finding.
+        await _store.AddFindingAsync(parentId, "Open redirect", Severity.Low, "3.5",
+            "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:N/I:L/A:N", "Web", "Allow-list redirects.", FindingStatus.Open);
+
+        var (result, childId) = await _store.RequestRetestAsync(parentId, "stakeholder");
+        Assert.False(result.Failed);
+
+        var carried = await _store.FindingsForAsync(childId!.Value);
+        Assert.True(carried.Count >= 2);
+        Assert.All(carried, f => Assert.Equal(FindingStatus.RetestPending, f.Status));
+
+        // Pass = fix verified → Closed; fail = still present → re-Open.
+        await _store.SetFindingStatusAsync(carried[0].Id, FindingStatus.Closed);
+        await _store.SetFindingStatusAsync(carried[1].Id, FindingStatus.Open);
+
+        var after = await _store.FindingsForAsync(childId.Value);
+        Assert.Equal(FindingStatus.Closed, after.Single(f => f.Id == carried[0].Id).Status);
+        Assert.Equal(FindingStatus.Open, after.Single(f => f.Id == carried[1].Id).Status);
+    }
+
+    [Fact]
+    public async Task AddAccessRequirement_persists_a_new_row()  // FR-ACC-01
+    {
+        var id = IdOf("ENG-2026-0419"); // Payments API at Access
+        var before = (await _store.AccessReqsForAsync(id)).Count;
+
+        var row = await _store.AddAccessRequirementAsync(id, "Sandbox", "https://sbx.test", "Read");
+
+        var after = await _store.AccessReqsForAsync(id);
+        Assert.Equal(before + 1, after.Count);
+        Assert.Equal(AccessStatus.AppTeamToProvision, after.Single(a => a.Id == row.Id).Status);
+    }
+
     public void Dispose()
     {
         _db.Dispose();

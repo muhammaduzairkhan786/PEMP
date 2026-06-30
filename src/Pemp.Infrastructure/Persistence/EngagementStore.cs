@@ -162,6 +162,70 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
     }
 
     /// <summary>
+    /// Capacity board (FR-ASG-02): active (non-closed) engagement count per tester name, so the
+    /// Delivery Manager can see relative load before assigning. Derived live from the store.
+    /// </summary>
+    public async Task<Dictionary<string, int>> ActiveAssignmentCountsAsync()
+    {
+        var rows = await db.Engagements.AsNoTracking()
+            .Where(e => e.AssignedTesterName != null && e.CurrentStage != Stage.Closed)
+            .GroupBy(e => e.AssignedTesterName!)
+            .Select(g => new { Name = g.Key, Count = g.Count() })
+            .ToListAsync();
+        return rows.ToDictionary(x => x.Name, x => x.Count);
+    }
+
+    // ---- Test credentials (SEC-CRD) ----------------------------------------
+    public Task<List<TestCredentialRecord>> CredentialsForAsync(Guid id) =>
+        db.TestCredentials.AsNoTracking().Where(c => c.EngagementId == id).OrderBy(c => c.Label).ToListAsync();
+
+    /// <summary>
+    /// Attach a test-account credential to an engagement (SEC-CRD). The secret is persisted for the
+    /// demo; production stores it in Key Vault / envelope-encrypted. Returns the new credential id.
+    /// </summary>
+    public async Task<Guid> AddTestCredentialAsync(Guid engagementId, string label, string username, string secret)
+    {
+        var cred = new TestCredentialRecord
+        {
+            Id = Guid.NewGuid(), EngagementId = engagementId,
+            Label = label, Username = username, Secret = secret,
+        };
+        db.TestCredentials.Add(cred);
+        await db.SaveChangesAsync();
+        return cred.Id;
+    }
+
+    /// <summary>
+    /// Set a finding's status in the live register (FR-FND-04 / FR-RET-03): used by the retest
+    /// pass/fail flow (pass → Closed, fail → Open) and remediation tracking.
+    /// </summary>
+    public async Task SetFindingStatusAsync(Guid findingId, FindingStatus status)
+    {
+        var row = await db.Findings.FirstOrDefaultAsync(f => f.Id == findingId);
+        if (row is null) return;
+        row.Status = status;
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Add a tester-defined access requirement row (FR-ACC-01): the owning tester adds the
+    /// environment/asset they need at the Access stage. Returns the new record.
+    /// </summary>
+    public async Task<AccessRequirementRecord> AddAccessRequirementAsync(
+        Guid engagementId, string environment, string url, string accessType)
+    {
+        var row = new AccessRequirementRecord
+        {
+            Id = Guid.NewGuid(), EngagementId = engagementId,
+            Environment = environment, Url = url, AccessType = accessType,
+            Status = AccessStatus.AppTeamToProvision,
+        };
+        db.AccessRequirements.Add(row);
+        await db.SaveChangesAsync();
+        return row;
+    }
+
+    /// <summary>
     /// Assign a tester (FR-ASG-03) and record the display name together, so the card/header
     /// don't show a stale "—" after assignment.
     /// </summary>

@@ -7,6 +7,7 @@
 @inject ILogger<Login> Logger
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
+@inject IConfiguration Configuration
 
 <PageTitle>Sign in · PEMP</PageTitle>
 
@@ -38,14 +39,20 @@
     <button type="submit" class="btn primary auth-submit">Sign in</button>
 </EditForm>
 
-<div class="auth-hint">
-    <span class="muted">Dev accounts</span>
-    <code>acme@pemp.dev · dm@pemp.dev · tester@pemp.dev · stakeholder@pemp.dev · admin@pemp.dev</code>
-    <span class="muted">Password <code>Pemp!2026</code> — you'll enrol an authenticator on first sign-in.</span>
-</div>
+@if (!EntraConfigured)
+{
+    <div class="auth-hint">
+        <span class="muted">Dev accounts</span>
+        <code>acme@pemp.dev · dm@pemp.dev · tester@pemp.dev · stakeholder@pemp.dev · admin@pemp.dev</code>
+        <span class="muted">Password <code>Pemp!2026</code> — you'll enrol an authenticator on first sign-in.</span>
+    </div>
+}
 
 @code {
     private string? errorMessage;
+
+    // The local dev sign-in hint is shown only when Entra (production identity) is NOT configured.
+    private bool EntraConfigured => !string.IsNullOrWhiteSpace(Configuration["AzureAd:ClientId"]);
 
     [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
 

@@ -2,6 +2,7 @@
 @attribute [Authorize(Roles = "System Administrator")]
 @inject EngagementStore Store
 @inject DemoSession Session
+@inject IJSRuntime JS
 <PageTitle>Admin · PEMP</PageTitle>
 
 <div class="wrap">
@@ -96,5 +97,28 @@
                              || a.Action.Contains(_filter, StringComparison.OrdinalIgnoreCase));
 
     void Verify() => _chainOk = Store.VerifyChain();
-    void Export() => _exportMsg = $"· exported {Filtered().Count()} entries (CSV) for compliance.";
+
+    // Real CSV export of the (filtered) audit log — a genuine admin action (FR-AUD-03). Read-only:
+    // it streams the existing hash-chained entries to the browser as a download; nothing mutates.
+    async Task Export()
+    {
+        var rows = Filtered().ToList();
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("Sequence,Actor,Action,Before,After,Timestamp");
+        foreach (var a in rows)
+            sb.AppendLine(string.Join(',', new[]
+            {
+                Csv(a.Sequence.ToString()), Csv(a.Actor), Csv(a.Action),
+                Csv(a.Before), Csv(a.After), Csv(a.Timestamp.ToString("u")),
+            }));
+        var fileName = $"pemp-audit-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.csv";
+        await JS.InvokeVoidAsync("pempDownload", fileName, sb.ToString());
+        _exportMsg = $"· exported {rows.Count} entries to {fileName}.";
+    }
+
+    // Minimal RFC-4180 CSV field quoting.
+    static string Csv(string v) =>
+        v.Contains(',') || v.Contains('"') || v.Contains('\n')
+            ? "\"" + v.Replace("\"", "\"\"") + "\""
+            : v;
 }

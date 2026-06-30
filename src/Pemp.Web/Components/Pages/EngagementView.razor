@@ -24,6 +24,7 @@ else
     var mine = next.Kind != ActionKind.None && next.OwnerRole == Session.Role;
 
     <div class="wrap">
+        <a class="backlink" href="engagements">← Back to engagements</a>
         <div class="eyebrow">Engagement</div>
         <h1 class="title">@_rec.AppName <span class="ref">@_rec.Reference</span></h1>
         <p class="sub">
@@ -80,7 +81,20 @@ else
             <div class="card nextaction">
                 <div style="font-size:26px">▸</div>
                 <div class="meta"><b>@next.Label</b><span class="muted">Owner: You (@Session.Role)@(Workflow.NeedsReauth(next.Kind) ? " · re-auth required (SEC-IAM-04)" : "")</span></div>
-                @if (next.Kind == ActionKind.CompleteAssessment)
+                @if (next.Kind == ActionKind.AssignTester)
+                {
+                    <div class="picker">
+                        <label class="qlabel">Assign from the capacity board <span class="srs">FR-ASG-02/03</span></label>
+                        <select class="inp" style="max-width:300px" @bind="_assignTesterId">
+                            @foreach (var t in DemoSeeder.Testers)
+                            {
+                                <option value="@t.Id">@t.Name — @Capacity(t.Name) active</option>
+                            }
+                        </select>
+                        <button class="btn primary" style="margin-top:8px" @onclick="() => OnAct(ActionKind.AssignTester)">Assign tester ▶</button>
+                    </div>
+                }
+                else if (next.Kind == ActionKind.CompleteAssessment)
                 {
                     <a class="btn primary" href="@($"engagement/{Id}/assessment")">Open assessment form ▶</a>
                 }
@@ -107,12 +121,18 @@ else
 
         <AccessRequirements EngagementId="Id" Reqs="_access"
                             ShowEmpty="@((int)_rec.CurrentStage >= (int)Stage.Access)"
-                            Editable="@(_rec.CurrentStage == Stage.Access && Session.Role == "Tester")" />
+                            Editable="@(_rec.CurrentStage == Stage.Access && Session.Role == "Tester" && _rec.AssignedTesterName == Session.Actor)"
+                            OnAdded="Load" />
+
+        <TestCredentialsPanel EngagementId="Id" Credentials="_credentials"
+                              CanView="@(Session.Role == "Tester" && _rec.AssignedTesterName == Session.Actor)" />
 
         <FindingsRegister Findings="_findings" EngagementId="Id"
                           ShowEmpty="@((int)_rec.CurrentStage >= (int)Stage.Execution)"
                           CanAdd="@(Session.Role == "Tester" && _rec.AssignedTesterName == Session.Actor
                                     && (_rec.CurrentStage == Stage.Execution || _rec.CurrentStage == Stage.Findings))"
+                          CanRetest="@(Session.Role == "Tester" && _rec.AssignedTesterName == Session.Actor
+                                       && _rec.CurrentStage == Stage.Retest)"
                           OnAdded="Load" />
 
         <EvidencePanel EngagementId="Id" Findings="_findings" Editable="@(Session.Role == "Tester" && _rec.CurrentStage != Stage.Closed)" />
@@ -163,12 +183,20 @@ else
     List<AuditEntryRow> _audit = new();
     List<FindingRecord> _findings = new();
     List<AccessRequirementRecord> _access = new();
+    List<TestCredentialRecord> _credentials = new();
     HashSet<string> _checklist = new();
+
+    // Capacity board + selected tester for the Assignment-stage picker (FR-ASG-02/03).
+    Dictionary<string, int> _capacity = new();
+    Guid _assignTesterId = DemoSeeder.TesterKhan;
+    int Capacity(string name) => _capacity.TryGetValue(name, out var n) ? n : 0;
     string? _error, _ok;
     bool? _chainOk;
     ActionKind _reauthFor = ActionKind.None;
     ElementReference _modalRef;
     bool _focusModal;
+
+    static string TesterName(Guid id) => Array.Find(DemoSeeder.Testers, t => t.Id == id)?.Name ?? "A. Khan";
 
     // QA peer reviewer must differ from the assigned tester (no self-review, FR-REP-02).
     Guid Reviewer() => _rec!.AssignedTesterId == DemoSeeder.TesterPatel ? DemoSeeder.TesterKhan : DemoSeeder.TesterPatel;
@@ -197,10 +225,14 @@ else
             _findings = await Store.FindingsForAsync(Id);
             _access = await Store.AccessReqsForAsync(Id);
             _checklist = await Store.ChecklistDoneAsync(Id);
+            _credentials = await Store.CredentialsForAsync(Id);
+            if (_rec.CurrentStage == Stage.Assignment)
+                _capacity = await Store.ActiveAssignmentCountsAsync(); // capacity board for the picker
         }
         else
         {
             _audit = new(); _findings = new(); _access = new(); _checklist = new();
+            _credentials = new(); _capacity = new();
         }
         _loaded = true;
     }
@@ -259,7 +291,7 @@ else
         var result = k switch
         {
             ActionKind.RouteToDm        => await Store.ExecuteAsync(Id, e => e.RouteToDeliveryManager(actor)),
-            ActionKind.AssignTester     => await Store.AssignTesterAsync(Id, DemoSeeder.TesterKhan, "A. Khan", actor),
+            ActionKind.AssignTester     => await Store.AssignTesterAsync(Id, _assignTesterId, TesterName(_assignTesterId), actor),
             ActionKind.CompleteAssessment => await Store.ExecuteAsync(Id, e => e.CompleteAssessment(actor)),
             ActionKind.ReviewSow        => await Store.ExecuteAsync(Id, e => e.ReviewSowAsDeliveryManager(actor)),
             ActionKind.SignSow          => await Store.ExecuteAsync(Id, e => e.SignSow(actor, reauth)),

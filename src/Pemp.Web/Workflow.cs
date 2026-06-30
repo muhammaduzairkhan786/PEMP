@@ -48,7 +48,7 @@ public static class Workflow
 
     public static (ActionKind Kind, string Label, string OwnerRole) Next(EngagementRecord r) => r.CurrentStage switch
     {
-        Stage.Intake => (ActionKind.RouteToDm, "Route to Delivery Manager", "Delivery Manager"),
+        Stage.Intake => (ActionKind.RouteToDm, "Send to Delivery Manager", "Delivery Manager"),
         Stage.Assignment => (ActionKind.AssignTester, "Assign a tester", "Delivery Manager"),
         Stage.Scoping => (ActionKind.CompleteAssessment, "Complete the assessment", "Stakeholder"),
         Stage.Sow when r.Type == EngagementType.Project && !r.SowReviewedByDm

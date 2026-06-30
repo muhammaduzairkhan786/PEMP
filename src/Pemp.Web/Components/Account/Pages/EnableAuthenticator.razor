@@ -14,6 +14,28 @@
 
 <PageTitle>Set up authenticator · PEMP</PageTitle>
 
+@if (recoveryCodes is not null)
+{
+    <div class="auth-head">
+        <h1>Save your recovery codes</h1>
+        <p class="muted">Two-factor is now active. Store these codes somewhere safe — each works once if you lose your authenticator. They won't be shown again.</p>
+    </div>
+
+    <div class="banner err" role="alert" style="margin-bottom:var(--space-4)">
+        ⚠ These are shown only once. Copy them now before continuing.
+    </div>
+
+    <div class="recovery-grid">
+        @foreach (var rc in recoveryCodes)
+        {
+            <code class="mono recovery-code">@rc</code>
+        }
+    </div>
+
+    <a class="btn primary auth-submit" href="@(ReturnUrl ?? "dashboard")">I've saved them — continue</a>
+}
+else
+{
 <div class="auth-head">
     <h1>Set up two-factor</h1>
     <p class="muted">PEMP holds sensitive data — every account is protected with an authenticator app.</p>
@@ -61,6 +83,7 @@
         </EditForm>
     </li>
 </ol>
+}
 
 @code {
     private const string AuthenticatorUriFormat =
@@ -71,6 +94,7 @@
     private string sharedKey = "";
     private string authenticatorUri = "";
     private MarkupString qrSvg;
+    private string[]? recoveryCodes;
 
     [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
 
@@ -104,10 +128,14 @@
         await UserManager.SetTwoFactorEnabledAsync(user, true);
         Logger.LogInformation("User enabled authenticator 2FA.");
         // Re-issue the auth cookie so it carries tfa="true" immediately — otherwise the
-        // MainLayout enrollment gate would bounce the user straight back here.
+        // server-side enrollment gate would bounce the user straight back here.
         await SignInManager.RefreshSignInAsync(user);
-        RedirectManager.RedirectToWithStatus(
-            ReturnUrl ?? "dashboard", "Two-factor authentication is now active.", HttpContext);
+
+        // Generate single-use recovery codes and show them ONCE (SEC-IAM): these let the user
+        // sign in if they lose their authenticator. They are not stored in plaintext and cannot
+        // be shown again — regenerating replaces them. Stay on the page to display them.
+        recoveryCodes = (await UserManager.GenerateNewTwoFactorRecoveryCodesAsync(user, 10))?.ToArray();
+        message = null;
     }
 
     private async Task LoadSharedKeyAndQrCodeUriAsync()

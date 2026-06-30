@@ -38,7 +38,22 @@
                         <td>@f.Title</td>
                         <td>@f.Asset</td>
                         <td class="mono" title="@f.CvssVector">@f.Cvss</td>
-                        <td><span class="pill @f.Status.ToString().ToLowerInvariant()">@StatusLabel(f.Status)</span></td>
+                        <td>
+                            <span class="pill @f.Status.ToString().ToLowerInvariant()">@StatusLabel(f.Status)</span>
+                            @if (CanRetest && f.Status == FindingStatus.RetestPending)
+                            {
+                                <div class="retestrow">
+                                    <button type="button" class="btn ghost retestpass" @onclick="() => Retest(f, true)">✓ Pass</button>
+                                    <button type="button" class="btn ghost retestfail" @onclick="() => Retest(f, false)">✗ Fail</button>
+                                </div>
+                            }
+                            else if (CanRetest && (f.Status == FindingStatus.Closed || f.Status == FindingStatus.Open))
+                            {
+                                <span class="muted" style="font-size:var(--text-xs);display:block;margin-top:3px">
+                                    retest-pending → @StatusLabel(f.Status)
+                                </span>
+                            }
+                        </td>
                     </tr>
                 }
             </tbody>
@@ -80,6 +95,7 @@ else if (ShowEmpty)
     [Parameter] public List<FindingRecord> Findings { get; set; } = new();
     [Parameter] public Guid EngagementId { get; set; }
     [Parameter] public bool CanAdd { get; set; }
+    [Parameter] public bool CanRetest { get; set; }
     [Parameter] public bool ShowEmpty { get; set; }
     [Parameter] public EventCallback OnAdded { get; set; }
 
@@ -105,6 +121,13 @@ else if (ShowEmpty)
         _title = _asset = _cvss = _cvssVector = _remediation = "";
         _severity = Severity.Medium; _status = FindingStatus.Open;
         _msg = "Recorded — live in the register (FR-FND-03).";
+        if (OnAdded.HasDelegate) await OnAdded.InvokeAsync();
+    }
+
+    // Retest verdict (FR-RET-03): pass = fix verified → Closed; fail = still present → re-Open.
+    async Task Retest(FindingRecord f, bool pass)
+    {
+        await Store.SetFindingStatusAsync(f.Id, pass ? FindingStatus.Closed : FindingStatus.Open);
         if (OnAdded.HasDelegate) await OnAdded.InvokeAsync();
     }
 

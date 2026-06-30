@@ -13,6 +13,20 @@ public static class DemoSeeder
     public static readonly Guid TesterLee = Guid.Parse("22222222-2222-2222-2222-222222222222");
     public static readonly Guid TesterPatel = Guid.Parse("33333333-3333-3333-3333-333333333333");
 
+    /// <summary>A tester on the capacity board (FR-ASG): stable id + display name.</summary>
+    public sealed record TesterInfo(Guid Id, string Name);
+
+    /// <summary>
+    /// The assignable testers shown on the capacity board picker (FR-ASG-02/03). A. Khan is the
+    /// primary tester login; the others give the Delivery Manager a real choice.
+    /// </summary>
+    public static readonly TesterInfo[] Testers =
+    {
+        new(TesterKhan, "A. Khan"),
+        new(TesterPatel, "R. Patel"),
+        new(TesterLee, "S. Lee"),
+    };
+
     public static void Seed(PempDbContext db, Func<DateTimeOffset> clock)
     {
         if (db.Engagements.Any()) return;
@@ -111,6 +125,16 @@ public static class DemoSeeder
             A(pay.Id, "Pre-production", "https://preprod.payments.axaxl.example", "Read-Write", AccessStatus.AppTeamToProvision),
             A(pay.Id, "QA (lower env)", "https://qa.payments.axaxl.example", "Read-Write", AccessStatus.AppTeamToProvision),
             A(pay.Id, "APIs / Postman collection", "token + subscription key", "Other", AccessStatus.AppTeamToProvision)
+        );
+
+        // Test credentials (SEC-CRD): vault-backed in prod; here so the masked-reveal + re-auth
+        // flow is exercisable by the assigned tester. Payments API is at Access; Retail Web mid-test.
+        TestCredentialRecord C(Guid eng, string label, string user, string secret)
+            => new() { Id = Guid.NewGuid(), EngagementId = eng, Label = label, Username = user, Secret = secret };
+        db.TestCredentials.AddRange(
+            C(pay.Id, "QA app login", "qa.tester@payments.test", "Q4-Sandbox!7xtR"),
+            C(pay.Id, "API service account", "svc-pentest", "ak_live_8f3b2c1d9e7a4506"),
+            C(retail.Id, "Retail admin (test)", "admin.test@retail.test", "R3tail!Demo-92Kp")
         );
 
         // Tester checklist (Tab 4): Retail Web is mid-test — pre-reqs done, some during-test done.
