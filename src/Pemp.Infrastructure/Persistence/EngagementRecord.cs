@@ -22,6 +22,14 @@ public sealed class EngagementRecord
     public string? AssignedTesterName { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 
+    /// <summary>
+    /// Optimistic-concurrency token (rank 3 / TOCTOU). A provider-agnostic value-token: it is bumped on
+    /// every state-changing save and included in the UPDATE's WHERE, so two transitions that both pass
+    /// guards no longer last-write-win — the loser hits a <see cref="Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException"/>
+    /// (surfaced as a friendly "reload and retry"). Works identically on SQLite and Azure SQL.
+    /// </summary>
+    public byte[] RowVersion { get; set; } = Guid.NewGuid().ToByteArray();
+
     // Guard flags (mirror the aggregate)
     public bool AssessmentComplete { get; set; }
     public bool SowReviewedByDm { get; set; }

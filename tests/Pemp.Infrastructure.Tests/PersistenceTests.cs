@@ -526,6 +526,39 @@ public sealed class PersistenceTests : IDisposable
         Assert.NotNull(await _store.GetAsync(id));
     }
 
+    [Fact]
+    public async Task Concurrent_transition_conflict_is_caught_and_resolves_safely()  // rank 3 (TOCTOU / optimistic concurrency)
+    {
+        var id = IdOf("ENG-2026-0419"); // Payments API, BAU, at Access (assigned A. Khan)
+
+        // _db tracks the engagement at its current RowVersion — the stale snapshot the loser will hold.
+        var tracked = await _db.Engagements.FirstAsync(e => e.Id == id);
+        Assert.Equal(Stage.Access, tracked.CurrentStage);
+        var seqBefore = _db.AuditEntries.Count();
+
+        // A SECOND session commits the transition first (out-of-band), advancing the row + its RowVersion.
+        var options = new DbContextOptionsBuilder<PempDbContext>().UseSqlite(_conn).Options;
+        using (var db2 = new PempDbContext(options))
+        {
+            var store2 = new EngagementStore(db2, Clock, new AuditHmacKey(Key));
+            var first = await store2.ExecuteAsync(id, Khan, EngagementAction.VerifyAccess, e => e.VerifyAccess("A. Khan"));
+            Assert.False(first.Failed);
+        }
+
+        // Our session (still holding the stale tracked entity) attempts the SAME transition. The bumped
+        // RowVersion no longer matches in the UPDATE's WHERE → conflict, surfaced as a friendly failure
+        // rather than a throw or a corrupting last-write-win.
+        var second = await _store.ExecuteAsync(id, Khan, EngagementAction.VerifyAccess, e => e.VerifyAccess("A. Khan"));
+        Assert.True(second.Failed);
+        Assert.Contains("Reload", second.Error);
+
+        // No corruption: exactly one transition committed, the chain verifies, sequences are unique.
+        Assert.True(new EfAuditChain(_db, Key).Verify());
+        var seqs = _db.AuditEntries.Select(a => a.Sequence).ToList();
+        Assert.Equal(seqs.Count, seqs.Distinct().Count());  // DB-generated sequence — no duplicate PK
+        Assert.Equal(seqBefore + 1, seqs.Count);            // only the winner appended
+    }
+
     public void Dispose()
     {
         _db.Dispose();

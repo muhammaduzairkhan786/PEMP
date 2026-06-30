@@ -491,6 +491,7 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
         if (result.Failed) return result;
         rec.CopyFrom(aggregate);
         rec.AssignedTesterName = testerName;
+        rec.RowVersion = Guid.NewGuid().ToByteArray();
         await db.SaveChangesAsync();
         return result;
     }
@@ -560,6 +561,7 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
         if (result.Failed) return result; // guard rejected — nothing appended, nothing saved
 
         rec.CopyFrom(aggregate);
+        rec.RowVersion = Guid.NewGuid().ToByteArray(); // bump the concurrency token (checked in the UPDATE WHERE)
         try
         {
             await db.SaveChangesAsync();
@@ -567,7 +569,10 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
         catch (DbUpdateConcurrencyException)
         {
             // TOCTOU: another transition committed between our read and write. Don't corrupt or
-            // last-write-win — ask the caller to reload and retry against fresh state.
+            // last-write-win — drop the uncommitted audit append + state change so the context isn't
+            // left dirty, and ask the caller to reload and retry against fresh state.
+            foreach (var entry in db.ChangeTracker.Entries().Where(e => e.State == EntityState.Added).ToList())
+                entry.State = EntityState.Detached;
             return Result.Fail("This engagement changed in another session. Reload and try again.");
         }
         return result;

@@ -35,10 +35,13 @@ public sealed class PempDbContext(DbContextOptions<PempDbContext> options) : Ide
         // store enums as readable strings (audit/portability)
         eng.Property(e => e.Type).HasConversion<string>();
         eng.Property(e => e.CurrentStage).HasConversion<string>();
+        // Optimistic-concurrency token (rank 3): provider-agnostic — declared a concurrency token and
+        // bumped by the store on each state-changing save, so it works on both SQLite and Azure SQL.
+        eng.Property(e => e.RowVersion).IsConcurrencyToken();
 
         var aud = b.Entity<AuditEntryRow>();
         aud.HasKey(a => a.Sequence);
-        aud.Property(a => a.Sequence).ValueGeneratedNever(); // sequence is chain-assigned, not DB identity
+        aud.Property(a => a.Sequence).ValueGeneratedOnAdd(); // DB assigns the position (IDENTITY) — no client PK race
         aud.HasIndex(a => a.EngagementId);
 
         var fnd = b.Entity<FindingRecord>();

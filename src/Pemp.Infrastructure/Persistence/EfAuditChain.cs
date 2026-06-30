@@ -12,22 +12,22 @@ namespace Pemp.Infrastructure.Persistence;
 public sealed class EfAuditChain(PempDbContext db, byte[] key) : IAuditChain
 {
     private bool _init;
-    private long _seq;
     private string _prev = HashChain.GenesisHash;
 
     private void EnsureInit()
     {
         if (_init) return;
         var last = db.AuditEntries.OrderByDescending(e => e.Sequence).FirstOrDefault();
-        if (last is not null) { _seq = last.Sequence; _prev = last.Hash; }
+        if (last is not null) { _prev = last.Hash; }
         _init = true;
     }
 
     public AuditEntry Append(Guid engagementId, string actor, string action, string before, string after, string source, DateTimeOffset at)
     {
         EnsureInit();
-        var entry = HashChain.Next(_seq + 1, _prev, engagementId, actor, action, before, after, source, at, key);
-        _seq = entry.Sequence;
+        // Sequence 0 → the DB assigns the position (IDENTITY); the chain link is the PrevHash, so a
+        // concurrent append cannot collide on a client-assigned primary key (rank 3).
+        var entry = HashChain.Next(0, _prev, engagementId, actor, action, before, after, source, at, key);
         _prev = entry.Hash;
         db.AuditEntries.Add(AuditEntryRow.From(entry));
         return entry;
