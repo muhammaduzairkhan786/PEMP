@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
-    <script>
+    <script nonce="@CspNonce">
         // Apply saved theme before first paint (no flash); expose a toggle for the UI.
         (function () { try { document.documentElement.setAttribute('data-theme', localStorage.getItem('pemp-theme') || 'dark'); } catch (e) { } })();
         window.pempToggleTheme = function () {
@@ -45,6 +45,10 @@
     // Account pages run as static SSR so their form posts hit SignInManager/UserManager
     // server-side; the rest of the app is InteractiveServer.
     [CascadingParameter] private HttpContext? HttpContext { get; set; }
+
+    // Per-request CSP nonce (set by the security-headers middleware in Program.cs) authorising
+    // the inline theme/download script under the enforcing Content-Security-Policy.
+    private string? CspNonce => HttpContext?.Items["csp-nonce"] as string;
 
     private IComponentRenderMode? RenderModeForPage =>
         HttpContext?.Request.Path.StartsWithSegments("/Account") == true
