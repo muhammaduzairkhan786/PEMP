@@ -81,6 +81,15 @@
 
   --sev-on:        #ffffff;
 
+  /* Amber/orange darkened for AA-readable TEXT on the light canvas — the vivid dark-mode
+     values fail contrast as foreground here. Distribution-bar fills (var(--sev-*) as a
+     background) remain perfectly legible at these deeper tones. Verified against:
+     .sevchip.medium/.high, .chip.crit-medium/.crit-high, .pill.warn/.wait/.retestpending,
+     .chip.retest. */
+  --sev-high:      #c2410c;   /* burnt orange */
+  --sev-medium:    #b7791f;   /* dark gold */
+  --state-waiting: #b7791f;   /* amber */
+
   --elev-raised: 0 1px 2px rgba(20,30,60,.06), 0 4px 12px rgba(20,30,60,.08);
   --elev-drawer: -8px 0 32px rgba(20,30,60,.12);
   --elev-modal:  0 24px 64px rgba(20,30,60,.22);

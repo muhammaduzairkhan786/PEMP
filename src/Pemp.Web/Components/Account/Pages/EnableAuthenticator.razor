@@ -7,6 +7,7 @@
 @using System.Text.Encodings.Web
 @using QRCoder
 @inject UserManager<ApplicationUser> UserManager
+@inject SignInManager<ApplicationUser> SignInManager
 @inject IdentityUserAccessor UserAccessor
 @inject IdentityRedirectManager RedirectManager
 @inject ILogger<EnableAuthenticator> Logger
@@ -102,6 +103,9 @@
 
         await UserManager.SetTwoFactorEnabledAsync(user, true);
         Logger.LogInformation("User enabled authenticator 2FA.");
+        // Re-issue the auth cookie so it carries tfa="true" immediately — otherwise the
+        // MainLayout enrollment gate would bounce the user straight back here.
+        await SignInManager.RefreshSignInAsync(user);
         RedirectManager.RedirectToWithStatus(
             ReturnUrl ?? "dashboard", "Two-factor authentication is now active.", HttpContext);
     }
