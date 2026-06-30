@@ -60,6 +60,7 @@ else
 
     protected override async Task OnParametersSetAsync()
     {
+        await Session.EnsureInitializedAsync(); // resolve role/scope before any scoped fetch (SSR-safe)
         if (Id == _loadedId) return;
         _loadedId = Id;
         _loaded = false;

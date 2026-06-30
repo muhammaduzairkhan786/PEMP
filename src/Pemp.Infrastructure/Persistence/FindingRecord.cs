@@ -15,7 +15,9 @@ public sealed class FindingRecord
     public Guid EngagementId { get; set; }
     public string Title { get; set; } = "";
     public Severity Severity { get; set; }
-    public string Cvss { get; set; } = "";
+    public string Cvss { get; set; } = "";           // CVSS base score (e.g. "8.1")
+    public string CvssVector { get; set; } = "";      // CVSS vector string (e.g. "CVSS:3.1/AV:N/...")
     public string Asset { get; set; } = "";
+    public string Remediation { get; set; } = "";
     public FindingStatus Status { get; set; }
 }

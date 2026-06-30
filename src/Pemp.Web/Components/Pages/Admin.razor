@@ -16,7 +16,7 @@
     else
     {
         <div class="sectionlabel">Users &amp; roles <span class="srs">FR-ADM-01 · SEC-IAM-03</span></div>
-        <div class="card" style="padding:0;overflow:hidden">
+        <div class="card tablecard">
             <table class="t">
                 <thead><tr><th>Name</th><th>Role (= Entra group)</th><th>Type</th><th>Conditional Access</th></tr></thead>
                 <tbody>
@@ -56,7 +56,7 @@
             }
         </div>
         <div class="q"><input class="inp" placeholder="filter by actor or action…" @bind="_filter" @bind:event="oninput" /></div>
-        <div class="card" style="padding:0;overflow:hidden">
+        <div class="card tablecard">
             <table class="t">
                 <thead><tr><th>#</th><th>Actor</th><th>Action</th><th>Before → After</th><th>When</th></tr></thead>
                 <tbody>
@@ -83,7 +83,11 @@
     bool? _chainOk;
     string? _exportMsg;
 
-    protected override async Task OnInitializedAsync() => _audit = await Store.AllAuditAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureInitializedAsync(); // resolve role before the role check renders (SSR-safe)
+        _audit = await Store.AllAuditAsync();
+    }
 
     IEnumerable<AuditEntryRow> Filtered() =>
         string.IsNullOrWhiteSpace(_filter)

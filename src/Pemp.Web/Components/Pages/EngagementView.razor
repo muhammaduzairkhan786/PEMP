@@ -105,9 +105,15 @@ else
             </div>
         }
 
-        <AccessRequirements EngagementId="Id" Reqs="_access" Editable="@(_rec.CurrentStage == Stage.Access && Session.Role == "Tester")" />
+        <AccessRequirements EngagementId="Id" Reqs="_access"
+                            ShowEmpty="@((int)_rec.CurrentStage >= (int)Stage.Access)"
+                            Editable="@(_rec.CurrentStage == Stage.Access && Session.Role == "Tester")" />
 
-        <FindingsRegister Findings="_findings" />
+        <FindingsRegister Findings="_findings" EngagementId="Id"
+                          ShowEmpty="@((int)_rec.CurrentStage >= (int)Stage.Execution)"
+                          CanAdd="@(Session.Role == "Tester" && _rec.AssignedTesterName == Session.Actor
+                                    && (_rec.CurrentStage == Stage.Execution || _rec.CurrentStage == Stage.Findings))"
+                          OnAdded="Load" />
 
         <EvidencePanel EngagementId="Id" Findings="_findings" Editable="@(Session.Role == "Tester" && _rec.CurrentStage != Stage.Closed)" />
 
@@ -125,7 +131,7 @@ else
                 <span class="pill @(_chainOk == true ? "ok" : "warn")">@(_chainOk == true ? "🔗 verified" : "⚠ broken")</span>
             }
         </div>
-        <div class="card" style="padding:0;overflow:hidden">
+        <div class="card tablecard">
             <table class="t">
                 <thead><tr><th>#</th><th>Actor</th><th>Action</th><th>Before → After</th><th>When</th></tr></thead>
                 <tbody>
@@ -175,6 +181,7 @@ else
     // navigation (e.g. opening a spawned retest child) refreshes instead of showing stale data.
     protected override async Task OnParametersSetAsync()
     {
+        await Session.EnsureInitializedAsync(); // resolve role/scope before any scoped fetch (SSR-safe)
         if (Id == _loadedId) return;
         _loadedId = Id;
         _loaded = false;

@@ -1,8 +1,5 @@
 @inherits LayoutComponentBase
-@using Microsoft.AspNetCore.Components.Authorization
 @inject DemoSession Session
-@inject NavigationManager NavigationManager
-@inject IConfiguration Configuration
 
 <div class="shell">
     <div class="brand"><div class="logo">P</div><b>PEMP</b></div>
@@ -47,35 +44,8 @@
 </div>
 
 @code {
-    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
-
-    protected override async Task OnInitializedAsync()
-    {
-        if (AuthState is null)
-        {
-            return;
-        }
-
-        var user = (await AuthState).User;
-        if (user.Identity?.IsAuthenticated == true)
-        {
-            Session.Actor = user.FindFirst("DisplayName")?.Value
-                ?? user.Identity.Name
-                ?? Session.Actor;
-            // No recognised role → no-privilege state (empty), not a misleading default that
-            // would expose role-gated nav (e.g. New Request) to an unmapped user.
-            Session.Role = Array.Find(DemoSession.Roles, user.IsInRole) ?? "";
-
-            // 2FA enrollment gate — LOCAL Identity path only. Entra (production) carries no
-            // "tfa" claim and enforces MFA via Conditional Access, so it is left untouched.
-            // EnableAuthenticator uses AuthLayout (not this layout), so there is no redirect loop.
-            if (!EntraConfigured && user.FindFirst("tfa")?.Value != "true")
-            {
-                NavigationManager.NavigateTo("Account/EnableAuthenticator", forceLoad: true);
-            }
-        }
-    }
-
-    private bool EntraConfigured =>
-        !string.IsNullOrWhiteSpace(Configuration["AzureAd:ClientId"]);
+    // Role/actor come from the authenticated principal, resolved before any markup renders so
+    // the whoami + role-gated nav never flash a default identity (the SSR ordering fix). The
+    // 2FA-enrollment gate is now enforced SERVER-SIDE in Program.cs (a real 302), not here.
+    protected override Task OnInitializedAsync() => Session.EnsureInitializedAsync();
 }

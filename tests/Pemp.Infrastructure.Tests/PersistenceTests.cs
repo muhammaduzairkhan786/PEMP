@@ -93,13 +93,14 @@ public sealed class PersistenceTests : IDisposable
     [Fact]
     public async Task GetScoped_enforces_object_level_access()
     {
-        var claims = IdOf("ENG-2026-0412"); // assigned A. Khan
-        var retail = IdOf("ENG-2026-0408"); // assigned R. Patel
-        var mobile = IdOf("ENG-2026-0421"); // Mobile App, at Scoping
+        var claims = IdOf("ENG-2026-0412");  // assigned A. Khan
+        var retail = IdOf("ENG-2026-0408");  // assigned A. Khan
+        var mobile = IdOf("ENG-2026-0421");  // Mobile App, assigned A. Khan, at Scoping
+        var partner = IdOf("ENG-2026-0422"); // Partner Portal, unassigned, at Intake
 
-        // Tester scope (A. Khan): reaches own assignment, blocked from another tester's.
+        // Tester scope (A. Khan): reaches own assignment, blocked from one not assigned to them.
         Assert.NotNull(await _store.GetScopedAsync(claims, null, "A. Khan"));
-        Assert.Null(await _store.GetScopedAsync(retail, null, "A. Khan"));
+        Assert.Null(await _store.GetScopedAsync(partner, null, "A. Khan"));
 
         // Stakeholder app scope (Mobile App): reaches own app, blocked from others (anti-BOLA).
         Assert.NotNull(await _store.GetScopedAsync(mobile, "Mobile App", null));
@@ -107,6 +108,33 @@ public sealed class PersistenceTests : IDisposable
 
         // Unrestricted (Acme/DM/Admin): reaches anything.
         Assert.NotNull(await _store.GetScopedAsync(retail, null, null));
+    }
+
+    [Fact]
+    public async Task AddFinding_persists_into_the_live_register()
+    {
+        // Retail Web is mid-test (assigned A. Khan) — record a new finding.
+        var id = IdOf("ENG-2026-0408");
+        var before = (await _store.FindingsForAsync(id)).Count;
+
+        var findingId = await _store.AddFindingAsync(
+            id, "Open redirect on /login", Severity.Medium, "4.7",
+            "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:N/I:L/A:N", "Web",
+            "Validate redirect targets against an allow-list.");
+
+        var after = await _store.FindingsForAsync(id);
+        Assert.Equal(before + 1, after.Count);
+        var added = after.Single(f => f.Id == findingId);
+        Assert.Equal("Open redirect on /login", added.Title);
+        Assert.Equal(Severity.Medium, added.Severity);
+        Assert.Equal("4.7", added.Cvss);
+        Assert.Equal("CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:N/I:L/A:N", added.CvssVector);
+        Assert.Equal("Web", added.Asset);
+        Assert.Equal("Validate redirect targets against an allow-list.", added.Remediation);
+        Assert.Equal(FindingStatus.Open, added.Status); // default
+
+        // It also surfaces in the portfolio-wide register (analytics feed).
+        Assert.Contains(await _store.AllFindingsAsync(), f => f.Id == findingId);
     }
 
     [Fact]

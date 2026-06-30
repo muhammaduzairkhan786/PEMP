@@ -62,6 +62,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        await Session.EnsureInitializedAsync(); // resolve role/scope before any query (SSR-safe)
         var recs = await Store.ListScopedAsync(Session.AppScope, Session.TesterScope);
         _items = recs
             .Select(r => { var n = Workflow.Next(r); return new Item(r, n.Label, n.OwnerRole); })

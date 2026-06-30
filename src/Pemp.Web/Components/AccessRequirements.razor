@@ -4,7 +4,7 @@
 @if (Reqs.Count > 0)
 {
     <div class="sectionlabel">Access requirements <span class="srs">FR-ACC-01</span></div>
-    <div class="card" style="padding:0;overflow:hidden">
+    <div class="card tablecard">
         <table class="t">
             <thead><tr><th>Environment / asset</th><th>URL / detail</th><th>Access</th><th>Status</th></tr></thead>
             <tbody>
@@ -36,11 +36,17 @@
     </div>
     <p class="muted" style="font-size:var(--text-xs);margin-top:8px">Tester defines required access per environment; app team provisions · <span class="srs">FR-ACC-02</span></p>
 }
+else if (ShowEmpty)
+{
+    <div class="sectionlabel">Access requirements <span class="srs">FR-ACC-01</span></div>
+    <div class="card muted">No access requirements defined yet.</div>
+}
 
 @code {
     [Parameter] public Guid EngagementId { get; set; }
     [Parameter] public List<AccessRequirementRecord> Reqs { get; set; } = new();
     [Parameter] public bool Editable { get; set; }
+    [Parameter] public bool ShowEmpty { get; set; }
 
     async Task SetStatus(AccessRequirementRecord r, ChangeEventArgs e)
     {

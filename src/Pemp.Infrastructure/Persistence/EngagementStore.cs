@@ -55,6 +55,32 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
         db.Findings.AsNoTracking().Where(f => f.EngagementId == id)
           .OrderBy(f => f.Severity).ThenBy(f => f.Title).ToListAsync();
 
+    /// <summary>
+    /// Record a new finding into the live register (FR-FND-01/03): entered once by the assigned
+    /// tester during Execution/Findings, it flows straight into the consolidated register and
+    /// analytics. Returns the new finding id.
+    /// </summary>
+    public async Task<Guid> AddFindingAsync(
+        Guid engagementId, string title, Severity severity, string cvss, string cvssVector,
+        string asset, string remediation, FindingStatus status = FindingStatus.Open)
+    {
+        var finding = new FindingRecord
+        {
+            Id = Guid.NewGuid(),
+            EngagementId = engagementId,
+            Title = title,
+            Severity = severity,
+            Cvss = cvss,
+            CvssVector = cvssVector,
+            Asset = asset,
+            Remediation = remediation,
+            Status = status,
+        };
+        db.Findings.Add(finding);
+        await db.SaveChangesAsync();
+        return finding.Id;
+    }
+
     // ---- Evidence (FR-FND-02 / SEC-EVD) ------------------------------------
     public Task<List<EvidenceRecord>> EvidenceForAsync(Guid id) =>
         db.Evidence.AsNoTracking().Where(e => e.EngagementId == id).ToListAsync();

@@ -1,4 +1,6 @@
 @* Live vulnerability register (FR-FND-01/03/04): severity distribution + filter chips + table *@
+@inject EngagementStore Store
+
 @if (Findings.Count > 0)
 {
     <div class="sectionlabel">Live register <span class="srs">FR-FND-01</span></div>
@@ -25,7 +27,7 @@
         }
     </div>
 
-    <div class="card" style="padding:0;overflow:hidden">
+    <div class="card tablecard">
         <table class="t">
             <thead><tr><th>Severity</th><th>Finding</th><th>Asset</th><th>CVSS</th><th>Status</th></tr></thead>
             <tbody>
@@ -35,7 +37,7 @@
                         <td><span class="sevchip @f.Severity.ToString().ToLowerInvariant()">@f.Severity</span></td>
                         <td>@f.Title</td>
                         <td>@f.Asset</td>
-                        <td class="mono">@f.Cvss</td>
+                        <td class="mono" title="@f.CvssVector">@f.Cvss</td>
                         <td><span class="pill @f.Status.ToString().ToLowerInvariant()">@StatusLabel(f.Status)</span></td>
                     </tr>
                 }
@@ -44,16 +46,67 @@
     </div>
     <p class="muted" style="font-size:var(--text-xs);margin-top:8px">Entered once → flows live into the register · <span class="srs">FR-FND-03</span></p>
 }
+else if (ShowEmpty)
+{
+    <div class="sectionlabel">Live register <span class="srs">FR-FND-01</span></div>
+    <div class="card muted">No findings recorded yet.</div>
+}
+
+@if (CanAdd)
+{
+    <div class="card">
+        <div class="sectionlabel" style="margin-top:0">Record a finding <span class="srs">FR-FND-01/03</span></div>
+        <div class="q"><input class="inp" placeholder="title (e.g. SQLi in /search)" @bind="_title" /></div>
+        <div class="q">
+            <select class="inp" style="max-width:210px" @bind="_severity">
+                @foreach (var s in Order){<option value="@s">@s</option>}
+            </select>
+        </div>
+        <div class="q"><input class="inp" placeholder="asset (e.g. Web, API)" @bind="_asset" /></div>
+        <div class="q"><input class="inp" placeholder="CVSS vector (e.g. CVSS:3.1/AV:N/AC:L/...)" @bind="_cvssVector" /></div>
+        <div class="q"><input class="inp" style="max-width:160px" placeholder="CVSS score (e.g. 8.1)" @bind="_cvss" /></div>
+        <div class="q"><textarea class="inp" rows="2" placeholder="remediation" @bind="_remediation"></textarea></div>
+        <div class="q" style="border:none">
+            <select class="inp" style="max-width:210px" @bind="_status">
+                @foreach (var st in Enum.GetValues<FindingStatus>()){<option value="@st">@StatusLabel(st)</option>}
+            </select>
+            <button class="btn primary" style="margin-top:8px" @onclick="Add">Add finding ▶</button>
+            @if (_msg is not null){<span class="muted" style="margin-left:10px">@_msg</span>}
+        </div>
+    </div>
+}
 
 @code {
     [Parameter] public List<FindingRecord> Findings { get; set; } = new();
+    [Parameter] public Guid EngagementId { get; set; }
+    [Parameter] public bool CanAdd { get; set; }
+    [Parameter] public bool ShowEmpty { get; set; }
+    [Parameter] public EventCallback OnAdded { get; set; }
+
     Severity? _filter;
+
+    // Add-finding form state.
+    string _title = "", _asset = "", _cvss = "", _cvssVector = "", _remediation = "";
+    Severity _severity = Severity.Medium;
+    FindingStatus _status = FindingStatus.Open;
+    string? _msg;
 
     static readonly Severity[] Order = { Severity.Critical, Severity.High, Severity.Medium, Severity.Low, Severity.Info };
 
     int Count(Severity s) => Findings.Count(f => f.Severity == s);
     int Pct(int n) => Findings.Count == 0 ? 0 : (int)Math.Round(100.0 * n / Findings.Count);
     IEnumerable<FindingRecord> Filtered() => _filter is null ? Findings : Findings.Where(f => f.Severity == _filter);
+
+    async Task Add()
+    {
+        if (string.IsNullOrWhiteSpace(_title)) { _msg = "Enter a title."; return; }
+        await Store.AddFindingAsync(EngagementId, _title.Trim(), _severity, _cvss.Trim(),
+            _cvssVector.Trim(), _asset.Trim(), _remediation.Trim(), _status);
+        _title = _asset = _cvss = _cvssVector = _remediation = "";
+        _severity = Severity.Medium; _status = FindingStatus.Open;
+        _msg = "Recorded — live in the register (FR-FND-03).";
+        if (OnAdded.HasDelegate) await OnAdded.InvokeAsync();
+    }
 
     static string SevVar(Severity s) => s switch
     {
