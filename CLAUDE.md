@@ -4,18 +4,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state
 
-**Phase 2 (Design) complete; Phase 3 (Implementation) — a runnable demo vertical slice is built and merged to `main`.** See `IMPLEMENTATION_PLAN.md` for the per-phase status. The Blazor app lives on `main`.
+**Phase 2 (Design) complete; Phase 3 (Implementation) — the Blazor app is built, hardened, and furnished, all merged to `main`.** See `IMPLEMENTATION_PLAN.md` for the per-phase status.
 
 | Phase | Stage | Status |
 |-------|-------|--------|
 | 1 | Requirements | ✅ `PEMP_SRS_v1.0_Master.docx` (released baseline) |
 | 2 | Design | ✅ `DESIGN_PLAN.md` v0.3, `design/*`, prototype, compliance |
-| 3 | Implementation | 🟢 domain + EF persistence + Blazor Server UI + Entra wiring + Bicep IaC (demo vertical slice). Findings register/record, evidence, retest pass/fail child, masked credentials, peer-review QA gate and light/dark theme are all built |
-| 4–6 | Testing / Security / Deploy | 🟡 38 tests green (15 domain + 23 infra); integration/authz matrix, security review and Azure deploy still to do |
+| 3 | Implementation | ✅ domain + EF persistence + Blazor Server UI + Entra wiring + Bicep IaC. Findings register/record, evidence, retest pass/fail child, masked credentials, peer-review QA gate, light/dark theme, drawer-rail engagement view, ⌘K palette, role rollup tabs, portfolio search, live CVSS scoring, signed-URL evidence download, comms log — all built |
+| 4–6 | Testing / Security / Deploy | 🟡 75 tests green (18 domain + 57 infra); 2 QA sweeps + a 12-dimension fleet review applied. **Deferred to prod phase:** EF migrations, CI pipeline, private-endpoint network posture, scale-out (DbContextFactory + Redis/SignalR), full integration/authz matrix |
 
-> ✅ **Built on .NET 10** (Homebrew `dotnet` is 10.x; target bumped from net8 → **net10.0**, still LTS). `dotnet test` = **38 tests green** (15 domain guard/audit + 23 infrastructure persistence), 0 code warnings. The demo runs end-to-end on SQLite; sign-in is **local ASP.NET Core Identity (email/password + authenticator-app TOTP 2FA)** for dev, and **Entra SSO + Azure SQL activate via config** (see below).
+> ✅ **Built on .NET 10** (Homebrew `dotnet` is 10.x; **net10.0**, LTS). `dotnet test` = **75 tests green** (18 domain guard/audit + 57 infrastructure persistence/scope/schema/evidence/comms), 0 code warnings. Runs end-to-end on SQLite; sign-in is **local ASP.NET Core Identity (email/password + authenticator-app TOTP 2FA)** for dev, and **Entra SSO + Azure SQL activate via config** (see below).
 >
-> **Defining trait stays enforcement:** all UI actions route through the domain guards in `src/Pemp.Domain/Engagement.cs` — a failed guard changes and persists nothing. The hash-chained audit append is atomic with each transition (`EngagementStore.ExecuteAsync`).
+> **Defining trait stays enforcement:** all actions route through the domain guards in `src/Pemp.Domain/Engagement.cs` — a failed guard changes and persists nothing. Enforcement now reaches the **write path** too: every mutating store method re-derives object/role scope server-side via `CallerContext` (anti-BOLA + separation-of-duties), not just the UI. The HMAC-keyed hash-chained audit append is atomic with each transition, append-only at the data layer (EF interceptor), verified on read, and the key is Key-Vault-sourced + fail-closed outside Development.
 
 ### Repository structure
 ```
@@ -37,10 +37,10 @@ Directory.Build.props       Shared build settings (net10.0, latest C#, nullable,
 src/Pemp.Domain/            Domain core: Engagement state machine + guards, hash-chained Audit, Result
 src/Pemp.Infrastructure/    EF Core (SQLite local / Azure SQL), EfAuditChain, EngagementStore, DemoSeeder
 src/Pemp.Web/               Blazor Web App (interactive server): My-Turn, engagements, spine, gated actions
-tests/Pemp.Domain.Tests/    xUnit — encodes the guard table + audit invariants (15)
-tests/Pemp.Infrastructure.Tests/  xUnit — EF persistence, object-level scope, audit-chain (23)
+tests/Pemp.Domain.Tests/    xUnit — encodes the guard table + audit invariants (18)
+tests/Pemp.Infrastructure.Tests/  xUnit — EF persistence, object-level scope, schema, audit-chain, evidence, comms (57)
 ```
-Application/API layers were collapsed for the demo: `Pemp.Web` calls `EngagementStore` (in Infrastructure) directly. A dedicated `Pemp.Application` use-case layer is the clean next refactor per `design/architecture.md §6`.
+`Pemp.Web` calls `EngagementStore` / `CommsStore` (in Infrastructure) directly. A dedicated `Pemp.Application` use-case layer remains the clean next refactor per `design/architecture.md §6` (deferred — see the fleet backlog in memory).
 
 ## Environment setup
 
@@ -52,8 +52,8 @@ Application/API layers were collapsed for the demo: `Pemp.Web` calls `Engagement
 
 ```bash
 dotnet build PEMP.sln                 # strict: code warnings are errors (NuGet audit advisories stay warnings)
-dotnet test                           # 38 tests — domain guard table + audit (15), infra persistence/scope (23)
-dotnet run --project src/Pemp.Web     # the demo app → open the printed URL (SQLite, seeded)
+dotnet test                           # 75 tests — domain guard table + audit (18), infra persistence/scope/schema/evidence/comms (57)
+dotnet run --project src/Pemp.Web     # the app → open the printed URL (SQLite, seeded; run in Development)
 open design/prototype/index.html      # the static clickable prototype
 ```
 Local demo needs no cloud: sign in with one of the seeded dev logins (local ASP.NET Core Identity, email/password + authenticator-app TOTP — see `docs/DEMO.md`). For Entra SSO + Azure SQL, set `UseSqlite:false`, a SqlServer `ConnectionStrings:Pemp`, and `AzureAd:*` (per the setup guide); the app auto-falls back to **local Identity** when `AzureAd:ClientId` is blank.
