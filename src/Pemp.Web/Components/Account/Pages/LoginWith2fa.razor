@@ -1,0 +1,88 @@
+@page "/Account/LoginWith2fa"
+@layout AuthLayout
+@attribute [AllowAnonymous]
+
+@inject SignInManager<ApplicationUser> SignInManager
+@inject UserManager<ApplicationUser> UserManager
+@inject ILogger<LoginWith2fa> Logger
+@inject IdentityRedirectManager RedirectManager
+
+<PageTitle>Two-factor sign-in · PEMP</PageTitle>
+
+<div class="auth-head">
+    <h1>Verify it's you</h1>
+    <p class="muted">Enter the 6-digit code from your authenticator app.</p>
+</div>
+
+<StatusMessage Message="@errorMessage" />
+
+<EditForm Model="Input" method="post" OnValidSubmit="OnValidSubmitAsync" FormName="login-with-2fa">
+    <DataAnnotationsValidator />
+    <input type="hidden" name="ReturnUrl" value="@ReturnUrl" />
+    <input type="hidden" name="RememberMe" value="@RememberMe" />
+
+    <label class="auth-label" for="code">Authenticator code</label>
+    <InputText id="code" @bind-Value="Input.TwoFactorCode" class="inp auth-inp mono"
+               autocomplete="one-time-code" inputmode="numeric" placeholder="123 456" />
+    <ValidationMessage For="() => Input.TwoFactorCode" class="auth-val" />
+
+    <label class="auth-check">
+        <InputCheckbox @bind-Value="Input.RememberMachine" />
+        <span>Don't ask again on this device</span>
+    </label>
+
+    <button type="submit" class="btn primary auth-submit">Verify</button>
+</EditForm>
+
+@code {
+    private string? errorMessage;
+
+#pragma warning disable CS8618 // bound from the form / initialised in OnInitializedAsync
+    [SupplyParameterFromForm] private InputModel Input { get; set; }
+#pragma warning restore CS8618
+
+    [SupplyParameterFromQuery] private string? ReturnUrl { get; set; }
+
+    [SupplyParameterFromQuery] private bool RememberMe { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Input ??= new();
+        // Ensure the user has gone through the username & password screen first.
+        _ = await SignInManager.GetTwoFactorAuthenticationUserAsync()
+            ?? throw new InvalidOperationException("Unable to load two-factor authentication user.");
+    }
+
+    private async Task OnValidSubmitAsync()
+    {
+        var authenticatorCode = Input.TwoFactorCode!.Replace(" ", string.Empty).Replace("-", string.Empty);
+        var result = await SignInManager.TwoFactorAuthenticatorSignInAsync(
+            authenticatorCode, RememberMe, Input.RememberMachine);
+
+        if (result.Succeeded)
+        {
+            Logger.LogInformation("User logged in with 2fa.");
+            RedirectManager.RedirectTo(ReturnUrl ?? "dashboard");
+        }
+        else if (result.IsLockedOut)
+        {
+            Logger.LogWarning("User account locked out.");
+            RedirectManager.RedirectTo("Account/Login");
+        }
+        else
+        {
+            errorMessage = "Error: Invalid authenticator code.";
+        }
+    }
+
+    private sealed class InputModel
+    {
+        [Required]
+        [StringLength(7, MinimumLength = 6)]
+        [Display(Name = "Authenticator code")]
+        public string? TwoFactorCode { get; set; }
+
+        [Display(Name = "Remember this machine")]
+        public bool RememberMachine { get; set; }
+    }
+}

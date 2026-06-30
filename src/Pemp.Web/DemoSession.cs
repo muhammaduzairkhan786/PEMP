@@ -1,8 +1,10 @@
 namespace Pemp.Web;
 
 /// <summary>
-/// Stand-in for the signed-in identity during the demo — a role switcher in place of
-/// Entra SSO (task 9 swaps this for Microsoft.Identity.Web claims). Per-circuit (scoped).
+/// Per-circuit signed-in context. In the dev/local-Identity path it is populated in
+/// MainLayout from the authenticated user's role + display name; in production the same
+/// values come from Entra group / name claims. Pages read <see cref="Role"/> and
+/// <see cref="Actor"/> exactly as before. Per-circuit (scoped).
 /// </summary>
 public sealed class DemoSession
 {
@@ -11,14 +13,7 @@ public sealed class DemoSession
 
     public string Role { get; set; } = "Acme CA Officer";
 
-    public string Actor => Role switch
-    {
-        "Tester" => "A. Khan",
-        "Acme CA Officer" => "J. Okafor",
-        "Delivery Manager" => "M. Reyes",
-        "Stakeholder" => "P. Devlin",
-        _ => "S. Cole",
-    };
+    public string Actor { get; set; } = "J. Okafor";
 
     // ---- Object-level scope (SEC-AZN / SEC-INS-01) ----
     // A Stakeholder sees only their own application; a Tester only their assigned engagements.

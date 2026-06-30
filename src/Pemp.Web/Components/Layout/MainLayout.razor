@@ -1,6 +1,6 @@
 @inherits LayoutComponentBase
+@using Microsoft.AspNetCore.Components.Authorization
 @inject DemoSession Session
-@inject NavigationManager Nav
 
 <div class="shell">
     <div class="brand"><div class="logo">P</div><b>PEMP</b></div>
@@ -8,17 +8,19 @@
     <header class="topbar">
         <span class="eyebrow">Pentest Engagement Management</span>
         <span class="sp"></span>
-        <label class="muted" style="font-size:var(--text-xs)" for="roleSel">Viewing as</label>
-        <select id="roleSel" class="rolesel" @onchange="OnRole">
-            @foreach (var r in DemoSession.Roles)
-            {
-                <option value="@r" selected="@(r == Session.Role)">@r</option>
-            }
-        </select>
+        <div class="whoami">
+            <span class="whoami-name">@Session.Actor</span>
+            <span class="whoami-role">@Session.Role</span>
+        </div>
+        <form action="Account/Logout" method="post" class="logout-form">
+            <AntiforgeryToken />
+            <input type="hidden" name="returnUrl" value="" />
+            <button type="submit" class="btn ghost logout-btn">Sign out</button>
+        </form>
     </header>
 
     <nav class="side">
-        <NavLink href="" Match="NavLinkMatch.All">⌂ My Turn</NavLink>
+        <NavLink href="dashboard" Match="NavLinkMatch.All">⌂ My Turn</NavLink>
         @if (Session.Role == "Acme CA Officer")
         {
             <NavLink href="new-request">＋ New Request</NavLink>
@@ -42,10 +44,22 @@
 </div>
 
 @code {
-    void OnRole(ChangeEventArgs e)
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    protected override async Task OnInitializedAsync()
     {
-        Session.Role = e.Value?.ToString() ?? Session.Role;
-        // Land each role on its home: Admin → console, everyone else → My-Turn.
-        Nav.NavigateTo(Session.Role == "System Administrator" ? "/admin" : "/");
+        if (AuthState is null)
+        {
+            return;
+        }
+
+        var user = (await AuthState).User;
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            Session.Actor = user.FindFirst("DisplayName")?.Value
+                ?? user.Identity.Name
+                ?? Session.Actor;
+            Session.Role = Array.Find(DemoSession.Roles, user.IsInRole) ?? Session.Role;
+        }
     }
 }

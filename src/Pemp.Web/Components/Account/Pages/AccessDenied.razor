@@ -1,0 +1,12 @@
+@page "/Account/AccessDenied"
+@layout AuthLayout
+@attribute [AllowAnonymous]
+<PageTitle>Access denied · PEMP</PageTitle>
+
+<div class="auth-head">
+    <h1>Access denied</h1>
+    <p class="muted">Your role doesn't have access to that area. PEMP shows each role only its
+        own controls and data.</p>
+</div>
+
+<a class="btn primary auth-submit" href="dashboard">Back to My Turn</a>

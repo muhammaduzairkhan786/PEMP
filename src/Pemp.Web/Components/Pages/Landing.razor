@@ -1,0 +1,82 @@
+@page "/"
+@layout Pemp.Web.Components.Layout.EmptyLayout
+@attribute [AllowAnonymous]
+@inject NavigationManager Nav
+<PageTitle>PEMP — Pentest Engagement Management Platform</PageTitle>
+
+@if (_checked && !_authed)
+{
+    <div class="landing">
+        <header class="landing-nav">
+            <div class="landing-brand"><span class="logo">P</span><b>PEMP</b></div>
+            <a class="btn primary" href="Account/Login">Sign in</a>
+        </header>
+
+        <section class="landing-hero">
+            <span class="landing-eyebrow">CloudKonsult · for Acme Cyber Assurance</span>
+            <h1>The penetration-test engagement lifecycle, under control.</h1>
+            <p class="landing-lede">
+                PEMP runs every engagement end to end — intake, scoping, sign-off, testing,
+                findings and retest — in one guarded system of record. Stages cannot advance
+                until their preconditions are met, so nothing slips and nothing skips.
+            </p>
+            <div class="landing-cta">
+                <a class="btn primary lg" href="Account/Login">Sign in</a>
+                <span class="muted">Microsoft Entra SSO in production · local accounts in dev</span>
+            </div>
+        </section>
+
+        <section class="landing-grid">
+            <div class="landing-card">
+                <div class="landing-ic">⛓</div>
+                <h3>Enforcement, not record-keeping</h3>
+                <p class="muted">Testing can't begin without a signed Statement of Work and verified
+                    access. The state machine guards every gate.</p>
+            </div>
+            <div class="landing-card">
+                <div class="landing-ic">🛡</div>
+                <h3>Built for the data attackers want</h3>
+                <p class="muted">Vault-backed test credentials, encrypted evidence, and an
+                    append-only, tamper-evident audit log — with 2FA on every account.</p>
+            </div>
+            <div class="landing-card">
+                <div class="landing-ic">◎</div>
+                <h3>One story, every role</h3>
+                <p class="muted">Officers, delivery managers, testers and stakeholders each see the
+                    same engagement — with only their own controls and their own data.</p>
+            </div>
+            <div class="landing-card">
+                <div class="landing-ic">▦</div>
+                <h3>A live vulnerability register</h3>
+                <p class="muted">Each finding is entered once and flows into a consolidated register,
+                    tracked from open through remediated, retested and closed.</p>
+            </div>
+        </section>
+
+        <footer class="landing-foot muted">
+            UK-region hosted · UK GDPR &amp; ISO/IEC 27001 aligned · © 2026 CloudKonsult Limited
+        </footer>
+    </div>
+}
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private bool _checked;
+    private bool _authed;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthState is not null)
+        {
+            var user = (await AuthState).User;
+            _authed = user.Identity?.IsAuthenticated == true;
+        }
+        _checked = true;
+
+        if (_authed)
+        {
+            Nav.NavigateTo("dashboard");
+        }
+    }
+}
