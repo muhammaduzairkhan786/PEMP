@@ -65,7 +65,10 @@ else
 var useSqlite = builder.Configuration.GetValue("UseSqlite", true);
 var connectionString = builder.Configuration.GetConnectionString("Pemp")
                        ?? "Data Source=pemp-demo.db";
-builder.Services.AddPempInfrastructure(connectionString, useSqlite);
+// Audit HMAC key (SEC-AUD-01): dev reads it from Audit:HmacKey (appsettings.Development.json);
+// PROD MUST source it from Azure Key Vault via managed identity — never from config.
+var auditHmacKey = builder.Configuration["Audit:HmacKey"];
+builder.Services.AddPempInfrastructure(connectionString, useSqlite, auditHmacKey);
 
 // Per-circuit signed-in context (role + actor). Populated from the authenticated user in
 // MainLayout; carries the object-level scope used across the app (SEC-AZN / SEC-INS-01).
@@ -79,7 +82,8 @@ using (var scope = app.Services.CreateScope())
     var sp = scope.ServiceProvider;
     var db = sp.GetRequiredService<PempDbContext>();
     db.Database.EnsureCreated();
-    DemoSeeder.Seed(db, sp.GetRequiredService<Func<DateTimeOffset>>());
+    DemoSeeder.Seed(db, sp.GetRequiredService<Func<DateTimeOffset>>(),
+        sp.GetRequiredService<AuditHmacKey>().Value);
     if (!entraConfigured)
     {
         await UserSeeder.SeedAsync(sp); // dev Identity roles + one user per PEMP role

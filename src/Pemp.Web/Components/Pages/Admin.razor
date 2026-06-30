@@ -56,7 +56,8 @@
                 <span class="pill @(_chainOk == true ? "ok" : "warn")">@(_chainOk == true ? "🔗 verified" : "⚠ broken")</span>
             }
         </div>
-        <div class="q"><input class="inp" placeholder="filter by actor or action…" @bind="_filter" @bind:event="oninput" /></div>
+        <div class="q"><label class="qlabel" for="audit-filter">Filter audit log</label>
+            <input id="audit-filter" class="inp" placeholder="filter by actor or action…" @bind="_filter" @bind:event="oninput" /></div>
         <div class="card tablecard">
             <table class="t">
                 <thead><tr><th>#</th><th>Actor</th><th>Action</th><th>Before → After</th><th>When</th></tr></thead>
@@ -87,7 +88,10 @@
     protected override async Task OnInitializedAsync()
     {
         await Session.EnsureInitializedAsync(); // resolve role before the role check renders (SSR-safe)
-        _audit = await Store.AllAuditAsync();
+        // Verify-on-read (SEC-AUD-01): the tamper flag is surfaced automatically, not only on the manual button.
+        var (rows, intact) = await Store.AllAuditVerifiedAsync();
+        _audit = rows;
+        _chainOk = intact;
     }
 
     IEnumerable<AuditEntryRow> Filtered() =>

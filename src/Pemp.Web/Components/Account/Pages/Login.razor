@@ -74,8 +74,9 @@
 
     private async Task LoginUser()
     {
+        // Lock the account after repeated failures to blunt online password-guessing (SEC-IAM).
         var result = await SignInManager.PasswordSignInAsync(
-            Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false);
+            Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: true);
 
         if (result.Succeeded)
         {

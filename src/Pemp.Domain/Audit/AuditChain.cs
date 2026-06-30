@@ -27,21 +27,31 @@ public sealed record AuditEntry(
 
 /// <summary>
 /// Shared hash-chain primitives so any <see cref="IAuditChain"/> implementation
-/// (in-memory or DB-backed) chains identically (SEC-AUD-01).
+/// (in-memory or DB-backed) chains identically (SEC-AUD-01). The chain link is an
+/// HMAC-SHA256 keyed by a secret (<c>Audit:HmacKey</c>, in PROD from Azure Key Vault via
+/// managed identity) — so anyone who edits a persisted row cannot recompute a valid tail
+/// without the key, even with full database access. Genesis/sequence semantics are unchanged.
 /// </summary>
 public static class HashChain
 {
     public const string GenesisHash = "0000000000000000000000000000000000000000000000000000000000000000";
 
-    public static string ComputeHash(string input) =>
-        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(input))).ToLowerInvariant();
+    /// <summary>
+    /// Dev/test fallback HMAC key used only when no <c>Audit:HmacKey</c> is configured.
+    /// PRODUCTION MUST supply a real secret from Azure Key Vault — never rely on this default.
+    /// </summary>
+    public static readonly byte[] DefaultKey =
+        Encoding.UTF8.GetBytes("PEMP-DEV-AUDIT-HMAC-KEY-not-for-production");
 
-    /// <summary>Build the next chained entry from the previous hash + the new fields.</summary>
+    public static string ComputeHash(string input, byte[] key) =>
+        Convert.ToHexString(HMACSHA256.HashData(key, Encoding.UTF8.GetBytes(input))).ToLowerInvariant();
+
+    /// <summary>Build the next chained entry from the previous hash + the new fields, keyed-HMAC sealed.</summary>
     public static AuditEntry Next(long sequence, string prevHash, Guid engagementId, string actor,
-        string action, string before, string after, string source, DateTimeOffset at)
+        string action, string before, string after, string source, DateTimeOffset at, byte[] key)
     {
         var draft = new AuditEntry(sequence, engagementId, actor, action, before, after, at, source, prevHash, string.Empty);
-        return draft with { Hash = ComputeHash(draft.Canonical()) };
+        return draft with { Hash = ComputeHash(draft.Canonical(), key) };
     }
 }
 
@@ -65,12 +75,17 @@ public sealed class InMemoryHashChain : IAuditChain
     public const string GenesisHash = HashChain.GenesisHash;
 
     private readonly List<AuditEntry> _entries = new();
+    private readonly byte[] _key;
+
+    /// <param name="key">HMAC key; defaults to <see cref="HashChain.DefaultKey"/> for the in-memory model/tests.</param>
+    public InMemoryHashChain(byte[]? key = null) => _key = key ?? HashChain.DefaultKey;
+
     public IReadOnlyList<AuditEntry> Entries => _entries;
 
     public AuditEntry Append(Guid engagementId, string actor, string action, string before, string after, string source, DateTimeOffset at)
     {
         var prevHash = _entries.Count == 0 ? HashChain.GenesisHash : _entries[^1].Hash;
-        var entry = HashChain.Next(_entries.Count + 1, prevHash, engagementId, actor, action, before, after, source, at);
+        var entry = HashChain.Next(_entries.Count + 1, prevHash, engagementId, actor, action, before, after, source, at, _key);
         _entries.Add(entry);
         return entry;
     }
@@ -81,7 +96,7 @@ public sealed class InMemoryHashChain : IAuditChain
         foreach (var e in _entries)
         {
             if (e.PrevHash != prev) return false;
-            if (e.Hash != HashChain.ComputeHash(e.Canonical())) return false;
+            if (e.Hash != HashChain.ComputeHash(e.Canonical(), _key)) return false;
             prev = e.Hash;
         }
         return true;

@@ -87,7 +87,7 @@ h1.title{font-size:var(--text-2xl);font-weight:750;margin:4px 0 2px;letter-spaci
 .row:hover{border-color:var(--border-strong);transform:translateX(2px);box-shadow:var(--elev-raised)}
 .row .grow{flex:1;min-width:0} .row .verb{font-weight:600}
 .ref{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-muted)}
-.enggrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(296px,1fr));gap:var(--space-3)}
+.enggrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:var(--space-3)}
 .engcard{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-4);transition:all var(--dur-fast);display:block}
 .engcard:hover{transform:translateY(-2px);border-color:var(--border-strong);box-shadow:var(--elev-raised)}
 .engcard .top{display:flex;align-items:center;gap:8px} .engcard .nm{font-weight:700}

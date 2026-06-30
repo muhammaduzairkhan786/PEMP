@@ -1,5 +1,6 @@
 @* Evidence attached to findings (FR-FND-02, SEC-EVD): encrypted-at-rest, signed-URL access *@
 @inject EngagementStore Store
+@inject DemoSession Session
 
 @if (Findings.Count > 0)
 {
@@ -36,19 +37,23 @@
     {
         <div class="card">
             <div class="sectionlabel" style="margin-top:0">Attach evidence</div>
-            <div class="q"><select class="inp" @bind="_fid"><option value="">Finding…</option>@foreach (var f in Findings){<option value="@f.Id">@f.Title</option>}</select></div>
-            <div class="q"><input class="inp" placeholder="file name (e.g. poc.png)" @bind="_file" /></div>
-            <div class="q"><select class="inp" @bind="_kind">@foreach (var k in Enum.GetValues<EvidenceKind>()){<option value="@k">@k</option>}</select></div>
+            <div class="q"><label class="qlabel" for="ev-finding">Finding</label>
+                <select id="ev-finding" class="inp" @bind="_fid"><option value="">Finding…</option>@foreach (var f in Findings){<option value="@f.Id">@f.Title</option>}</select></div>
+            <div class="q"><label class="qlabel" for="ev-file">File name</label>
+                <input id="ev-file" class="inp" placeholder="file name (e.g. poc.png)" @bind="_file" /></div>
+            <div class="q"><label class="qlabel" for="ev-kind">Kind</label>
+                <select id="ev-kind" class="inp" @bind="_kind">@foreach (var k in Enum.GetValues<EvidenceKind>()){<option value="@k">@k</option>}</select></div>
             <div class="q" style="border:none">
-                <input class="inp" placeholder="note" @bind="_note" />
+                <label class="qlabel" for="ev-note">Note</label>
+                <input id="ev-note" class="inp" placeholder="note" @bind="_note" />
                 <button class="btn primary" style="margin-top:8px" @onclick="Add">Attach (encrypted) ▶</button>
-                @if (_msg is not null){<span class="muted" style="margin-left:10px">@_msg</span>}
+                @if (_msg is not null){<span class="muted" style="margin-left:10px" role="status" aria-live="polite">@_msg</span>}
             </div>
         </div>
     }
     else if (_msg is not null)
     {
-        <p class="muted" style="font-size:var(--text-sm)">@_msg</p>
+        <p class="muted" style="font-size:var(--text-sm)" role="status" aria-live="polite">@_msg</p>
     }
 }
 
@@ -76,7 +81,8 @@
     async Task Add()
     {
         if (!Guid.TryParse(_fid, out var fid) || string.IsNullOrWhiteSpace(_file)) { _msg = "Pick a finding and enter a file name."; return; }
-        await Store.AddEvidenceAsync(EngagementId, fid, _file.Trim(), _kind, _note.Trim());
+        await Store.AddEvidenceAsync(EngagementId, fid, _file.Trim(), _kind, _note.Trim(),
+            actor: Session.Actor, role: Session.Role);
         _file = ""; _note = ""; _msg = "Attached — encrypted at rest (SEC-EVD-01).";
         _evidence = await Store.EvidenceForAsync(EngagementId);
     }

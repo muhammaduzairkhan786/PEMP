@@ -1,5 +1,6 @@
 @* Conditional assessment questionnaire (workbook Tab 1 / FR-SCO-01). Auto-saves answers. *@
 @inject EngagementStore Store
+@inject DemoSession Session
 
 <div class="sectionlabel" style="margin-top:0">
     Completeness <span class="srs">FR-SCO-03</span>
@@ -14,16 +15,24 @@
         @foreach (var q in VisibleQuestions(section))
         {
             <div class="q">
-                <label class="qlabel">@q.Text</label>
+                @if (q.Type == QType.Checkbox)
+                {
+                    @* Checkbox group: the caption labels the set; each option is its own wrapped <label>. *@
+                    <span class="qlabel">@q.Text</span>
+                }
+                else
+                {
+                    <label class="qlabel" for="@q.Id">@q.Text</label>
+                }
                 @switch (q.Type)
                 {
                     case QType.YesNo:
-                        <select class="inp" disabled="@ReadOnly" value="@Val(q.Id)" @onchange="e => Save(q.Id, e)">
+                        <select id="@q.Id" class="inp" disabled="@ReadOnly" value="@Val(q.Id)" @onchange="e => Save(q.Id, e)">
                             <option value="">—</option><option>Yes</option><option>No</option>
                         </select>
                         break;
                     case QType.Radio:
-                        <select class="inp" disabled="@ReadOnly" value="@Val(q.Id)" @onchange="e => Save(q.Id, e)">
+                        <select id="@q.Id" class="inp" disabled="@ReadOnly" value="@Val(q.Id)" @onchange="e => Save(q.Id, e)">
                             <option value="">—</option>
                             @foreach (var o in q.Options!){ <option>@o</option> }
                         </select>
@@ -37,10 +46,10 @@
                         </div>
                         break;
                     case QType.LongText:
-                        <textarea class="inp" rows="2" disabled="@ReadOnly" value="@Val(q.Id)" @onchange="e => Save(q.Id, e)"></textarea>
+                        <textarea id="@q.Id" class="inp" rows="2" disabled="@ReadOnly" value="@Val(q.Id)" @onchange="e => Save(q.Id, e)"></textarea>
                         break;
                     default:
-                        <input class="inp" disabled="@ReadOnly" value="@Val(q.Id)" @onchange="e => Save(q.Id, e)" />
+                        <input id="@q.Id" class="inp" disabled="@ReadOnly" value="@Val(q.Id)" @onchange="e => Save(q.Id, e)" />
                         break;
                 }
             </div>
@@ -86,7 +95,7 @@
     {
         if (ReadOnly) return;
         Answers[id] = e.Value?.ToString() ?? "";
-        await Store.SaveAssessmentAnswerAsync(EngagementId, id, Answers[id]);
+        await Store.SaveAssessmentAnswerAsync(EngagementId, id, Answers[id], actor: Session.Actor, role: Session.Role);
         Recount();
     }
 
@@ -97,7 +106,7 @@
         if (e.Value is true) { if (!set.Contains(opt)) set.Add(opt); }
         else set.Remove(opt);
         Answers[id] = string.Join('|', set);
-        await Store.SaveAssessmentAnswerAsync(EngagementId, id, Answers[id]);
+        await Store.SaveAssessmentAnswerAsync(EngagementId, id, Answers[id], actor: Session.Actor, role: Session.Role);
         Recount();
     }
 }

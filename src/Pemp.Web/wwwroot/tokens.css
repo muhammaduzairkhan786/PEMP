@@ -81,14 +81,23 @@
 
   --sev-on:        #ffffff;
 
-  /* Amber/orange darkened for AA-readable TEXT on the light canvas — the vivid dark-mode
-     values fail contrast as foreground here. Distribution-bar fills (var(--sev-*) as a
-     background) remain perfectly legible at these deeper tones. Verified against:
-     .sevchip.medium/.high, .chip.crit-medium/.crit-high, .pill.warn/.wait/.retestpending,
-     .chip.retest. */
+  /* Status colours darkened for AA-readable TEXT on the light canvas (#fff / #f6f7fb) —
+     the vivid dark-mode values fail 4.5:1 as foreground here. Every value below clears
+     4.5:1 as text (ratios noted inline, computed vs #fff except --state-locked vs canvas).
+     Distribution-bar FILLS (var(--sev-*) as a background, no text) remain perfectly
+     legible at these deeper tones. Used as text in: .sevchip.*, .pill.*, .banner.*,
+     .chip.crit-*, .chip.retest, retest pass/fail, "encrypted ✓"/"✓ compliant", .auth-val,
+     and .node.locked .lbl/.bead. */
+  --sev-critical:  #d11919;   /* deep red — 5.43:1 on #fff */
   --sev-high:      #c2410c;   /* burnt orange */
-  --sev-medium:    #b7791f;   /* dark gold */
-  --state-waiting: #b7791f;   /* amber */
+  --sev-medium:    #8a5a00;   /* dark amber — 5.93:1 (was #b7791f, only 3.64:1) */
+  --sev-low:       #1366d6;   /* deep blue — 5.38:1 */
+  --sev-info:      #5a6477;   /* slate grey — 5.95:1 (matches --ink-muted) */
+
+  --state-waiting: #8a5a00;   /* dark amber — 5.93:1 (was #b7791f, only 3.64:1) */
+  --state-done:    #0f7a5f;   /* deep green — 5.29:1 */
+  --state-blocked: #c2271f;   /* deep red — 5.83:1 */
+  --state-locked:  #606a7e;   /* slate grey — 5.08:1 on canvas (was #6b7689, 4.29:1) */
 
   --elev-raised: 0 1px 2px rgba(20,30,60,.06), 0 4px 12px rgba(20,30,60,.08);
   --elev-drawer: -8px 0 32px rgba(20,30,60,.12);

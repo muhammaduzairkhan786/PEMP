@@ -17,17 +17,17 @@
     else
     {
         <div class="card">
-            <div class="q"><b>Type</b><br>
-                <select class="inp" @bind="_type">
+            <div class="q"><label class="qlabel" for="req-type"><b>Type</b></label>
+                <select id="req-type" class="inp" @bind="_type">
                     <option value="@EngagementType.Bau">BAU (routine / recurring)</option>
                     <option value="@EngagementType.Project">Project (release-tied, DM review)</option>
                 </select>
             </div>
-            <div class="q"><b>Application</b><br>
-                <input class="inp" @bind="_app" @bind:event="oninput" placeholder="e.g. Claims Portal" />
+            <div class="q"><label class="qlabel" for="req-app"><b>Application</b></label>
+                <input id="req-app" class="inp" @bind="_app" @bind:event="oninput" placeholder="e.g. Claims Portal" />
             </div>
-            <div class="q" style="border:none"><b>Criticality</b><br>
-                <select class="inp" @bind="_crit"><option>High</option><option>Medium</option><option>Low</option></select>
+            <div class="q" style="border:none"><label class="qlabel" for="req-crit"><b>Criticality</b></label>
+                <select id="req-crit" class="inp" @bind="_crit"><option>High</option><option>Medium</option><option>Low</option></select>
             </div>
         </div>
 

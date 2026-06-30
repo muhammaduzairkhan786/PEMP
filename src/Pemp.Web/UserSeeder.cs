@@ -22,6 +22,10 @@ public static class UserSeeder
         new("acme@pemp.dev",        "Acme CA Officer",      "J. Okafor"),
         new("dm@pemp.dev",          "Delivery Manager",     "M. Reyes"),
         new("tester@pemp.dev",      "Tester",               "A. Khan"),
+        // Every tester on the capacity board (DemoSeeder.Testers) gets a real login, so a tester the
+        // Delivery Manager assigns is never an orphan whose engagement can't be reached as that tester.
+        new("patel@pemp.dev",       "Tester",               "R. Patel"),
+        new("lee@pemp.dev",         "Tester",               "S. Lee"),
         new("stakeholder@pemp.dev", "Stakeholder",          "P. Devlin"),
         new("admin@pemp.dev",       "System Administrator", "S. Cole"),
     };

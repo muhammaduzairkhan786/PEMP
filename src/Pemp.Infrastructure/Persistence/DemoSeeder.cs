@@ -27,10 +27,10 @@ public static class DemoSeeder
         new(TesterLee, "S. Lee"),
     };
 
-    public static void Seed(PempDbContext db, Func<DateTimeOffset> clock)
+    public static void Seed(PempDbContext db, Func<DateTimeOffset> clock, byte[]? auditKey = null)
     {
         if (db.Engagements.Any()) return;
-        var chain = new EfAuditChain(db);
+        var chain = new EfAuditChain(db, auditKey ?? Pemp.Domain.Audit.HashChain.DefaultKey);
         const string dm = "M. Reyes", acme = "J. Okafor";
 
         // Claims Portal — Project, parked at the SoW sign-off gate (DM-reviewed, awaiting Acme).
@@ -97,7 +97,9 @@ public static class DemoSeeder
         // Live register (FR-FND): findings for the engagements that have reached testing.
         FindingRecord F(Guid eng, string title, Severity sev, string cvss, string vector, string asset, string remediation, FindingStatus status)
             => new() { Id = Guid.NewGuid(), EngagementId = eng, Title = title, Severity = sev, Cvss = cvss, CvssVector = vector, Asset = asset, Remediation = remediation, Status = status };
-        var fSqli = F(retail.Id, "SQLi in /claims search", Severity.High, "8.1", "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N", "Web", "Use parameterised queries; validate and allow-list input.", FindingStatus.RetestPending);
+        // Retail Web is mid-test and has NOT been retested, so its findings are Open (not RetestPending,
+        // which is only valid once a retest child is carrying them for re-verification).
+        var fSqli = F(retail.Id, "SQLi in /claims search", Severity.High, "8.1", "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N", "Web", "Use parameterised queries; validate and allow-list input.", FindingStatus.Open);
         var fXss = F(retail.Id, "Stored XSS in note field", Severity.High, "7.4", "CVSS:3.1/AV:N/AC:L/PR:L/UI:R/S:C/C:H/I:L/A:N", "Web", "Context-aware output encoding; CSP.", FindingStatus.Open);
         db.Findings.AddRange(
             F(retail.Id, "Auth bypass via JWT confusion", Severity.Critical, "9.1", "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N", "API", "Pin the signing algorithm; reject 'none'; verify 'kid'.", FindingStatus.Open),
