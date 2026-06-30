@@ -2,16 +2,16 @@
 @inject EngagementStore Store
 @inject DemoSession Session
 
-<div class="sectionlabel" style="margin-top:0">
-    Completeness <span class="srs">FR-SCO-03</span>
+<h2 class="sectionlabel" style="margin-top:0">
+    Completeness <Srs>FR-SCO-03</Srs>
     <span class="muted" style="margin-left:8px">@_answered / @_visible answered (@Pct%)</span>
-</div>
+</h2>
 <div class="meter"><i style="width:@Pct%"></i></div>
 
 @foreach (var section in VisibleSections())
 {
     <div class="card">
-        <div class="sectionlabel" style="margin-top:0">@section.Name</div>
+        <h3 class="sectionlabel" style="margin-top:0">@section.Name</h3>
         @foreach (var q in VisibleQuestions(section))
         {
             <div class="q">

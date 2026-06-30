@@ -16,7 +16,7 @@
     }
     else
     {
-        <div class="sectionlabel">Users &amp; roles <span class="srs">FR-ADM-01 · SEC-IAM-03</span></div>
+        <h2 class="sectionlabel">Users &amp; roles <Srs>FR-ADM-01 · SEC-IAM-03</Srs></h2>
         <div class="card tablecard">
             <table class="t">
                 <thead><tr><th>Name</th><th>Role (= Entra group)</th><th>Type</th><th>Conditional Access</th></tr></thead>
@@ -32,7 +32,7 @@
         </div>
         <p class="muted" style="font-size:var(--text-xs);margin-top:6px">Roles are Entra group membership — changed in Entra, reflected here. No local password store.</p>
 
-        <div class="sectionlabel">Integrations <span class="srs">FR-ADM-03 · CON-05</span></div>
+        <h2 class="sectionlabel">Integrations <Srs>FR-ADM-03 · CON-05</Srs></h2>
         <div class="card">
             <div class="q">Entra ID (SSO) <span class="pill ok">● connected</span></div>
             <div class="q">Mail / Teams <span class="pill ok">● connected</span></div>
@@ -40,7 +40,7 @@
             <div class="q" style="border:none">Azure Key Vault <span class="pill ok">● connected (managed identity)</span></div>
         </div>
 
-        <div class="sectionlabel">Configuration <span class="srs">FR-ADM-02/04 · FR-DOC-04</span></div>
+        <h2 class="sectionlabel">Configuration <Srs>FR-ADM-02/04 · FR-DOC-04</Srs></h2>
         <div class="card">
             <div class="q"><b>Templates</b> assessment · SoW · email</div>
             <div class="q"><b>SLA thresholds</b> assign 2d · sign 2d · QA 1d</div>
@@ -48,14 +48,14 @@
             <div class="q" style="border:none"><b>Feature flags</b> command palette · snooze</div>
         </div>
 
-        <div class="sectionlabel">
-            Global audit log <span class="srs">FR-AUD-03 · SEC-AUD-01</span>
+        <h2 class="sectionlabel">
+            Global audit log <Srs>FR-AUD-03 · SEC-AUD-01</Srs>
             <button class="btn ghost" style="margin-left:8px" @onclick="Verify">Verify chain</button>
             @if (_chainOk is not null)
             {
-                <span class="pill @(_chainOk == true ? "ok" : "warn")">@(_chainOk == true ? "🔗 verified" : "⚠ broken")</span>
+                <span class="pill @(_chainOk == true ? "ok" : "warn")" role="status" aria-live="polite">@(_chainOk == true ? "🔗 verified" : "⚠ broken")</span>
             }
-        </div>
+        </h2>
         <div class="q"><label class="qlabel" for="audit-filter">Filter audit log</label>
             <input id="audit-filter" class="inp" placeholder="filter by actor or action…" @bind="_filter" @bind:event="oninput" /></div>
         @if (!_loaded)

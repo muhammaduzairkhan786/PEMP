@@ -4,7 +4,7 @@
 
 @if (Findings.Count > 0)
 {
-    <div class="sectionlabel">Evidence <span class="srs">FR-FND-02 · SEC-EVD-01/02</span></div>
+    <h2 class="sectionlabel">Evidence <Srs>FR-FND-02 · SEC-EVD-01/02</Srs></h2>
     <div class="card">
         @if (_evidence.Count == 0)
         {
@@ -36,18 +36,22 @@
     @if (Editable)
     {
         <div class="card">
-            <div class="sectionlabel" style="margin-top:0">Attach evidence</div>
+            <h3 class="sectionlabel" style="margin-top:0">Attach evidence</h3>
             <div class="q"><label class="qlabel" for="ev-finding">Finding</label>
-                <select id="ev-finding" class="inp" @bind="_fid"><option value="">Finding…</option>@foreach (var f in Findings){<option value="@f.Id">@f.Title</option>}</select></div>
+                <select id="ev-finding" class="inp" @bind="_fid" @ref="_findingRef"
+                        aria-invalid="@(_invalid && string.IsNullOrEmpty(_fid) ? "true" : null)"
+                        aria-describedby="@(_invalid ? "ev-msg" : null)"><option value="">Finding…</option>@foreach (var f in Findings){<option value="@f.Id">@f.Title</option>}</select></div>
             <div class="q"><label class="qlabel" for="ev-file">File name</label>
-                <input id="ev-file" class="inp" placeholder="file name (e.g. poc.png)" @bind="_file" /></div>
+                <input id="ev-file" class="inp" placeholder="file name (e.g. poc.png)" @bind="_file" @ref="_fileRef"
+                       aria-invalid="@(_invalid && string.IsNullOrWhiteSpace(_file) ? "true" : null)"
+                       aria-describedby="@(_invalid ? "ev-msg" : null)" /></div>
             <div class="q"><label class="qlabel" for="ev-kind">Kind</label>
                 <select id="ev-kind" class="inp" @bind="_kind">@foreach (var k in Enum.GetValues<EvidenceKind>()){<option value="@k">@k</option>}</select></div>
             <div class="q" style="border:none">
                 <label class="qlabel" for="ev-note">Note</label>
                 <input id="ev-note" class="inp" placeholder="note" @bind="_note" />
                 <button class="btn primary" style="margin-top:8px" @onclick="Add">Attach (encrypted) ▶</button>
-                @if (_msg is not null){<span class="muted" style="margin-left:10px" role="status" aria-live="polite">@_msg</span>}
+                @if (_msg is not null){<span id="ev-msg" class="muted" style="margin-left:10px" role="status" aria-live="polite">@_msg</span>}
             </div>
         </div>
     }
@@ -67,6 +71,11 @@
     EvidenceKind _kind = EvidenceKind.Screenshot;
     string? _msg;
 
+    // Validation state: aria-invalid/describedby on the offending field(s) + focus-on-error.
+    bool _invalid;
+    bool _focusError;
+    ElementReference _findingRef, _fileRef;
+
     Guid _loadedId;
 
     // Reload when the engagement changes (e.g. navigating to a spawned retest child),
@@ -80,11 +89,26 @@
 
     async Task Add()
     {
-        if (!Guid.TryParse(_fid, out var fid) || string.IsNullOrWhiteSpace(_file)) { _msg = "Pick a finding and enter a file name."; return; }
+        if (!Guid.TryParse(_fid, out var fid) || string.IsNullOrWhiteSpace(_file))
+        {
+            _invalid = true; _msg = "Pick a finding and enter a file name."; _focusError = true;
+            return;
+        }
+        _invalid = false;
         await Store.AddEvidenceAsync(EngagementId, fid, _file.Trim(), _kind, _note.Trim(),
             actor: Session.Actor, role: Session.Role);
         _file = ""; _note = ""; _msg = "Attached — encrypted at rest (SEC-EVD-01).";
         _evidence = await Store.EvidenceForAsync(EngagementId);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusError)
+        {
+            _focusError = false;
+            // Focus the first offending control: the finding picker if unset, else the file name.
+            try { await (string.IsNullOrEmpty(_fid) ? _findingRef : _fileRef).FocusAsync(); } catch { /* not rendered */ }
+        }
     }
 
     void Mock(EvidenceRecord e) => _msg = $"A signed, short-lived URL would open '{e.FileName}' after re-authentication (SEC-EVD-02/03).";

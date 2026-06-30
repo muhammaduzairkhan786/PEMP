@@ -4,7 +4,7 @@
 
 @if (Reqs.Count > 0)
 {
-    <div class="sectionlabel">Access requirements <span class="srs">FR-ACC-01</span></div>
+    <h2 class="sectionlabel">Access requirements <Srs>FR-ACC-01</Srs></h2>
     <div class="card tablecard">
         <table class="t">
             <thead><tr><th>Environment / asset</th><th>URL / detail</th><th>Access</th><th>Status</th></tr></thead>
@@ -35,20 +35,21 @@
             </tbody>
         </table>
     </div>
-    <p class="muted" style="font-size:var(--text-xs);margin-top:8px">Tester defines required access per environment; app team provisions · <span class="srs">FR-ACC-02</span></p>
+    <p class="muted" style="font-size:var(--text-xs);margin-top:8px">Tester defines required access per environment; app team provisions<Srs Sep>FR-ACC-02</Srs></p>
 }
 else if (ShowEmpty)
 {
-    <div class="sectionlabel">Access requirements <span class="srs">FR-ACC-01</span></div>
+    <h2 class="sectionlabel">Access requirements <Srs>FR-ACC-01</Srs></h2>
     <div class="card muted">No access requirements defined yet.</div>
 }
 
 @if (Editable)
 {
     <div class="card">
-        <div class="sectionlabel" style="margin-top:0">Add an access requirement <span class="srs">FR-ACC-01</span></div>
+        <h3 class="sectionlabel" style="margin-top:0">Add an access requirement <Srs>FR-ACC-01</Srs></h3>
         <div class="q"><label class="qlabel" for="acc-env">Environment / asset</label>
-            <input id="acc-env" class="inp" placeholder="environment / asset (e.g. Pre-production)" @bind="_env" /></div>
+            <input id="acc-env" class="inp" placeholder="environment / asset (e.g. Pre-production)" @bind="_env" @ref="_envRef"
+                   aria-invalid="@(_invalid ? "true" : null)" aria-describedby="@(_invalid ? "acc-msg" : null)" /></div>
         <div class="q"><label class="qlabel" for="acc-url">URL / detail</label>
             <input id="acc-url" class="inp" placeholder="URL / detail" @bind="_url" /></div>
         <div class="q" style="border:none">
@@ -57,7 +58,7 @@ else if (ShowEmpty)
                 @foreach (var t in new[] { "Read", "Read-Write", "Admin", "Other" }){<option value="@t">@t</option>}
             </select>
             <button class="btn primary" style="margin-top:8px" @onclick="AddRow">Add requirement ▶</button>
-            @if (_msg is not null){<span class="muted" style="margin-left:10px" role="status" aria-live="polite">@_msg</span>}
+            @if (_msg is not null){<span id="acc-msg" class="muted" style="margin-left:10px" role="status" aria-live="polite">@_msg</span>}
         </div>
     </div>
 }
@@ -72,14 +73,33 @@ else if (ShowEmpty)
     string _env = "", _url = "", _type = "Read";
     string? _msg;
 
+    // Validation state for the required Environment field: aria-invalid/describedby + focus-on-error.
+    bool _invalid;
+    bool _focusError;
+    ElementReference _envRef;
+
     async Task AddRow()
     {
-        if (string.IsNullOrWhiteSpace(_env)) { _msg = "Enter an environment / asset."; return; }
+        if (string.IsNullOrWhiteSpace(_env))
+        {
+            _invalid = true; _msg = "Enter an environment / asset."; _focusError = true;
+            return;
+        }
+        _invalid = false;
         await Store.AddAccessRequirementAsync(EngagementId, _env.Trim(), _url.Trim(), _type,
             actor: Session.Actor, role: Session.Role);
         _env = _url = ""; _type = "Read";
         _msg = "Added — app team to provision (FR-ACC-02).";
         if (OnAdded.HasDelegate) await OnAdded.InvokeAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusError)
+        {
+            _focusError = false;
+            try { await _envRef.FocusAsync(); } catch { /* not rendered */ }
+        }
     }
 
     async Task SetStatus(AccessRequirementRecord r, ChangeEventArgs e)

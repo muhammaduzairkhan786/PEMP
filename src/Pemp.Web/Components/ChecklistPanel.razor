@@ -2,17 +2,17 @@
 @inject EngagementStore Store
 @inject DemoSession Session
 
-<div class="sectionlabel">
-    Tester checklist <span class="srs">SOP Tab 4</span>
+<h2 class="sectionlabel">
+    Tester checklist <Srs>SOP Tab 4</Srs>
     <span class="muted" style="margin-left:8px">@_done.Count / @ChecklistTemplate.TotalItems done</span>
-</div>
+</h2>
 <div class="meter"><i style="width:@Pct%"></i></div>
 
 @foreach (var g in ChecklistTemplate.Groups)
 {
     var gdone = g.Items.Count(i => _done.Contains(i.Code));
     <div class="card">
-        <div class="sectionlabel" style="margin-top:0">@g.Name <span class="muted">(@gdone / @g.Items.Length)</span></div>
+        <h3 class="sectionlabel" style="margin-top:0">@g.Name <span class="muted">(@gdone / @g.Items.Length)</span></h3>
         @foreach (var item in g.Items)
         {
             <label class="chkrow">

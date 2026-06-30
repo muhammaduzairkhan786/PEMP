@@ -1,5 +1,6 @@
-@* Compact spine for engagement cards *@
-<div class="minispine">
+@* Compact spine for engagement cards — purely decorative; the card already states the stage in text,
+   so hide this dot strip from assistive tech to avoid noise. *@
+<div class="minispine" aria-hidden="true">
     @for (var i = 0; i < Workflow.Spine.Length; i++)
     {
         var s = Workflow.Spine[i];

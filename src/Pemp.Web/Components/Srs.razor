@@ -1,0 +1,24 @@
+@* Internal SRS requirement-ID chip (FR-/SEC-/NFR- tokens). Rendered ONLY when traceability
+   mode is enabled (Ui:ShowTraceability=true) — hidden by default so non-technical roles aren't
+   shown internal requirement IDs (fleet rank 16). The IDs stay in the markup/code for traceability
+   regardless of the flag. Read defensively: a missing/blank/invalid key resolves to OFF. *@
+@inject IConfiguration Configuration
+
+@if (_show)
+{
+    @if (Sep){<text> · </text>}
+    <span class="srs">@ChildContent</span>
+}
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    // When true, emit the " · " separator *inside* the gated block so hiding the chip doesn't leave a
+    // dangling middot in the surrounding sentence. Use at call sites where the chip follows running text.
+    [Parameter] public bool Sep { get; set; }
+
+    bool _show;
+
+    protected override void OnInitialized() =>
+        _show = bool.TryParse(Configuration["Ui:ShowTraceability"], out var on) && on;
+}
