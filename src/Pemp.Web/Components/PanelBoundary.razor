@@ -1,0 +1,46 @@
+@* PanelBoundary.razor — wraps an interactive panel in an <ErrorBoundary> so an unhandled
+   exception in ONE panel renders a themed, logged, recoverable fallback instead of dropping the
+   whole interactive-server circuit to the ReconnectModal (fleet rank 31). The rest of the page
+   stays live; the user can reload just this section. *@
+@inject ILogger<PanelBoundary> Logger
+
+<ErrorBoundary @ref="_boundary">
+    <ChildContent>
+        @ChildContent
+    </ChildContent>
+    <ErrorContent Context="ex">
+        @{ LogOnce(ex); }
+        <div class="panelerr" role="alert">
+            <span class="panelerr-ic" aria-hidden="true">⚠</span>
+            <div class="panelerr-body">
+                <b>@(Label ?? "This section") couldn't be shown.</b>
+                <p class="panelerr-sub">Something went wrong rendering this panel. The rest of the engagement is unaffected, and no state was changed.</p>
+                <button type="button" class="btn ghost" @onclick="Recover">↻ Reload this panel</button>
+            </div>
+        </div>
+    </ErrorContent>
+</ErrorBoundary>
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    /// <summary>Human label for the panel (used in the fallback copy and the log line).</summary>
+    [Parameter] public string? Label { get; set; }
+
+    ErrorBoundary? _boundary;
+    Exception? _logged;
+
+    // Log once per distinct exception (ErrorContent re-renders on every parent render while in the
+    // error state). Idempotent on the exception reference so the log isn't spammed.
+    void LogOnce(Exception ex)
+    {
+        if (ReferenceEquals(ex, _logged)) return;
+        _logged = ex;
+        Logger.LogError(ex, "Panel '{Label}' threw and was contained by its boundary", Label ?? "(unlabelled)");
+    }
+
+    void Recover()
+    {
+        _logged = null;
+        _boundary?.Recover();
+    }
+}

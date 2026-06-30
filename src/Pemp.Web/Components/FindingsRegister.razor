@@ -1,4 +1,5 @@
 @* Live vulnerability register (FR-FND-01/03/04): severity distribution + filter chips + table *@
+@using System.Globalization
 @inject EngagementStore Store
 @inject DemoSession Session
 
@@ -81,9 +82,34 @@ else if (ShowEmpty)
             </select>
         </div>
         <div class="q"><label class="qlabel" for="fnd-asset">Asset</label>
-            <input id="fnd-asset" class="inp" placeholder="asset (e.g. Web, API)" @bind="_asset" /></div>
+            <input id="fnd-asset" class="inp" list="fnd-asset-options" autocomplete="off"
+                   placeholder="asset (e.g. Web, API)" @bind="_asset" />
+            @if (KnownAssets.Count > 0)
+            {
+                <datalist id="fnd-asset-options">
+                    @foreach (var a in KnownAssets){<option value="@a" />}
+                </datalist>
+            }
+        </div>
         <div class="q"><label class="qlabel" for="fnd-cvssvec">CVSS vector</label>
-            <input id="fnd-cvssvec" class="inp" placeholder="CVSS vector (e.g. CVSS:3.1/AV:N/AC:L/...)" @bind="_cvssVector" /></div>
+            <input id="fnd-cvssvec" class="inp" placeholder="CVSS vector (e.g. CVSS:3.1/AV:N/AC:L/...)"
+                   @bind="_cvssVector" @bind:event="oninput" @bind:after="DeriveCvss" />
+            <div class="cvss-live" role="status" aria-live="polite">
+                @if (_derived is { } d)
+                {
+                    <span class="cvss-score @SevClass(_derivedSeverity)">@d.ToString("0.0")</span>
+                    <span class="cvss-band @SevClass(_derivedSeverity)">@_derivedSeverity resolved live</span>
+                }
+                else if (!string.IsNullOrWhiteSpace(_cvssVector))
+                {
+                    <span class="cvss-hint">Incomplete vector — add AV/AC/PR/UI/S/C/I/A to resolve a score</span>
+                }
+                else
+                {
+                    <span class="cvss-hint">Score resolves live as you type the vector</span>
+                }
+            </div>
+        </div>
         <div class="q"><label class="qlabel" for="fnd-cvss">CVSS score</label>
             <input id="fnd-cvss" class="inp" style="max-width:160px" placeholder="CVSS score (e.g. 8.1)" @bind="_cvss" /></div>
         <div class="q"><label class="qlabel" for="fnd-remediation">Remediation</label>
@@ -115,6 +141,20 @@ else if (ShowEmpty)
     FindingStatus _status = FindingStatus.Open;
     string? _msg;
 
+    // Live CVSS derivation state — the base score parsed from the vector as the user types
+    // (the design's "CVSS resolving live" moment). Null until the vector is complete & valid.
+    double? _derived;
+    Severity _derivedSeverity = Severity.Info;
+
+    // Asset autocomplete: distinct assets already present in THIS engagement's findings (reuses
+    // the in-memory list — no store call), ordered for a stable suggestion list.
+    List<string> KnownAssets => Findings
+        .Select(f => f.Asset)
+        .Where(a => !string.IsNullOrWhiteSpace(a))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .OrderBy(a => a, StringComparer.OrdinalIgnoreCase)
+        .ToList();
+
     // Validation state for the required Title field: drives aria-invalid/aria-describedby and a
     // focus-the-error pass on submit (accessibility — fleet rank 27).
     bool _invalid;
@@ -145,6 +185,7 @@ else if (ShowEmpty)
             _cvssVector.Trim(), _asset.Trim(), _remediation.Trim(), Session.Caller, _status);
         _title = _asset = _cvss = _cvssVector = _remediation = "";
         _severity = Severity.Medium; _status = FindingStatus.Open;
+        _derived = null; _derivedSeverity = Severity.Info;
         _msg = "Recorded — live in the register (FR-FND-03).";
         if (OnAdded.HasDelegate) await OnAdded.InvokeAsync();
     }
@@ -163,6 +204,118 @@ else if (ShowEmpty)
     {
         await Store.SetFindingStatusAsync(f.Id, pass ? FindingStatus.Closed : FindingStatus.Open, Session.Caller);
         if (OnAdded.HasDelegate) await OnAdded.InvokeAsync();
+    }
+
+    // Live derivation: recompute the base score from the vector on each keystroke. On a complete,
+    // valid vector we auto-fill the score field and suggest the matching severity band (the user can
+    // still override either). Persistence is unchanged — the score is still passed as the string field.
+    void DeriveCvss()
+    {
+        _derived = Cvss31.BaseScore(_cvssVector);
+        if (_derived is { } score)
+        {
+            _derivedSeverity = SeverityFor(score);
+            _cvss = score.ToString("0.0", CultureInfo.InvariantCulture);
+            _severity = _derivedSeverity;
+        }
+    }
+
+    // CVSS 3.x qualitative band → finding severity (None maps to the register's "Info").
+    static Severity SeverityFor(double score) => score switch
+    {
+        >= 9.0 => Severity.Critical,
+        >= 7.0 => Severity.High,
+        >= 4.0 => Severity.Medium,
+        >= 0.1 => Severity.Low,
+        _ => Severity.Info,
+    };
+
+    static string SevClass(Severity s) => s.ToString().ToLowerInvariant();
+
+    /// <summary>
+    /// CVSS v3.1 base-score calculator (FIRST specification §7.1). Parses the vector string and
+    /// computes the base score client-side so the tester sees it resolve live. Returns null when the
+    /// vector is missing any required base metric or is otherwise unparseable.
+    /// </summary>
+    static class Cvss31
+    {
+        public static double? BaseScore(string? vector)
+        {
+            if (string.IsNullOrWhiteSpace(vector)) return null;
+            var m = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var tok in vector.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                var kv = tok.Split(':', 2);
+                if (kv.Length == 2) m[kv[0]] = kv[1];
+            }
+
+            // Require all eight base metrics; bail if any is absent or has an unknown value.
+            if (!TryAv(m, out var av) || !TryAc(m, out var ac) || !TryUi(m, out var ui) ||
+                !TryScope(m, out var changed) || !TryPr(m, out var pr, changed) ||
+                !TryImpact(m, "C", out var c) || !TryImpact(m, "I", out var i) || !TryImpact(m, "A", out var a))
+                return null;
+
+            var isc = 1.0 - (1.0 - c) * (1.0 - i) * (1.0 - a);
+            var impact = changed
+                ? 7.52 * (isc - 0.029) - 3.25 * Math.Pow(isc - 0.02, 15)
+                : 6.42 * isc;
+            if (impact <= 0) return 0.0;
+
+            var exploit = 8.22 * av * ac * pr * ui;
+            var raw = changed ? 1.08 * (impact + exploit) : impact + exploit;
+            return RoundUp(Math.Min(raw, 10.0));
+        }
+
+        // CVSS 3.1 round-up: smallest one-decimal number >= input (integer-arithmetic form, §Appendix A).
+        static double RoundUp(double input)
+        {
+            var intInput = (int)Math.Round(input * 100000, MidpointRounding.AwayFromZero);
+            return intInput % 10000 == 0
+                ? intInput / 100000.0
+                : (Math.Floor(intInput / 10000.0) + 1) / 10.0;
+        }
+
+        static bool TryAv(IDictionary<string, string> m, out double v) => Lookup(m, "AV", out v,
+            ("N", 0.85), ("A", 0.62), ("L", 0.55), ("P", 0.2));
+        static bool TryAc(IDictionary<string, string> m, out double v) => Lookup(m, "AC", out v,
+            ("L", 0.77), ("H", 0.44));
+        static bool TryUi(IDictionary<string, string> m, out double v) => Lookup(m, "UI", out v,
+            ("N", 0.85), ("R", 0.62));
+        static bool TryImpact(IDictionary<string, string> m, string key, out double v) => Lookup(m, key, out v,
+            ("H", 0.56), ("L", 0.22), ("N", 0.0));
+
+        static bool TryScope(IDictionary<string, string> m, out bool changed)
+        {
+            changed = false;
+            if (!m.TryGetValue("S", out var s)) return false;
+            if (s.Equals("C", StringComparison.OrdinalIgnoreCase)) { changed = true; return true; }
+            if (s.Equals("U", StringComparison.OrdinalIgnoreCase)) { changed = false; return true; }
+            return false;
+        }
+
+        // PR weight depends on Scope (Changed grants L/H higher weights).
+        static bool TryPr(IDictionary<string, string> m, out double v, bool changed)
+        {
+            v = 0;
+            if (!m.TryGetValue("PR", out var pr)) return false;
+            v = pr.ToUpperInvariant() switch
+            {
+                "N" => 0.85,
+                "L" => changed ? 0.68 : 0.62,
+                "H" => changed ? 0.50 : 0.27,
+                _ => -1,
+            };
+            return v >= 0;
+        }
+
+        static bool Lookup(IDictionary<string, string> m, string key, out double v, params (string K, double V)[] opts)
+        {
+            v = 0;
+            if (!m.TryGetValue(key, out var raw)) return false;
+            foreach (var (k, val) in opts)
+                if (raw.Equals(k, StringComparison.OrdinalIgnoreCase)) { v = val; return true; }
+            return false;
+        }
     }
 
     static string SevVar(Severity s) => s switch

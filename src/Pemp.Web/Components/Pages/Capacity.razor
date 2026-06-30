@@ -1,0 +1,67 @@
+@page "/capacity"
+@attribute [Authorize(Roles = PempRoles.DeliveryManager)]
+@inject EngagementStore Store
+@inject DemoSession Session
+<PageTitle>Capacity · PEMP</PageTitle>
+
+@* Delivery Manager capacity board (FR-ASG-02): active (non-closed) load per tester, so the DM
+   can see who is free before assigning. Counts come from the store's ActiveAssignmentCountsAsync;
+   every tester is listed (incl. idle ones) from the seeded roster. *@
+
+<div class="wrap">
+    <div class="eyebrow">Assignment</div>
+    <h1 class="title">Capacity board</h1>
+    <p class="sub">Active engagements per tester — pick the lightest load before you assign.</p>
+
+    @if (_rows is null)
+    {
+        <div aria-busy="true"><Skeleton Rows="4" /></div>
+    }
+    else
+    {
+        var max = _rows.Count == 0 ? 0 : _rows.Max(r => r.Count);
+        <div class="tiles">
+            <div class="tile"><div class="k">Testers</div><div class="v">@_rows.Count</div></div>
+            <div class="tile"><div class="k">Active engagements</div><div class="v">@_rows.Sum(r => r.Count)</div></div>
+            <div class="tile"><div class="k">Available now</div><div class="v">@_rows.Count(r => r.Count == 0)</div></div>
+        </div>
+
+        <h2 class="sectionlabel">Load by tester <Srs>FR-ASG-02</Srs></h2>
+        <div class="card tablecard">
+            <table class="t">
+                <thead><tr><th>Tester</th><th>Active load</th><th>Count</th></tr></thead>
+                <tbody>
+                    @foreach (var r in _rows)
+                    {
+                        <tr>
+                            <td>@r.Name</td>
+                            <td>
+                                <div class="meter" style="max-width:240px">
+                                    <span style="display:block;height:100%;border-radius:inherit;background:var(--brand);width:@(max == 0 ? 0 : 100 * r.Count / max)%"></span>
+                                </div>
+                            </td>
+                            <td class="mono">@(r.Count == 0 ? "free" : r.Count.ToString())</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    record Row(string Name, int Count);
+    List<Row>? _rows;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureInitializedAsync(); // resolve role/scope before any query (SSR-safe)
+        var counts = await Store.ActiveAssignmentCountsAsync();
+        // List every tester on the roster (idle ones show 0), busiest first.
+        _rows = DemoSeeder.Testers
+            .Select(t => new Row(t.Name, counts.TryGetValue(t.Name, out var c) ? c : 0))
+            .OrderByDescending(r => r.Count)
+            .ThenBy(r => r.Name)
+            .ToList();
+    }
+}

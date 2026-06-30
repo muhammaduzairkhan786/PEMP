@@ -1,0 +1,21 @@
+/* ReauthDialog — the scrim/modal shell themselves come from the global .scrim/.modal (reused
+   read-only). These scoped rules only refine the ceremony's attestation block so it reads as a
+   distinct "you are agreeing to…" panel in both themes via tokens. */
+
+.attest {
+    border-radius: var(--radius-md);
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    padding: var(--space-2) var(--space-3) var(--space-2) var(--space-6);
+    margin: var(--space-2) 0;
+}
+
+.attest li {
+    color: var(--ink);
+    margin: 4px 0;
+}
+
+/* Inline error inside the ceremony should never spill past the modal width. */
+.banner.err {
+    overflow-wrap: anywhere;
+}

@@ -1,0 +1,14 @@
+/* ⌘K discoverability hint on the My-Turn header — component-scoped, token-driven. */
+.kbdhint {
+    color: var(--ink-muted);
+    font-size: var(--text-xs);
+}
+
+.kbdhint kbd {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 1px 5px;
+    color: var(--ink-muted);
+}

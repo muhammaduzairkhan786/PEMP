@@ -1,0 +1,75 @@
+@* EngagementTabs.razor — the drawer-rail / progressive-disclosure tablist (DESIGN_PLAN §1.4/§4).
+   Implements the WAI-ARIA tabs pattern: role="tablist"/role="tab", aria-selected, roving tabindex,
+   and ArrowLeft/Right + Home/End keyboard navigation with automatic activation. The panels live in
+   the parent (which owns the store + lazy-loading); this component only renders the rail and reports
+   the active tab so only the active section renders/loads. Theme-correct in both themes via tokens. *@
+
+<div class="tabrail" role="tablist" aria-label="Engagement sections">
+    @for (var i = 0; i < Tabs.Count; i++)
+    {
+        var t = Tabs[i];
+        var idx = i;
+        var selected = t.Id == Active;
+        <button type="button" role="tab"
+                id="@($"tab-{t.Id}")"
+                class="tab @(selected ? "sel" : "")"
+                aria-selected="@(selected ? "true" : "false")"
+                aria-controls="@($"panel-{t.Id}")"
+                tabindex="@(selected ? "0" : "-1")"
+                @ref="_refs[t.Id]"
+                @onclick="() => SelectAsync(t.Id)"
+                @onkeydown="e => OnKeyAsync(e, idx)">
+            <span class="tab-ic" aria-hidden="true">@t.Icon</span>
+            <span class="tab-lbl">@t.Label</span>
+            @if (t.Badge is int b && b > 0)
+            {
+                <span class="tab-badge" aria-hidden="true">@b</span>
+            }
+        </button>
+    }
+</div>
+
+@code {
+    public sealed record TabItem(string Id, string Label, string Icon, int? Badge = null);
+
+    [Parameter, EditorRequired] public IReadOnlyList<TabItem> Tabs { get; set; } = Array.Empty<TabItem>();
+    [Parameter] public string Active { get; set; } = "";
+    [Parameter] public EventCallback<string> ActiveChanged { get; set; }
+
+    readonly Dictionary<string, ElementReference> _refs = new();
+    string? _focusTarget;
+
+    async Task SelectAsync(string id)
+    {
+        if (id == Active) return;
+        Active = id;
+        await ActiveChanged.InvokeAsync(id);
+    }
+
+    // Automatic-activation arrow-key model: ←/→ move and select the adjacent tab, Home/End jump to
+    // the ends. Selection moves DOM focus to the newly active tab (roving tabindex).
+    async Task OnKeyAsync(KeyboardEventArgs e, int current)
+    {
+        int target = e.Key switch
+        {
+            "ArrowRight" or "ArrowDown" => (current + 1) % Tabs.Count,
+            "ArrowLeft" or "ArrowUp" => (current - 1 + Tabs.Count) % Tabs.Count,
+            "Home" => 0,
+            "End" => Tabs.Count - 1,
+            _ => -1,
+        };
+        if (target < 0) return;
+        var id = Tabs[target].Id;
+        _focusTarget = id;
+        await SelectAsync(id);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusTarget is string id && _refs.TryGetValue(id, out var el))
+        {
+            _focusTarget = null;
+            try { await el.FocusAsync(); } catch { /* not rendered */ }
+        }
+    }
+}

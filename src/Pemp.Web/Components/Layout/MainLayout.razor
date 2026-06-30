@@ -23,13 +23,30 @@
     </header>
 
     <nav class="side">
+        @* Role-tailored noun-tabs (DESIGN_PLAN; ≤6 per role, NFR-USA-01). Each role sees only the
+           rollups it owns; the portfolio-wide Analytics tab is restricted to the portfolio roles. *@
         <NavLink href="dashboard" Match="NavLinkMatch.All" aria-current="@Cur("dashboard")">⌂ My Turn</NavLink>
         @if (Session.Role == PempRoles.AcmeOfficer)
         {
             <NavLink href="new-request" aria-current="@Cur("new-request")">＋ New Request</NavLink>
         }
         <NavLink href="engagements" aria-current="@Cur("engagements")">◉ Engagements</NavLink>
-        <NavLink href="analytics" aria-current="@Cur("analytics")">▦ Analytics</NavLink>
+        @if (Session.Role is PempRoles.AcmeOfficer or PempRoles.DeliveryManager)
+        {
+            <NavLink href="approvals" aria-current="@Cur("approvals")">✓ @(Session.Role == PempRoles.DeliveryManager ? "Reviews" : "Approvals")</NavLink>
+        }
+        @if (Session.Role == PempRoles.DeliveryManager)
+        {
+            <NavLink href="capacity" aria-current="@Cur("capacity")">▤ Capacity</NavLink>
+        }
+        @if (Session.Role == PempRoles.Tester)
+        {
+            <NavLink href="my-findings" aria-current="@Cur("my-findings")">⚑ Findings</NavLink>
+        }
+        @if (PempRoles.IsPortfolio(Session.Role))
+        {
+            <NavLink href="analytics" aria-current="@Cur("analytics")">▦ Analytics</NavLink>
+        }
         @if (Session.Role == PempRoles.Administrator)
         {
             <NavLink href="admin" aria-current="@Cur("admin")">⚙ Admin</NavLink>
@@ -38,6 +55,9 @@
     </nav>
 
     <main class="content" id="main" tabindex="-1">@Body</main>
+
+    @* ⌘K command palette — mounted once for the whole shell (the global key listener is in JS). *@
+    <CommandPalette />
 </div>
 
 <div id="blazor-error-ui" data-nosnippet>

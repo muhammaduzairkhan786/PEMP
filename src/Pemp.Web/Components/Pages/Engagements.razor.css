@@ -1,0 +1,62 @@
+/* Portfolio search / filter / sort controls. Dark+light via tokens; reuses global .inp / .fchip. */
+.portfolio-controls{
+    display:flex;
+    gap:var(--space-3);
+    flex-wrap:wrap;
+    align-items:center;
+    margin-bottom:var(--space-3);
+}
+
+.search-wrap{
+    position:relative;
+    flex:1 1 280px;
+    min-width:220px;
+    max-width:520px;
+}
+.search-icon{
+    position:absolute;
+    left:11px;
+    top:50%;
+    transform:translateY(-50%);
+    color:var(--ink-muted);
+    font-size:var(--text-md);
+    pointer-events:none;
+}
+.search-inp{
+    max-width:100%;
+    padding-left:32px;
+}
+/* tame the native search clear control so it tracks the theme */
+.search-inp::-webkit-search-cancel-button{ cursor:pointer; }
+
+.control-group{ flex:0 0 auto; }
+.sort-inp{
+    max-width:200px;
+    cursor:pointer;
+}
+
+.resultcount{
+    font-size:var(--text-xs);
+    margin:2px 0 var(--space-3);
+}
+
+.myturn-badge{
+    margin-left:auto;
+    color:var(--brand-glow);
+    font-size:var(--text-sm);
+    line-height:1;
+}
+
+.emptyfilter{
+    display:flex;
+    align-items:center;
+    gap:var(--space-3);
+    flex-wrap:wrap;
+}
+.clearbtn{ font-size:var(--text-xs); }
+
+@media (max-width:640px){
+    .portfolio-controls{ flex-direction:column; align-items:stretch; }
+    .search-wrap,.sort-inp{ max-width:100%; }
+    .sort-inp{ width:100%; }
+}

@@ -1,0 +1,175 @@
+@* ReauthDialog.razor — the SEC-IAM-04 step-up ceremony, extracted so it is defined once and reused
+   by the engagement gate actions and the credential reveal. Encapsulates the attestation modal,
+   the focus-trap + Esc/Enter handling, and (local Identity path) server-side fresh-TOTP verification.
+   The Entra path defers real step-up to Conditional Access and confirms directly (acr handled in prod).
+   OnConfirmed fires ONLY after a valid code (local) or immediately (Entra). The code is never logged. *@
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.Extensions.DependencyInjection
+@inject IConfiguration Configuration
+@inject IServiceProvider Services
+@inject IJSRuntime JS
+@inject ILogger<ReauthDialog> Logger
+@implements IAsyncDisposable
+
+@if (Open)
+{
+    <div class="scrim" @onclick="CancelAsync" @onkeydown="OnModalKey">
+        <div class="modal" @ref="_modalRef" tabindex="-1" role="dialog" aria-modal="true"
+             aria-labelledby="reauth-title" @onclick:stopPropagation="true">
+            <h3 id="reauth-title">@Title</h3>
+            @if (!string.IsNullOrEmpty(Intro))
+            {
+                <p class="muted" style="margin-bottom:12px">@Intro</p>
+            }
+            @if (Lines is { Length: > 0 })
+            {
+                <ul class="attest">@foreach (var l in Lines){<li>@l</li>}</ul>
+            }
+            @if (ShowChainNote)
+            {
+                <div class="chainline"><span class="tick">🔗</span> Creates an immutable, hash-chained record<Srs Sep>SEC-AUD-01</Srs></div>
+            }
+            @if (EntraConfigured)
+            {
+                <div class="reauthnote">🔐 Re-authenticate via Entra MFA before it commits<Srs Sep>SEC-IAM-04</Srs></div>
+            }
+            else
+            {
+                <div class="reauthnote">@NoteText<Srs Sep>SEC-IAM-04</Srs></div>
+                <input class="inp mono" style="max-width:200px;margin-top:8px" @bind="_totp" @bind:event="oninput"
+                       @onkeydown="OnTotpKey" inputmode="numeric" autocomplete="one-time-code" placeholder="123 456" aria-label="Authenticator code" />
+            }
+            @if (_modalError is not null)
+            {
+                <div class="banner err" style="margin-top:8px" role="alert">⛔ @_modalError</div>
+            }
+            <div class="actions">
+                <button class="btn ghost" @onclick="CancelAsync">Cancel</button>
+                <button class="btn primary" @onclick="ConfirmAsync">@(EntraConfigured ? EntraConfirmLabel : ConfirmLabel)</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    /// <summary>Whether the ceremony is showing. The parent owns this (it knows which action is gated).</summary>
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public string Intro { get; set; } = "";
+    /// <summary>Attestation bullet points the actor is agreeing to.</summary>
+    [Parameter] public string[]? Lines { get; set; }
+    /// <summary>Show the hash-chain immutability note (engagement gate actions; not credential reveal).</summary>
+    [Parameter] public bool ShowChainNote { get; set; }
+    [Parameter] public string NoteText { get; set; } = "🔐 Enter your current authenticator (TOTP) code to confirm this privileged action";
+    [Parameter] public string ConfirmLabel { get; set; } = "Verify & confirm ▶";
+    [Parameter] public string EntraConfirmLabel { get; set; } = "Confirm via Entra MFA ▶";
+    /// <summary>Context for the failure warning log (WHO/WHAT only — never the code).</summary>
+    [Parameter] public string LogContext { get; set; } = "";
+    /// <summary>Fires after a successful re-auth (valid TOTP locally, or immediately on the Entra path).</summary>
+    [Parameter] public EventCallback OnConfirmed { get; set; }
+    /// <summary>Fires on Cancel / Esc so the parent can close the ceremony.</summary>
+    [Parameter] public EventCallback OnCancelled { get; set; }
+
+    public bool EntraConfigured => !string.IsNullOrWhiteSpace(Configuration["AzureAd:ClientId"]);
+
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    string _totp = "";
+    string? _modalError;
+    ElementReference _modalRef;
+    bool _wasOpen;
+    bool _focusModal;
+    IJSObjectReference? _focusTrap;
+
+    // The parent toggles Open; detect the opening edge here to (re)arm focus + clear stale entry/error.
+    protected override void OnParametersSet()
+    {
+        if (Open && !_wasOpen) { _focusModal = true; _totp = ""; _modalError = null; }
+        _wasOpen = Open;
+    }
+
+    // Confirm the privileged action. Local path: a fresh authenticator TOTP code is verified
+    // server-side BEFORE OnConfirmed runs; a wrong/blank code blocks it and shows an inline error.
+    async Task ConfirmAsync()
+    {
+        if (EntraConfigured) { _totp = ""; await ReleaseFocusTrapAsync(); await OnConfirmed.InvokeAsync(); return; }
+
+        _modalError = null;
+        if (await VerifyTotpAsync(_totp))
+        {
+            _totp = "";
+            await ReleaseFocusTrapAsync();   // restore focus to the trigger before the modal unmounts
+            await OnConfirmed.InvokeAsync();
+        }
+        else
+        {
+            // Re-auth failure for a privileged action (SEC-IAM-04). Log WHO/WHAT — never the code.
+            Logger.LogWarning("Re-auth (TOTP) failed for {Context}", LogContext);
+            _modalError = "That authenticator code wasn't valid. Re-enter the current 6-digit code from your app.";
+        }
+    }
+
+    // Verify a fresh TOTP against the signed-in user's authenticator key (local Identity path only).
+    // The code is never logged. Returns false on any missing dependency so the action stays blocked.
+    async Task<bool> VerifyTotpAsync(string code)
+    {
+        if (string.IsNullOrWhiteSpace(code) || AuthState is null) return false;
+        var userManager = Services.GetService<UserManager<ApplicationUser>>();
+        if (userManager is null) return false;
+        var principal = (await AuthState).User;
+        var user = await userManager.GetUserAsync(principal);
+        if (user is null) return false;
+        var normalized = code.Replace(" ", string.Empty).Replace("-", string.Empty);
+        return await userManager.VerifyTwoFactorTokenAsync(
+            user, userManager.Options.Tokens.AuthenticatorTokenProvider, normalized);
+    }
+
+    async Task CancelAsync()
+    {
+        await ReleaseFocusTrapAsync();
+        _totp = ""; _modalError = null;
+        await OnCancelled.InvokeAsync();
+    }
+
+    async Task OnModalKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape") await CancelAsync();
+    }
+
+    // Enter on the TOTP field confirms (keyboard parity with the primary button); Esc-to-close is
+    // handled by OnModalKey on the scrim. The Entra path has no TOTP field.
+    async Task OnTotpKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await ConfirmAsync();
+    }
+
+    // Trap focus inside the ceremony dialog and move focus to the right control on open (the TOTP
+    // input on the local path; the first focusable on the Entra path) — accessibility (WCAG 2.4.3).
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusModal && Open)
+        {
+            _focusModal = false;
+            _focusTrap ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/focus-trap.js");
+            var initial = EntraConfigured ? null : "input[autocomplete='one-time-code']";
+            await _focusTrap.InvokeVoidAsync("activate", _modalRef, initial);
+        }
+    }
+
+    // Release the trap and return focus to the trigger. Called before the modal unmounts.
+    async Task ReleaseFocusTrapAsync()
+    {
+        if (_focusTrap is not null)
+        {
+            try { await _focusTrap.InvokeVoidAsync("release", _modalRef); } catch { /* circuit gone */ }
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_focusTrap is not null)
+        {
+            try { await _focusTrap.DisposeAsync(); } catch { /* circuit already torn down */ }
+        }
+    }
+}

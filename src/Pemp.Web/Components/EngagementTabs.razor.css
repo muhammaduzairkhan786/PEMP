@@ -1,0 +1,72 @@
+/* EngagementTabs — the horizontal drawer-rail. Scrolls horizontally on narrow viewports rather
+   than wrapping, so the rail always reads as one band. Tokens keep dark/light parity. */
+
+.tabrail {
+    display: flex;
+    gap: var(--space-1);
+    align-items: stretch;
+    border-bottom: 1px solid var(--border);
+    margin: var(--space-6) 0 var(--space-4);
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+
+.tab {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border: 0;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    background: transparent;
+    color: var(--ink-muted);
+    font: inherit;
+    font-size: var(--text-sm);
+    white-space: nowrap;
+    cursor: pointer;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    transition: color var(--dur-fast) var(--ease-standard),
+                background var(--dur-fast) var(--ease-standard),
+                border-color var(--dur-fast) var(--ease-standard);
+}
+
+.tab:hover {
+    color: var(--ink);
+    background: var(--surface-raised);
+}
+
+.tab.sel {
+    color: var(--brand-ink, var(--brand));
+    border-bottom-color: var(--brand);
+    font-weight: 600;
+}
+
+.tab:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+}
+
+.tab-ic {
+    font-size: var(--text-base);
+    line-height: 1;
+}
+
+.tab-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    line-height: 1;
+    color: var(--brand-ink, var(--brand));
+    background: var(--brand-soft);
+    border-radius: var(--radius-pill);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .tab { transition: none; }
+}

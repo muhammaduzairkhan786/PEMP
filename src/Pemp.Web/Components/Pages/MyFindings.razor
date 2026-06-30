@@ -1,0 +1,78 @@
+@page "/my-findings"
+@attribute [Authorize(Roles = PempRoles.Tester)]
+@inject EngagementStore Store
+@inject DemoSession Session
+<PageTitle>My findings · PEMP</PageTitle>
+
+@* Tester rollup (FR-FND-01/03): every OPEN finding across the tester's OWN engagements, in one
+   place, worst-first. Scope is the store's tester-scoped read; findings are pulled only for
+   engagements actually assigned to this tester (the peer-review Report queue is excluded here). *@
+
+<div class="wrap">
+    <div class="eyebrow">Live register</div>
+    <h1 class="title">My findings</h1>
+    <p class="sub">Open findings across your engagements — what still needs remediation.</p>
+
+    @if (_rows is null)
+    {
+        <div aria-busy="true"><Skeleton Rows="5" /></div>
+    }
+    else
+    {
+        <div class="tiles">
+            <div class="tile"><div class="k">Open findings</div><div class="v">@_rows.Count</div></div>
+            <div class="tile"><div class="k">Critical / High</div><div class="v">@_rows.Count(r => r.Finding.Severity <= Severity.High)</div></div>
+            <div class="tile"><div class="k">Engagements</div><div class="v">@_rows.Select(r => r.EngagementId).Distinct().Count()</div></div>
+        </div>
+
+        <h2 class="sectionlabel">Open findings <Srs>FR-FND-01</Srs></h2>
+        @if (_rows.Count == 0)
+        {
+            <div class="card muted">No open findings across your engagements. Nicely clear.</div>
+        }
+        else
+        {
+            <div class="card tablecard">
+                <table class="t">
+                    <thead><tr><th>Severity</th><th>Finding</th><th>Application</th><th>CVSS</th><th>Status</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var r in _rows)
+                        {
+                            <tr>
+                                <td><span class="sevchip @r.Finding.Severity.ToString().ToLowerInvariant()">@r.Finding.Severity</span></td>
+                                <td>@r.Finding.Title</td>
+                                <td class="muted">@r.AppName <span class="ref">@r.Reference</span></td>
+                                <td class="mono">@r.Finding.Cvss</td>
+                                <td class="muted">@r.Finding.Status</td>
+                                <td><a class="btn ghost" href="@($"engagement/{r.EngagementId}")" aria-label="Open @r.AppName">Open ▶</a></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    record Row(Guid EngagementId, string AppName, string Reference, FindingRecord Finding);
+    List<Row>? _rows;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureInitializedAsync(); // resolve role/scope before any query (SSR-safe)
+        var recs = await Store.ListScopedAsync(Session.AppScope, Session.TesterScope, Session.Role);
+        // Only the tester's OWN assignments — the scoped read also returns the peer-QA Report queue,
+        // which is other testers' work, so exclude those here.
+        var mine = recs.Where(r => Session.TesterScope is Guid id && r.AssignedTesterId == id).ToList();
+
+        var rows = new List<Row>();
+        foreach (var r in mine)
+        {
+            var findings = await Store.FindingsForAsync(r.Id);
+            foreach (var f in findings.Where(f => f.Status == FindingStatus.Open || f.Status == FindingStatus.RetestPending))
+                rows.Add(new Row(r.Id, r.AppName, r.Reference, f));
+        }
+        _rows = rows.OrderBy(x => x.Finding.Severity).ThenBy(x => x.AppName).ToList();
+    }
+}
