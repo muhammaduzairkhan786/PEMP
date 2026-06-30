@@ -75,11 +75,16 @@
             Logger.LogInformation("User logged in.");
             var user = await UserManager.FindByEmailAsync(Input.Email);
             // First sign-in: no authenticator yet → force enrolment before reaching the app.
+            // (A password sign-in for a 2FA-enabled account returns RequiresTwoFactor, not
+            // Succeeded — so when we get here 2FA is normally still off and this branch fires.)
             if (user is not null && !await UserManager.GetTwoFactorEnabledAsync(user))
             {
                 RedirectManager.RedirectTo("Account/EnableAuthenticator",
                     new() { ["returnUrl"] = ReturnUrl });
             }
+            // RedirectManager.RedirectTo is [DoesNotReturn] (it throws a NavigationException),
+            // so the branch above never falls through. This final call only runs in the edge
+            // case where the user couldn't be re-loaded; it also satisfies definite-return.
             RedirectManager.RedirectTo(ReturnUrl ?? "dashboard");
         }
         else if (result.RequiresTwoFactor)

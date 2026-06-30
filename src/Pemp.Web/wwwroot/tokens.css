@@ -39,7 +39,7 @@
   --state-locked:  #6b7689;   /* grey */
 
   /* ---- Type ---- */
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Inter, sans-serif;
+  --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Roboto, Arial, sans-serif;
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, monospace;
   --text-xs: .75rem;  --text-sm: .8125rem; --text-base: .9375rem;
   --text-lg: 1.0625rem; --text-xl: 1.375rem; --text-2xl: 1.75rem; --text-display: 2.5rem;
@@ -80,6 +80,15 @@
   --brand-glow-sh: 0 0 0 1px rgba(61,107,255,.45), 0 0 20px 2px rgba(47,84,214,.30);
 
   --sev-on:        #ffffff;
+
+  /* Amber/orange darkened for AA-readable TEXT on the light canvas — the vivid dark-mode
+     values fail contrast as foreground here. Distribution-bar fills (var(--sev-*) as a
+     background) remain perfectly legible at these deeper tones. Verified against:
+     .sevchip.medium/.high, .chip.crit-medium/.crit-high, .pill.warn/.wait/.retestpending,
+     .chip.retest. */
+  --sev-high:      #c2410c;   /* burnt orange */
+  --sev-medium:    #b7791f;   /* dark gold */
+  --state-waiting: #b7791f;   /* amber */
 
   --elev-raised: 0 1px 2px rgba(20,30,60,.06), 0 4px 12px rgba(20,30,60,.08);
   --elev-drawer: -8px 0 32px rgba(20,30,60,.12);

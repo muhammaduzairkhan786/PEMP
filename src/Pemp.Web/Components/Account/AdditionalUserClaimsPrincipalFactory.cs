@@ -29,6 +29,10 @@ internal sealed class AdditionalUserClaimsPrincipalFactory(
             {
                 identity.AddClaim(new Claim("PempRole", user.PempRole));
             }
+            // 2FA enrollment gate (local Identity path): the layout blocks app pages until
+            // the user has enrolled an authenticator. Re-issued on RefreshSignInAsync so the
+            // cookie carries the up-to-date value the moment 2FA is enabled.
+            identity.AddClaim(new Claim("tfa", user.TwoFactorEnabled ? "true" : "false"));
         }
         return principal;
     }

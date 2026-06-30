@@ -1,6 +1,8 @@
 @inherits LayoutComponentBase
 @using Microsoft.AspNetCore.Components.Authorization
 @inject DemoSession Session
+@inject NavigationManager NavigationManager
+@inject IConfiguration Configuration
 
 <div class="shell">
     <div class="brand"><div class="logo">P</div><b>PEMP</b></div>
@@ -8,6 +10,7 @@
     <header class="topbar">
         <span class="eyebrow">Pentest Engagement Management</span>
         <span class="sp"></span>
+        <button type="button" class="btn ghost themebtn" onclick="window.pempToggleTheme()" title="Toggle light / dark" aria-label="Toggle light or dark theme">◐ Theme</button>
         <div class="whoami">
             <span class="whoami-name">@Session.Actor</span>
             <span class="whoami-role">@Session.Role</span>
@@ -59,7 +62,20 @@
             Session.Actor = user.FindFirst("DisplayName")?.Value
                 ?? user.Identity.Name
                 ?? Session.Actor;
-            Session.Role = Array.Find(DemoSession.Roles, user.IsInRole) ?? Session.Role;
+            // No recognised role → no-privilege state (empty), not a misleading default that
+            // would expose role-gated nav (e.g. New Request) to an unmapped user.
+            Session.Role = Array.Find(DemoSession.Roles, user.IsInRole) ?? "";
+
+            // 2FA enrollment gate — LOCAL Identity path only. Entra (production) carries no
+            // "tfa" claim and enforces MFA via Conditional Access, so it is left untouched.
+            // EnableAuthenticator uses AuthLayout (not this layout), so there is no redirect loop.
+            if (!EntraConfigured && user.FindFirst("tfa")?.Value != "true")
+            {
+                NavigationManager.NavigateTo("Account/EnableAuthenticator", forceLoad: true);
+            }
         }
     }
+
+    private bool EntraConfigured =>
+        !string.IsNullOrWhiteSpace(Configuration["AzureAd:ClientId"]);
 }

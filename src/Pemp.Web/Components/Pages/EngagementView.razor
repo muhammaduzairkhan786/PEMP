@@ -3,6 +3,7 @@
 @inject EngagementStore Store
 @inject DemoSession Session
 @inject NavigationManager Nav
+@inject IConfiguration Configuration
 <PageTitle>Engagement · PEMP</PageTitle>
 
 @if (!_loaded)
@@ -46,10 +47,10 @@ else
                     <p class="muted" style="margin-bottom:12px">@ModalIntro()</p>
                     <ul class="attest">@foreach (var l in ModalLines()){<li>@l</li>}</ul>
                     <div class="chainline"><span class="tick">🔗</span> Creates an immutable, hash-chained record · <span class="srs">SEC-AUD-01</span></div>
-                    <div class="reauthnote">🔐 Re-authenticate via Entra MFA before it commits · <span class="srs">SEC-IAM-04</span></div>
+                    <div class="reauthnote">🔐 @(EntraConfigured ? "Re-authenticate via Entra MFA before it commits" : "Confirm this privileged action before it commits") · <span class="srs">SEC-IAM-04</span></div>
                     <div class="actions">
                         <button class="btn ghost" @onclick="Cancel">Cancel</button>
-                        <button class="btn primary" @onclick="() => Run(_reauthFor, true)">Confirm via Entra MFA ▶</button>
+                        <button class="btn primary" @onclick="() => Run(_reauthFor, true)">@(EntraConfigured ? "Confirm via Entra MFA ▶" : "Confirm ▶")</button>
                     </div>
                 </div>
             </div>
@@ -146,6 +147,11 @@ else
 
 @code {
     [Parameter] public Guid Id { get; set; }
+
+    // Honest gate copy: only the Entra (production) path performs a real MFA re-prompt. On the
+    // local Identity path there is no Entra, so the ceremony confirms intent without claiming an
+    // MFA step that doesn't happen. (A fresh-TOTP re-prompt is out of scope here.)
+    bool EntraConfigured => !string.IsNullOrWhiteSpace(Configuration["AzureAd:ClientId"]);
 
     EngagementRecord? _rec;
     List<AuditEntryRow> _audit = new();
