@@ -1,6 +1,7 @@
-/* ReauthDialog — the scrim/modal shell themselves come from the global .scrim/.modal (reused
-   read-only). These scoped rules only refine the ceremony's attestation block so it reads as a
-   distinct "you are agreeing to…" panel in both themes via tokens. */
+/* ReauthDialog — the SEC-IAM-04 step-up ceremony. The scrim/modal shell come from the global
+   .scrim/.modal (reused read-only); these scoped rules refine the attestation block, the
+   hash-chain note and the TOTP entry so the ceremony reads as deliberate and trustworthy.
+   Tokens only; dark/light parity. */
 
 .attest {
     border-radius: var(--radius-md);
@@ -12,7 +13,38 @@
 
 .attest li {
     color: var(--ink);
-    margin: 4px 0;
+    margin: var(--space-1) 0;
+}
+
+/* The immutability assurance reads as a quiet, confident line. */
+.chainline {
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--state-done) 9%, transparent);
+    border: 1px solid color-mix(in srgb, var(--state-done) 28%, transparent);
+    color: var(--ink-muted);
+}
+
+.reauthnote {
+    color: var(--ink);
+}
+
+/* The authenticator code: a deliberate, centered OTP field — the moment of the ceremony. */
+.reauth-totp {
+    display: block;
+    width: 100%;
+    max-width: 260px;
+    margin-top: var(--space-3);
+    text-align: center;
+    font-size: var(--text-xl);
+    letter-spacing: .28em;
+    font-variant-numeric: tabular-nums;
+    padding: var(--space-3) var(--space-4);
+}
+
+.reauth-totp::placeholder {
+    letter-spacing: .28em;
+    color: var(--ink-muted);
 }
 
 /* Inline error inside the ceremony should never spill past the modal width. */

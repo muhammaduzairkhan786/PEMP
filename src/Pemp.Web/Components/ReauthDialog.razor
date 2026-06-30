@@ -36,7 +36,7 @@
             else
             {
                 <div class="reauthnote">@NoteText<Srs Sep>SEC-IAM-04</Srs></div>
-                <input class="inp mono" style="max-width:200px;margin-top:8px" @bind="_totp" @bind:event="oninput"
+                <input class="inp mono reauth-totp" @bind="_totp" @bind:event="oninput"
                        @onkeydown="OnTotpKey" inputmode="numeric" autocomplete="one-time-code" placeholder="123 456" aria-label="Authenticator code" />
             }
             @if (_modalError is not null)

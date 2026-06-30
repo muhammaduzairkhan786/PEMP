@@ -1,0 +1,76 @@
+/* EvidencePanel — evidence artifacts as a calm, secure-feeling list. The cards, pills and buttons
+   come from the global sheet; these scoped rules group evidence by finding with a serif sub-heading,
+   a soft kind badge, and a clear privileged-download affordance. Tokens only; dark/light parity. */
+
+.evgrp {
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.evgrp:last-child {
+    border-bottom: none;
+}
+
+.evtitle {
+    font-family: var(--font-serif);
+    font-weight: 600;
+    font-size: var(--text-base);
+    letter-spacing: -.01em;
+    margin-bottom: var(--space-2);
+}
+
+.evtile {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    font-size: var(--text-sm);
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface-raised);
+    margin-bottom: var(--space-2);
+    transition: border-color var(--dur-fast) var(--ease-standard),
+                box-shadow var(--dur-fast) var(--ease-standard);
+}
+
+.evtile:hover {
+    border-color: var(--border-strong);
+    box-shadow: var(--elev-raised);
+}
+
+/* The kind glyph reads as a quiet, contained badge rather than a loose emoji. */
+.evkind {
+    flex: none;
+    width: 30px;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    font-size: var(--text-base);
+}
+
+.evtile .mono {
+    color: var(--ink);
+    font-weight: 600;
+}
+
+/* Privileged, re-auth-gated download: clay-tinted hover so the secure action stands out. */
+.evtile .btn.ghost:hover {
+    border-color: color-mix(in srgb, var(--brand) 45%, var(--border-strong));
+    color: var(--brand-glow);
+    background: color-mix(in srgb, var(--brand) 6%, transparent);
+}
+
+/* A gracious empty state inside the evidence card. */
+.card > .muted {
+    display: block;
+    text-align: center;
+    padding: var(--space-6) var(--space-4);
+    color: var(--ink-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .evtile { transition: none; }
+}

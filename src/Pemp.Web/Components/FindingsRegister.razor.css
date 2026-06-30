@@ -29,3 +29,95 @@
 .cvss-score.medium,.cvss-band.medium{ color:var(--sev-medium); }
 .cvss-score.low,.cvss-band.low{ color:var(--sev-low); }
 .cvss-score.info,.cvss-band.info{ color:var(--sev-info); }
+
+/* ---- The register as a calm, authoritative data composition ---- */
+
+/* Severity distribution: a confident banded bar with a soft frame and hairline dividers. */
+.distbar {
+    height: 14px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    margin: var(--space-2) 0 var(--space-4);
+    box-shadow: inset 0 1px 2px color-mix(in srgb, var(--ink) 8%, transparent);
+}
+
+.distbar span {
+    box-shadow: inset 1px 0 0 color-mix(in srgb, var(--canvas) 55%, transparent);
+}
+
+.distbar span:first-child {
+    box-shadow: none;
+}
+
+/* Filter chips: quiet by default, a warm clay fill when active. */
+.fchip {
+    font-weight: 600;
+}
+
+.fchip.on {
+    color: var(--brand-glow);
+    background: var(--brand-soft);
+    border-color: color-mix(in srgb, var(--brand) 32%, transparent);
+}
+
+/* The table: tabular numerals, generous rows, a subtle hover read. */
+table.t th {
+    letter-spacing: .08em;
+}
+
+table.t td {
+    vertical-align: top;
+    padding: var(--space-3) 10px;
+}
+
+table.t tbody tr {
+    transition: background var(--dur-fast) var(--ease-standard);
+}
+
+table.t tbody tr:hover {
+    background: color-mix(in srgb, var(--brand) 4%, transparent);
+}
+
+table.t td.mono {
+    font-variant-numeric: tabular-nums;
+}
+
+.sevchip {
+    font-weight: 700;
+    letter-spacing: .01em;
+}
+
+/* Retest verdict: tasteful paired buttons under the status pill. */
+.retestrow {
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+}
+
+.retestrow .btn {
+    padding: 5px 12px;
+    font-weight: 650;
+}
+
+.retestrow .retestpass:hover {
+    background: color-mix(in srgb, var(--state-done) 12%, transparent);
+    border-color: color-mix(in srgb, var(--state-done) 55%, transparent);
+}
+
+.retestrow .retestfail:hover {
+    background: color-mix(in srgb, var(--state-blocked) 12%, transparent);
+    border-color: color-mix(in srgb, var(--state-blocked) 55%, transparent);
+}
+
+/* Record-a-finding: a refined inline tool. The live-CVSS readout gets a quiet framed well. */
+.cvss-live {
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface-raised);
+    max-width: 560px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    table.t tbody tr { transition: none; }
+}
