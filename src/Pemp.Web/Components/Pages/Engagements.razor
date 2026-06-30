@@ -41,7 +41,7 @@
     protected override async Task OnInitializedAsync()
     {
         await Session.EnsureInitializedAsync(); // resolve role/scope before any query (SSR-safe)
-        _recs = await Store.ListScopedAsync(Session.AppScope, Session.TesterScope);
+        _recs = await Store.ListScopedAsync(Session.AppScope, Session.TesterScope, Session.Role);
     }
 
     static string TypeClass(EngagementType t) =>

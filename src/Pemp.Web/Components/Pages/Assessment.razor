@@ -64,7 +64,7 @@ else
         if (Id == _loadedId) return;
         _loadedId = Id;
         _loaded = false;
-        _rec = await Store.GetScopedAsync(Id, Session.AppScope, Session.TesterScope); // anti-BOLA
+        _rec = await Store.GetScopedAsync(Id, Session.AppScope, Session.TesterScope, Session.Role); // anti-BOLA
         if (_rec is not null) _answers = await Store.AssessmentAnswersAsync(Id);
         _loaded = true;
     }
@@ -74,6 +74,6 @@ else
         var result = await Store.ExecuteAsync(Id, e => e.CompleteAssessment(Session.Actor));
         _done = result.Ok;
         _err = result.Error;
-        _rec = await Store.GetScopedAsync(Id, Session.AppScope, Session.TesterScope);
+        _rec = await Store.GetScopedAsync(Id, Session.AppScope, Session.TesterScope, Session.Role);
     }
 }

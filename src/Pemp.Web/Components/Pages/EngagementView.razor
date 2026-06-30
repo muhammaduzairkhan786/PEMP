@@ -7,6 +7,8 @@
 @inject NavigationManager Nav
 @inject IConfiguration Configuration
 @inject IServiceProvider Services
+@inject IJSRuntime JS
+@implements IAsyncDisposable
 <PageTitle>Engagement · PEMP</PageTitle>
 
 @if (!_loaded)
@@ -135,9 +137,9 @@ else
         else
         {
             <div class="card">⏳ Waiting on <b>@next.OwnerRole</b> — "@next.Label". <span class="muted">You're viewing as @Session.Role.</span>
-                @if (next.Kind == ActionKind.CompleteAssessment && Session.Role == "Tester")
+                @if (next.Kind == ActionKind.CompleteAssessment && Session.Role == "Stakeholder")
                 {
-                    <div style="margin-top:10px"><a class="btn ghost" href="@($"engagement/{Id}/assessment")">Open assessment form (assist)</a></div>
+                    <div style="margin-top:10px"><a class="btn ghost" href="@($"engagement/{Id}/assessment")">Open assessment form (provide input)</a></div>
                 }
             </div>
         }
@@ -148,7 +150,8 @@ else
                             OnAdded="Load" />
 
         <TestCredentialsPanel EngagementId="Id" Credentials="_credentials"
-                              CanView="@(Session.Role == "Tester" && _rec.AssignedTesterName == Session.Actor)" />
+                              CanView="@(Session.Role == "Tester" && _rec.AssignedTesterName == Session.Actor)"
+                              ShowEmpty="@(_rec.CurrentStage == Stage.Access || _rec.CurrentStage == Stage.Execution)" />
 
         <FindingsRegister Findings="_findings" EngagementId="Id"
                           ShowEmpty="@((int)_rec.CurrentStage >= (int)Stage.Execution)"
@@ -225,6 +228,7 @@ else
     ActionKind _reauthFor = ActionKind.None;
     ElementReference _modalRef;
     bool _focusModal;
+    IJSObjectReference? _focusTrap;
 
     static string TesterName(Guid id) => Array.Find(DemoSeeder.Testers, t => t.Id == id)?.Name ?? "A. Khan";
 
@@ -292,12 +296,13 @@ else
     async Task ConfirmReauth()
     {
         var action = _reauthFor;
-        if (EntraConfigured) { await Run(action, true); return; }
+        if (EntraConfigured) { await ReleaseFocusTrapAsync(); await Run(action, true); return; }
 
         _modalError = null;
         if (await VerifyTotpAsync(_totp))
         {
             _totp = "";
+            await ReleaseFocusTrapAsync();   // restore focus to the trigger before the modal unmounts
             await Run(action, true);
         }
         else
@@ -321,22 +326,46 @@ else
             user, userManager.Options.Tokens.AuthenticatorTokenProvider, normalized);
     }
 
-    // Move focus into the gate-ceremony dialog when it opens (accessibility).
+    // Trap focus inside the gate-ceremony dialog and move focus to the right control on open
+    // (the TOTP input on the local path; the first focusable on the Entra path) — accessibility.
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (_focusModal && _reauthFor != ActionKind.None)
         {
             _focusModal = false;
-            await _modalRef.FocusAsync();
+            _focusTrap ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/focus-trap.js");
+            var initial = EntraConfigured ? null : "input[autocomplete='one-time-code']";
+            await _focusTrap.InvokeVoidAsync("activate", _modalRef, initial);
         }
     }
 
-    void OnModalKey(KeyboardEventArgs e)
+    // Release the trap and return focus to the trigger button. Called before the modal unmounts.
+    async Task ReleaseFocusTrapAsync()
     {
-        if (e.Key == "Escape") Cancel();
+        if (_focusTrap is not null)
+        {
+            try { await _focusTrap.InvokeVoidAsync("release", _modalRef); } catch { /* circuit gone */ }
+        }
     }
 
-    void Cancel() { _reauthFor = ActionKind.None; _totp = ""; _modalError = null; }
+    async Task OnModalKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape") await Cancel();
+    }
+
+    async Task Cancel()
+    {
+        await ReleaseFocusTrapAsync();
+        _reauthFor = ActionKind.None; _totp = ""; _modalError = null;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_focusTrap is not null)
+        {
+            try { await _focusTrap.DisposeAsync(); } catch { /* circuit already torn down */ }
+        }
+    }
 
     string ModalTitle() => _reauthFor switch
     {

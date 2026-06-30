@@ -74,9 +74,10 @@ else
         Enter the 6-digit code the app shows to finish:
         <EditForm Model="Input" FormName="send-code" OnValidSubmit="OnValidSubmitAsync" method="post">
             <DataAnnotationsValidator />
+            <label class="auth-label" for="code">Verification code</label>
             <div class="auth-codrow">
                 <InputText id="code" @bind-Value="Input.Code" class="inp auth-inp mono"
-                           autocomplete="off" inputmode="numeric" placeholder="123 456" />
+                           autocomplete="off" inputmode="numeric" aria-required="true" placeholder="123 456" />
                 <button type="submit" class="btn primary">Verify &amp; enable</button>
             </div>
             <ValidationMessage For="() => Input.Code" class="auth-val" />

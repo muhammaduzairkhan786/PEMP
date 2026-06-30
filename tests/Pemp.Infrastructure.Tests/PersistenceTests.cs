@@ -133,8 +133,9 @@ public sealed class PersistenceTests : IDisposable
         Assert.NotNull(await _store.GetScopedAsync(mobile, "Mobile App", null));
         Assert.Null(await _store.GetScopedAsync(claims, "Mobile App", null));
 
-        // Unrestricted (Acme/DM/Admin): reaches anything.
-        Assert.NotNull(await _store.GetScopedAsync(retail, null, null));
+        // Unrestricted (Acme/DM/Admin): reaches anything. A null role is now fail-closed (scoped),
+        // so an all-portfolio role must be named explicitly to pass with no filter.
+        Assert.NotNull(await _store.GetScopedAsync(retail, null, null, role: "Delivery Manager"));
     }
 
     [Fact]
@@ -367,6 +368,80 @@ public sealed class PersistenceTests : IDisposable
         var child = (await _store.FindingsForAsync(childId!.Value)).Single(f => f.Title == src.Title);
         Assert.Equal(src.CvssVector, child.CvssVector);   // previously dropped — now carried
         Assert.Equal(src.Remediation, child.Remediation);
+    }
+
+    [Fact]
+    public async Task Null_or_unknown_role_fails_closed_and_sees_zero_engagements()  // SEC-AZN (fail-closed)
+    {
+        // An authenticated principal whose role is blank/unknown/null is NOT the legacy "unrestricted"
+        // default: it is scoped and, with no concrete filter, must see the EMPTY portfolio.
+        Assert.Empty(await _store.ListScopedAsync(null, null, role: ""));        // blank role
+        Assert.Empty(await _store.ListScopedAsync(null, null, role: "Auditor")); // unknown role
+        Assert.Empty(await _store.ListScopedAsync(null, null, role: null));      // null role
+        Assert.Null(await _store.GetScopedAsync(IdOf("ENG-2026-0408"), null, null, role: ""));
+        Assert.Null(await _store.GetScopedAsync(IdOf("ENG-2026-0408"), null, null, role: null));
+
+        // A named all-portfolio role still reaches the full estate (the legitimate unrestricted path).
+        Assert.NotEmpty(await _store.ListScopedAsync(null, null, role: "Acme CA Officer"));
+    }
+
+    [Fact]
+    public async Task Tester_can_open_a_report_they_did_not_author_but_not_other_non_report_engagements()  // FR-REP-02 / anti-BOLA
+    {
+        // Drive Retail Web (assigned A. Khan) from Findings to Report so it enters the peer-QA queue.
+        var report = IdOf("ENG-2026-0408");
+        Assert.False((await _store.ExecuteAsync(report, e => e.GenerateDraft("A. Khan"))).Failed);
+        Assert.Equal(Stage.Report, (await _store.GetAsync(report))!.CurrentStage);
+
+        // R. Patel (a DIFFERENT tester) CAN open it for review (Report-stage review access),
+        var asReviewer = await _store.GetScopedAsync(report, null, "R. Patel", role: "Tester");
+        Assert.NotNull(asReviewer);
+        // and it surfaces in their scoped list (the QA queue), even though none are assigned to them.
+        Assert.Contains(await _store.ListScopedAsync(null, "R. Patel", role: "Tester"), e => e.Id == report);
+
+        // ...but a NON-Report engagement they didn't author stays blocked (anti-BOLA preserved).
+        var claimsAtSow = IdOf("ENG-2026-0412"); // at Sow, assigned A. Khan
+        Assert.Null(await _store.GetScopedAsync(claimsAtSow, null, "R. Patel", role: "Tester"));
+        Assert.DoesNotContain(await _store.ListScopedAsync(null, "R. Patel", role: "Tester"), e => e.Id == claimsAtSow);
+    }
+
+    [Fact]
+    public async Task Engagement_drives_author_to_report_then_independent_review_release_and_close()  // FR-REP-02/04 (P1 happy path)
+    {
+        // The end-to-end peer-QA path the lifecycle previously dead-ended on: author drafts → an
+        // INDEPENDENT tester reviews → release → Closed, all through the store with an intact chain.
+        var id = IdOf("ENG-2026-0408"); // Retail Web, assigned A. Khan, at Findings
+
+        // Author generates the draft → Report.
+        Assert.False((await _store.ExecuteAsync(id, e => e.GenerateDraft("A. Khan"))).Failed);
+
+        // The author CANNOT pass their own QA (no self-review backstop, FR-REP-02).
+        var selfReview = await _store.ExecuteAsync(id, e => e.PeerReview(DemoSeeder.TesterKhan, true, "A. Khan"));
+        Assert.True(selfReview.Failed);
+        Assert.False((await _store.GetAsync(id))!.PeerReviewPassed);
+
+        // An INDEPENDENT tester (R. Patel) passes QA, then Acme releases (re-auth) → Closed.
+        Assert.False((await _store.ExecuteAsync(id, e => e.PeerReview(DemoSeeder.TesterPatel, true, "R. Patel"))).Failed);
+        Assert.True((await _store.GetAsync(id))!.PeerReviewPassed);
+        Assert.False((await _store.ExecuteAsync(id, e => e.ReleaseFinal("J. Okafor", reAuthenticated: true))).Failed);
+
+        Assert.Equal(Stage.Closed, (await _store.GetAsync(id))!.CurrentStage);
+        Assert.True(new EfAuditChain(_db, Key).Verify());
+    }
+
+    [Fact]
+    public async Task AssignTester_records_the_assigned_tester_in_the_audit_after()  // FR-AUD-02 (before/after completeness)
+    {
+        var id = IdOf("ENG-2026-0423"); // Quote Engine, routed, awaiting assignment
+        var result = await _store.AssignTesterAsync(id, DemoSeeder.TesterLee, "S. Lee", "M. Reyes");
+        Assert.False(result.Failed);
+
+        var last = _db.AuditEntries.OrderByDescending(a => a.Sequence).First();
+        Assert.Equal("Tester.Assigned", last.Action);
+        Assert.Equal("Assignment", last.Before);
+        Assert.Contains("S. Lee", last.After);          // WHO was assigned is now captured, not just the stage
+        Assert.Contains("Scoping", last.After);         // ...alongside the stage move
+        Assert.True(new EfAuditChain(_db, Key).Verify());
     }
 
     public void Dispose()

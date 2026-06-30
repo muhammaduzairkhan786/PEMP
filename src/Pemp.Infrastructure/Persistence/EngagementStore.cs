@@ -40,21 +40,39 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
 
     /// <summary>
     /// Object-level scoped list (SEC-AZN/SEC-INS-01). Fails CLOSED: only an explicit all-portfolio
-    /// <paramref name="role"/> (Acme/DM/Admin) gets an unrestricted listing. A scoped role (Tester,
-    /// Stakeholder, or any non-portfolio role) MUST supply a concrete filter — if it arrives with no
-    /// filter, or a blank one, the result is empty, never the full portfolio. When <paramref name="role"/>
-    /// is null the legacy null=unrestricted contract is preserved for callers not yet role-aware.
+    /// <paramref name="role"/> (Acme/DM/Admin) gets an unrestricted listing. EVERY other role — a
+    /// scoped role (Tester, Stakeholder), an unknown/blank role, AND a null role — MUST supply a
+    /// concrete filter; with no filter, or a blank one, the result is empty, never the full portfolio.
+    /// (Null role is treated as fail-closed too: an authenticated-but-unmapped principal sees nothing,
+    /// not the whole estate.) A Tester additionally sees Report-stage engagements authored by a
+    /// DIFFERENT tester — the independent peer-QA review queue (FR-REP-02) — without losing anti-BOLA
+    /// elsewhere.
     /// </summary>
     public Task<List<EngagementRecord>> ListScopedAsync(string? appName, string? assignedToName, string? role = null)
     {
-        var scoped = role is not null && !AllPortfolioRoles.Contains(role);
+        var scoped = !AllPortfolioRoles.Contains(role ?? "");
         // Fail closed: a scoped role with no concrete filter at all sees nothing.
         if (scoped && appName is null && assignedToName is null)
             return Task.FromResult(new List<EngagementRecord>());
 
         var q = db.Engagements.AsNoTracking().AsQueryable();
         if (appName is not null) q = q.Where(e => e.AppName == appName || e.AppName == appName + " (retest)");
-        if (assignedToName is not null) q = q.Where(e => e.AssignedTesterName == assignedToName);
+        if (assignedToName is not null)
+        {
+            // A Tester's scope = own assignments ∪ Report-stage engagements authored by another tester
+            // (the peer-QA queue, FR-REP-02). A blank name still matches nothing (fail-closed) because
+            // the union only opens for a concrete, non-empty tester name.
+            if (role == "Tester" && !string.IsNullOrEmpty(assignedToName))
+            {
+                var name = assignedToName;
+                q = q.Where(e => e.AssignedTesterName == name
+                    || (e.CurrentStage == Stage.Report && e.AssignedTesterName != null && e.AssignedTesterName != name));
+            }
+            else
+            {
+                q = q.Where(e => e.AssignedTesterName == assignedToName);
+            }
+        }
         return q.OrderBy(e => e.Reference).ToListAsync();
     }
 
@@ -65,19 +83,29 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
     /// Object-level authorized fetch (anti-BOLA/IDOR, SEC-AZN-02): returns null if the record is
     /// outside the caller's scope, so a direct URL can't reach another app's or another tester's
     /// engagement. Fails CLOSED — see <see cref="ListScopedAsync"/>: only an all-portfolio
-    /// <paramref name="role"/> may pass with no filter; a scoped role with a missing/blank filter
-    /// gets nothing. A blank filter also yields nothing because the equality check below fails.
+    /// <paramref name="role"/> may pass with no filter; every other role (scoped, unknown, OR null)
+    /// with a missing/blank filter gets nothing. A Tester may additionally open a Report-stage
+    /// engagement authored by a DIFFERENT tester (the peer-QA review path, FR-REP-02); they are
+    /// STILL blocked from non-Report engagements they didn't author.
     /// </summary>
     public async Task<EngagementRecord?> GetScopedAsync(Guid id, string? appName, string? assignedToName, string? role = null)
     {
-        var scoped = role is not null && !AllPortfolioRoles.Contains(role);
+        var scoped = !AllPortfolioRoles.Contains(role ?? "");
         // Fail closed: a scoped role that supplied no concrete filter at all reaches nothing.
         if (scoped && appName is null && assignedToName is null) return null;
 
         var rec = await db.Engagements.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id);
         if (rec is null) return null;
         if (appName is not null && rec.AppName != appName && rec.AppName != appName + " (retest)") return null;
-        if (assignedToName is not null && rec.AssignedTesterName != assignedToName) return null;
+        if (assignedToName is not null)
+        {
+            var isAssigned = rec.AssignedTesterName == assignedToName;
+            // Peer-QA review access: a Report-stage engagement authored by another tester is in scope.
+            var isPeerReviewable = role == "Tester" && !string.IsNullOrEmpty(assignedToName)
+                && rec.CurrentStage == Stage.Report
+                && rec.AssignedTesterName != null && rec.AssignedTesterName != assignedToName;
+            if (!isAssigned && !isPeerReviewable) return null;
+        }
         return rec;
     }
 
@@ -309,7 +337,7 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
         if (rec is null) return Result.Fail("Engagement not found.");
         var chain = NewChain();
         var aggregate = rec.ToDomain(chain, clock);
-        var result = aggregate.AssignTester(testerId, actor);
+        var result = aggregate.AssignTester(testerId, actor, testerLabel: testerName);
         if (result.Failed) return result;
         rec.CopyFrom(aggregate);
         rec.AssignedTesterName = testerName;

@@ -63,10 +63,32 @@
     protected override async Task OnInitializedAsync()
     {
         await Session.EnsureInitializedAsync(); // resolve role/scope before any query (SSR-safe)
-        var recs = await Store.ListScopedAsync(Session.AppScope, Session.TesterScope);
+        // Pass the role so the fail-closed scope is enforced AND a Tester's peer-QA review queue
+        // (Report-stage engagements authored by another tester) is included (FR-REP-02).
+        var recs = await Store.ListScopedAsync(Session.AppScope, Session.TesterScope, Session.Role);
         _items = recs
-            .Select(r => { var n = Workflow.Next(r); return new Item(r, n.Label, n.OwnerRole); })
+            .Select(MakeItem)
             .Where(i => i.Owner != "")
             .ToList();
+    }
+
+    // Project the next move per engagement, with a Tester-specific peer-review framing so the
+    // independent reviewer can find the QA queue and the author isn't shown an action they can't do.
+    Item MakeItem(EngagementRecord r)
+    {
+        var n = Workflow.Next(r);
+        if (Session.Role == "Tester" && r.CurrentStage == Stage.Report && !r.PeerReviewPassed)
+        {
+            var isAuthor = r.AssignedTesterName == Session.Actor;
+            if (r.DraftGenerated)
+                return isAuthor
+                    ? new Item(r, "Awaiting independent peer review", "Peer reviewer")  // author waits
+                    : new Item(r, "Awaiting your peer review", "Tester");               // reviewer acts (FR-REP-02)
+            // No draft yet (returned for rework): only the author re-drafts; others just wait.
+            return isAuthor
+                ? new Item(r, "Re-draft report (address QA comments)", "Tester")
+                : new Item(r, "Awaiting re-draft by author", "Peer reviewer");
+        }
+        return new Item(r, n.Label, n.OwnerRole);
     }
 }

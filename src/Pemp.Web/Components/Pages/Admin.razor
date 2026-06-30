@@ -58,23 +58,30 @@
         </div>
         <div class="q"><label class="qlabel" for="audit-filter">Filter audit log</label>
             <input id="audit-filter" class="inp" placeholder="filter by actor or action…" @bind="_filter" @bind:event="oninput" /></div>
-        <div class="card tablecard">
-            <table class="t">
-                <thead><tr><th>#</th><th>Actor</th><th>Action</th><th>Before → After</th><th>When</th></tr></thead>
-                <tbody>
-                    @foreach (var a in Filtered())
-                    {
-                        <tr>
-                            <td class="mono">@a.Sequence</td>
-                            <td>@a.Actor</td>
-                            <td class="mono">@a.Action</td>
-                            <td class="mono muted">@a.Before → @a.After</td>
-                            <td class="muted">@a.Timestamp.ToString("dd MMM HH:mm")</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
+        @if (!_loaded)
+        {
+            <div class="card tablecard" aria-busy="true"><Skeleton Rows="6" /></div>
+        }
+        else
+        {
+            <div class="card tablecard">
+                <table class="t">
+                    <thead><tr><th>#</th><th>Actor</th><th>Action</th><th>Before → After</th><th>When</th></tr></thead>
+                    <tbody>
+                        @foreach (var a in Filtered())
+                        {
+                            <tr>
+                                <td class="mono">@a.Sequence</td>
+                                <td>@a.Actor</td>
+                                <td class="mono">@a.Action</td>
+                                <td class="mono muted">@a.Before → @a.After</td>
+                                <td class="muted">@a.Timestamp.ToString("dd MMM HH:mm")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
         <p class="muted" style="font-size:var(--text-xs);margin-top:6px">@_audit.Count entries · append-only · hash-chained. <a href="#" @onclick:preventDefault @onclick="Export">Export</a> @_exportMsg</p>
     }
 </div>
@@ -84,6 +91,7 @@
     string _filter = "";
     bool? _chainOk;
     string? _exportMsg;
+    bool _loaded;
 
     protected override async Task OnInitializedAsync()
     {
@@ -92,6 +100,7 @@
         var (rows, intact) = await Store.AllAuditVerifiedAsync();
         _audit = rows;
         _chainOk = intact;
+        _loaded = true; // gate the audit table on a skeleton so it never flashes empty before data resolves
     }
 
     IEnumerable<AuditEntryRow> Filtered() =>
