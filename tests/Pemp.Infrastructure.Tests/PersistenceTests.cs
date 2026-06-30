@@ -618,6 +618,33 @@ public sealed class PersistenceTests : IDisposable
         Assert.NotNull(await _store.GetScopedAsync(childId.Value, null, DemoSeeder.TesterKhan, role: "Tester"));
     }
 
+    // ---- Reference minting (rank 29) ---------------------------------------
+
+    [Fact]
+    public async Task Raise_mints_unique_references()  // rank 29 (no duplicate ENG-2026-NNNN)
+    {
+        var refs = new List<string>();
+        for (var i = 0; i < 6; i++)
+        {
+            var id = await _store.RaiseAsync(EngagementType.Bau, $"Fresh App {i}", "Low", Acme);
+            refs.Add((await _store.GetAsync(id))!.Reference);
+        }
+        Assert.Equal(refs.Count, refs.Distinct().Count());     // every minted reference is unique
+        Assert.All(refs, r => Assert.StartsWith("ENG-2026-", r));
+    }
+
+    [Fact]
+    public async Task Duplicate_reference_is_rejected_by_the_unique_index()  // rank 29 (the concurrency backstop)
+    {
+        var existing = _db.Engagements.First().Reference;
+        _db.Engagements.Add(new EngagementRecord
+        {
+            Id = Guid.NewGuid(), Reference = existing, AppId = Guid.NewGuid(),
+            AppName = "Collision", Criticality = "Low", CurrentStage = Stage.Intake,
+        });
+        await Assert.ThrowsAnyAsync<DbUpdateException>(() => _db.SaveChangesAsync());
+    }
+
     public void Dispose()
     {
         _db.Dispose();

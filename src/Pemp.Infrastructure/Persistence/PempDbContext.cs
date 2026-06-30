@@ -36,6 +36,11 @@ public sealed class PempDbContext(DbContextOptions<PempDbContext> options) : Ide
         var eng = b.Entity<EngagementRecord>();
         eng.HasKey(e => e.Id);
         eng.HasIndex(e => e.Reference).IsUnique();
+        // Indexes on the object-level scope columns (rank 29): every scoped read filters by AppId or
+        // AssignedTesterId (often combined with stage for the peer-QA queue), so these back the hot paths.
+        eng.HasIndex(e => e.AppId);
+        eng.HasIndex(e => e.AssignedTesterId);
+        eng.HasIndex(e => e.CurrentStage);
         eng.Property(e => e.Reference).IsRequired().HasMaxLength(32);
         eng.Property(e => e.AppName).IsRequired().HasMaxLength(200);
         eng.Property(e => e.Criticality).HasMaxLength(20);
@@ -55,6 +60,9 @@ public sealed class PempDbContext(DbContextOptions<PempDbContext> options) : Ide
         aud.HasKey(a => a.Sequence);
         aud.Property(a => a.Sequence).ValueGeneratedOnAdd(); // DB assigns the position (IDENTITY) — no client PK race
         aud.HasIndex(a => a.EngagementId);
+        // The global audit console pages by recency and filters by actor (FR-AUD-03) — index both (rank 29).
+        aud.HasIndex(a => a.Timestamp);
+        aud.HasIndex(a => a.Actor);
         aud.Property(a => a.Actor).HasMaxLength(200);
         aud.Property(a => a.Action).HasMaxLength(100);
         aud.Property(a => a.Before).HasMaxLength(1024);
