@@ -648,6 +648,34 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
     }
 
     /// <summary>
+    /// Complete the assessment (FR-SCO-03) as a DATA-DERIVED gate: the assessment can only be marked
+    /// complete once at least one assessment answer has actually been recorded — the domain guard is
+    /// fed the real fact, not a UI flag, so an empty questionnaire cannot advance the engagement.
+    /// </summary>
+    public async Task<Result> CompleteAssessmentAsync(Guid id, CallerContext caller)
+    {
+        var hasAnswers = await db.AssessmentAnswers.AnyAsync(a => a.EngagementId == id);
+        return await ExecuteAsync(id, caller, EngagementAction.CompleteAssessment,
+            e => e.CompleteAssessment(caller.Actor, assessmentDataPresent: hasAnswers));
+    }
+
+    /// <summary>
+    /// Verify access (FR-ACC-04) as a DATA-DERIVED gate: access is "verified" only once at least one
+    /// access requirement has been recorded AND every recorded requirement is provisioned (or marked
+    /// not-required). The real provisioning state — not a click — is passed into the domain guard, so
+    /// testing cannot begin while any requirement is still outstanding. Re-auth-gated (SEC-IAM-04).
+    /// </summary>
+    public async Task<Result> VerifyAccessAsync(Guid id, CallerContext caller, bool reAuthenticated)
+    {
+        var statuses = await db.AccessRequirements.AsNoTracking()
+            .Where(a => a.EngagementId == id).Select(a => a.Status).ToListAsync();
+        var provisioned = statuses.Count > 0
+            && statuses.All(s => s == AccessStatus.Provisioned || s == AccessStatus.NotRequired);
+        return await ExecuteAsync(id, caller, EngagementAction.VerifyAccess,
+            e => e.VerifyAccess(caller.Actor, reAuthenticated, accessProvisioned: provisioned));
+    }
+
+    /// <summary>
     /// Complete a retest child (FR-RET-03): the tester must have given every in-scope finding a
     /// pass/fail verdict first — completion is BLOCKED while any finding is still RetestPending.
     /// The verdict-recording happens via <see cref="SetFindingStatusAsync"/> (pass → Closed,

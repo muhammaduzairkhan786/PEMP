@@ -581,6 +581,60 @@ public sealed class PersistenceTests : IDisposable
             Func<TState, Exception?, string> formatter) => sink.Add((logLevel, formatter(state, exception)));
     }
 
+    // ---- Data-derived gates (rank 19) --------------------------------------
+
+    [Fact]
+    public async Task CompleteAssessment_is_a_data_derived_gate_requiring_recorded_answers()  // rank 19 / FR-SCO-03
+    {
+        var mobile = IdOf("ENG-2026-0421"); // at Scoping, assigned A. Khan, no answers seeded
+
+        // No answers recorded → completion is blocked and nothing advances.
+        var blocked = await _store.CompleteAssessmentAsync(mobile, Khan);
+        Assert.True(blocked.Failed);
+        Assert.Equal(Stage.Scoping, (await _store.GetAsync(mobile))!.CurrentStage);
+
+        // Record an answer, then completion succeeds (Scoping → SoW).
+        await _store.SaveAssessmentAnswerAsync(mobile, "app-type", "Web", Khan);
+        var ok = await _store.CompleteAssessmentAsync(mobile, Khan);
+        Assert.False(ok.Failed);
+        Assert.Equal(Stage.Sow, (await _store.GetAsync(mobile))!.CurrentStage);
+        Assert.True(new EfAuditChain(_db, Key).Verify());
+    }
+
+    [Fact]
+    public async Task VerifyAccess_is_a_data_derived_gate_requiring_provisioned_requirements()  // rank 19 / FR-ACC-04
+    {
+        var pay = IdOf("ENG-2026-0419"); // at Access, assigned A. Khan, requirements not all provisioned
+
+        var blocked = await _store.VerifyAccessAsync(pay, Khan, reAuthenticated: true);
+        Assert.True(blocked.Failed);
+        Assert.Equal(Stage.Access, (await _store.GetAsync(pay))!.CurrentStage);
+
+        // Provision every recorded requirement, then access verification succeeds (Access → Execution).
+        foreach (var r in await _store.AccessReqsForAsync(pay))
+            await _store.SetAccessStatusAsync(r.Id, AccessStatus.Provisioned, Khan);
+        var ok = await _store.VerifyAccessAsync(pay, Khan, reAuthenticated: true);
+        Assert.False(ok.Failed);
+        Assert.Equal(Stage.Execution, (await _store.GetAsync(pay))!.CurrentStage);
+        Assert.True(new EfAuditChain(_db, Key).Verify());
+    }
+
+    [Fact]
+    public async Task Retest_child_findings_link_back_to_their_original_for_provenance()  // rank 19 / FR-RET-02
+    {
+        var parentId = IdOf("ENG-2026-0399"); // Broker Portal, closed
+        var parentIds = (await _store.FindingsForAsync(parentId)).Select(f => f.Id).ToHashSet();
+
+        var (result, childId) = await _store.RequestRetestAsync(parentId, Acme);
+        Assert.False(result.Failed);
+
+        var children = await _store.FindingsForAsync(childId!.Value);
+        Assert.NotEmpty(children);
+        // Every carried child finding links back to a real parent finding (the before/after diff source).
+        Assert.All(children, c => Assert.NotNull(c.OriginalFindingId));
+        Assert.All(children, c => Assert.Contains(c.OriginalFindingId!.Value, parentIds));
+    }
+
     // ---- Stable-id object scope (rank 21, SEC-AZN-02) ----------------------
 
     [Fact]

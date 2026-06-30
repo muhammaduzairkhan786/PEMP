@@ -101,6 +101,39 @@ public class EngagementLifecycleTests
     }
 
     [Fact]
+    public void CompleteAssessment_is_blocked_when_no_assessment_data_is_present()  // FR-SCO-03 (data-derived gate)
+    {
+        var (e, _) = New();
+        Ok(e.RouteToDeliveryManager("acme"));
+        Ok(e.AssignTester(TesterA, "dm"));
+        Assert.Equal(Stage.Scoping, e.CurrentStage);
+
+        // No recorded answers → the gate refuses to advance; the engagement stays at Scoping.
+        Assert.False(e.CompleteAssessment("tester", assessmentDataPresent: false).Ok);
+        Assert.Equal(Stage.Scoping, e.CurrentStage);
+
+        // With recorded answers it advances to SoW.
+        Ok(e.CompleteAssessment("tester", assessmentDataPresent: true));
+        Assert.Equal(Stage.Sow, e.CurrentStage);
+    }
+
+    [Fact]
+    public void VerifyAccess_is_blocked_until_access_is_provisioned()  // FR-ACC-04 (data-derived gate)
+    {
+        var e = DriveToSow(out _);
+        Ok(e.SignSow("acme", reAuthenticated: true));
+        Assert.Equal(Stage.Access, e.CurrentStage);
+
+        // Unprovisioned access → blocked, even with re-auth.
+        Assert.False(e.VerifyAccess("tester", reAuthenticated: true, accessProvisioned: false).Ok);
+        Assert.Equal(Stage.Access, e.CurrentStage);
+
+        // Provisioned access → advances to Execution.
+        Ok(e.VerifyAccess("tester", reAuthenticated: true, accessProvisioned: true));
+        Assert.Equal(Stage.Execution, e.CurrentStage);
+    }
+
+    [Fact]
     public void Cannot_skip_stages()
     {
         var (e, _) = New();

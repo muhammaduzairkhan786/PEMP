@@ -413,10 +413,10 @@ else
         {
             ActionKind.RouteToDm        => await Store.ExecuteAsync(Id, caller, EngagementAction.RouteToDeliveryManager, e => e.RouteToDeliveryManager(actor)),
             ActionKind.AssignTester     => await Store.AssignTesterAsync(Id, _assignTesterId, TesterName(_assignTesterId), caller),
-            ActionKind.CompleteAssessment => await Store.ExecuteAsync(Id, caller, EngagementAction.CompleteAssessment, e => e.CompleteAssessment(actor)),
+            ActionKind.CompleteAssessment => await Store.CompleteAssessmentAsync(Id, caller),
             ActionKind.ReviewSow        => await Store.ExecuteAsync(Id, caller, EngagementAction.ReviewSow, e => e.ReviewSowAsDeliveryManager(actor)),
             ActionKind.SignSow          => await Store.ExecuteAsync(Id, caller, EngagementAction.SignSow, e => e.SignSow(actor, reauth)),
-            ActionKind.VerifyAccess     => await Store.ExecuteAsync(Id, caller, EngagementAction.VerifyAccess, e => e.VerifyAccess(actor, reauth)),
+            ActionKind.VerifyAccess     => await Store.VerifyAccessAsync(Id, caller, reauth),
             ActionKind.SendIr           => await Store.ExecuteAsync(Id, caller, EngagementAction.SendIrNotice, e => e.SendIrNotice(actor)),
             ActionKind.EndTest          => await Store.ExecuteAsync(Id, caller, EngagementAction.EndTest, e => e.EndTest(actor)),
             ActionKind.GenerateDraft    => await Store.ExecuteAsync(Id, caller, EngagementAction.GenerateDraft, e => e.GenerateDraft(actor)),
