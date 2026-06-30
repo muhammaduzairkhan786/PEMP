@@ -272,4 +272,17 @@ else
     app.MapAdditionalIdentityEndpoints(); // /Account/Logout
 }
 
+// Evidence download endpoint (SEC-EVD-02/03). The token is opaque, HMAC-signed, short-lived and
+// SINGLE-USE; it is only minted AFTER object-level scope + the re-auth step-up + a hash-chained
+// Evidence.Downloaded audit entry have all succeeded (see EngagementStore.RecordEvidenceDownloadAsync
+// and EvidencePanel). RequireAuthorization keeps it behind sign-in; an invalid / expired / already-used
+// token yields 404. Local dev streams a placeholder; prod hands out a Blob SAS instead of this path.
+app.MapGet("/evidence/download/{token}", (string token, Pemp.Infrastructure.Evidence.IEvidenceStorage storage) =>
+{
+    var ticket = storage.Redeem(token);
+    if (ticket is null) return Results.NotFound();
+    var (bytes, contentType, downloadName) = storage.Materialize(ticket);
+    return Results.File(bytes, contentType, downloadName);
+}).RequireAuthorization();
+
 app.Run();

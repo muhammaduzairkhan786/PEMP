@@ -23,6 +23,13 @@
             document.body.appendChild(a); a.click();
             document.body.removeChild(a); URL.revokeObjectURL(url);
         };
+        // Open a server-minted, short-lived signed download URL (evidence access, SEC-EVD-02/03).
+        window.pempOpenDownload = function (url) {
+            var a = document.createElement('a');
+            a.href = url; a.rel = 'noopener'; a.target = '_blank';
+            document.body.appendChild(a); a.click();
+            document.body.removeChild(a);
+        };
     </script>
     <ResourcePreloader />
     <link rel="stylesheet" href="tokens.css" />

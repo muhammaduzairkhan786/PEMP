@@ -696,6 +696,53 @@ public sealed class PersistenceTests : IDisposable
         Assert.Empty(await _store.OpenFindingCountsAsync(Array.Empty<Guid>()));
     }
 
+    // ---- Evidence download: scope + audit (rank 33 / SEC-EVD-02/03) --------
+
+    [Fact]
+    public async Task Evidence_download_is_authorized_and_audited()  // SEC-EVD-02/03 (per-download audit)
+    {
+        var id = IdOf("ENG-2026-0408"); // Retail Web, assigned A. Khan, has seeded evidence
+        var ev = (await _store.EvidenceForAsync(id)).First();
+        var auditBefore = _db.AuditEntries.Count();
+
+        var result = await _store.RecordEvidenceDownloadAsync(id, ev.Id, ev.FileName, Khan);
+
+        Assert.False(result.Failed);
+        Assert.Equal(auditBefore + 1, _db.AuditEntries.Count());
+        var last = _db.AuditEntries.OrderByDescending(a => a.Sequence).First();
+        Assert.Equal("Evidence.Downloaded", last.Action);
+        Assert.Equal("A. Khan", last.Actor);
+        Assert.Equal(ev.FileName, last.After);   // file LABEL only
+        Assert.True(new EfAuditChain(_db, Key).Verify());
+    }
+
+    [Fact]
+    public async Task Evidence_download_is_open_to_any_in_scope_role()  // SEC-EVD (read access ≠ tester-only write)
+    {
+        var id = IdOf("ENG-2026-0408"); // Retail Web — P. Devlin is the app stakeholder
+        var ev = (await _store.EvidenceForAsync(id)).First();
+        var stakeholder = CallerContext.ForStakeholder("P. Devlin", DemoSeeder.AppIdFor("Retail Web"));
+
+        var result = await _store.RecordEvidenceDownloadAsync(id, ev.Id, ev.FileName, stakeholder);
+        Assert.False(result.Failed);   // an in-scope stakeholder may download their app's evidence
+    }
+
+    [Fact]
+    public async Task Evidence_download_is_blocked_out_of_scope_and_audits_nothing()  // SEC-EVD / anti-BOLA
+    {
+        var id = IdOf("ENG-2026-0408"); // assigned A. Khan
+        var ev = (await _store.EvidenceForAsync(id)).First();
+        var lee = CallerContext.ForTester(DemoSeeder.TesterLee, "S. Lee"); // not assigned
+        var auditBefore = _db.AuditEntries.Count();
+
+        var result = await _store.RecordEvidenceDownloadAsync(id, ev.Id, ev.FileName, lee);
+
+        Assert.True(result.Failed);
+        Assert.Contains("scope", result.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(auditBefore, _db.AuditEntries.Count());   // nothing appended on denial
+        Assert.True(new EfAuditChain(_db, Key).Verify());
+    }
+
     // ---- Numeric CVSS score (rank 26 / FR-FND-01) --------------------------
 
     [Fact]

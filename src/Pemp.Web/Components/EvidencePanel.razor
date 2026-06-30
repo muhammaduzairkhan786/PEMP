@@ -1,6 +1,9 @@
 @* Evidence attached to findings (FR-FND-02, SEC-EVD): encrypted-at-rest, signed-URL access *@
+@using Pemp.Infrastructure.Evidence
 @inject EngagementStore Store
 @inject DemoSession Session
+@inject IEvidenceStorage Storage
+@inject IJSRuntime JS
 
 @if (Findings.Count > 0)
 {
@@ -25,8 +28,9 @@
                             <span class="pill ok">encrypted ✓</span>
                         }
                         <span class="muted">@e.Note</span>
-                        <a class="btn ghost" style="margin-left:auto" href="#" title="Re-auth required (SEC-EVD-03)"
-                           @onclick:preventDefault @onclick="() => Mock(e)">Signed link</a>
+                        <button type="button" class="btn ghost" style="margin-left:auto"
+                                title="Re-authentication required — opens a short-lived signed link (SEC-EVD-02/03)"
+                                @onclick="() => Ask(e)">🔐 Download</button>
                     </div>
                 }
             </div>
@@ -59,6 +63,19 @@
     {
         <p class="muted" style="font-size:var(--text-sm)" role="status" aria-live="polite">@_msg</p>
     }
+
+    @* Evidence download is a privileged, re-auth-gated action (SEC-EVD-03): the SAME step-up ceremony
+       as the credential reveal. Only after a valid re-auth is the download audited and a short-lived,
+       single-use signed URL minted + opened — see OnDownloadConfirmed. *@
+    <ReauthDialog Open="@(_downloadFor is not null)"
+                  Title="Download evidence"
+                  Intro="You are about to download an evidence artifact. This is a privileged action:"
+                  Lines="@DownloadLines"
+                  ShowChainNote="false"
+                  NoteText="🔐 Enter your current authenticator (TOTP) code to download this artifact"
+                  ConfirmLabel="Verify & download ▶"
+                  LogContext="@($"evidence download on {EngagementId}")"
+                  OnConfirmed="OnDownloadConfirmed" OnCancelled="OnDownloadCancelled" />
 }
 
 @code {
@@ -110,7 +127,36 @@
         }
     }
 
-    void Mock(EvidenceRecord e) => _msg = $"A signed, short-lived URL would open '{e.FileName}' after re-authentication (SEC-EVD-02/03).";
+    // ---- Re-auth-gated, audited signed-URL download (SEC-EVD-02/03) ----
+    static readonly string[] DownloadLines =
+    {
+        "Opens a short-lived, single-use signed link to the artifact",
+        "Every download is recorded in the tamper-evident audit log",
+        "Handle per the engagement's data-handling rules",
+    };
+
+    EvidenceRecord? _downloadFor;
+
+    void Ask(EvidenceRecord e) { _downloadFor = e; _msg = null; }
+
+    void OnDownloadCancelled() => _downloadFor = null;
+
+    // Runs only AFTER the ReauthDialog confirms a valid re-auth. Authorize + audit the download
+    // server-side (object-level scope + hash-chained Evidence.Downloaded); only on success mint a
+    // short-lived signed URL and open it. A failed authorization never mints a link.
+    async Task OnDownloadConfirmed()
+    {
+        var e = _downloadFor;
+        _downloadFor = null;
+        if (e is null) return;
+
+        var result = await Store.RecordEvidenceDownloadAsync(EngagementId, e.Id, e.FileName, Session.Caller);
+        if (result.Failed) { _msg = result.Error; return; }
+
+        var url = Storage.CreateDownloadUrl(e);
+        _msg = $"Signed link issued for '{e.FileName}' — downloaded (audited, SEC-EVD-02/03).";
+        await JS.InvokeVoidAsync("pempOpenDownload", url);
+    }
 
     static string KindIcon(EvidenceKind k) => k switch
     {

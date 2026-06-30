@@ -314,6 +314,36 @@ public sealed class EngagementStore(PempDbContext db, Func<DateTimeOffset> clock
         await db.SaveChangesAsync();
     }
 
+    /// <summary>
+    /// Authorize + AUDIT an evidence download (SEC-EVD-02/03), atomically appending a hash-chained
+    /// <c>Evidence.Downloaded</c> entry. Object-level scope is enforced with the SAME predicate as a
+    /// scoped read (anti-BOLA, fail-closed) — viewing an engagement in scope implies the right to
+    /// download its evidence, so this is open to any in-scope role (not just the assigned tester),
+    /// unlike a data WRITE. The re-auth step-up is enforced by the caller (the ReauthDialog ceremony)
+    /// BEFORE this is invoked, and the short-lived signed URL is minted only after this succeeds. The
+    /// file LABEL is recorded — never the bytes, a path, or any secret. Nothing is audited on failure.
+    /// </summary>
+    public async Task<Result> RecordEvidenceDownloadAsync(Guid engagementId, Guid evidenceId, string fileLabel, CallerContext caller)
+    {
+        var rec = await db.Engagements.FirstOrDefaultAsync(e => e.Id == engagementId);
+        if (rec is null) return Result.Fail("Engagement not found.");
+        if (!InScope(rec, caller.AppScope, caller.TesterScope, caller.Role))
+        {
+            _log.LogWarning(
+                "SEC-EVD: evidence download REJECTED on engagement {EngagementId} for actor={Actor} role={Role}: outside scope. CorrelationId={CorrelationId}",
+                engagementId, caller.Actor, caller.Role, Corr);
+            return Result.Fail("Not authorized for this engagement — outside your scope (SEC-AZN-02).");
+        }
+        var ev = await db.Evidence.AsNoTracking().FirstOrDefaultAsync(e => e.Id == evidenceId && e.EngagementId == engagementId);
+        if (ev is null) return Result.Fail("Evidence not found.");
+        StageAudit(engagementId, caller.Actor, caller.Role, "Evidence.Downloaded", "-", fileLabel);
+        await db.SaveChangesAsync();
+        _log.LogInformation(
+            "Evidence.Downloaded on {EngagementId} by actor={Actor} role={Role}. CorrelationId={CorrelationId}",
+            engagementId, caller.Actor, caller.Role, Corr);
+        return Result.Success();
+    }
+
     public bool VerifyChain() => NewChain().Verify();
 
     /// <summary>Global audit log for the admin console (FR-AUD-03), newest first; optional paging.</summary>
